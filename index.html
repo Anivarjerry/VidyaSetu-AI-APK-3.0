@@ -1,0 +1,364 @@
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content" />
+    <title>VidyaSetu AI - Premium</title>
+    <meta name="description" content="School Management System" />
+    <meta name="google-site-verification" content="7trvpsGQ27VmYnR6enGkTPfDKqpeT2Hv7sEQMOYsU5s" />
+    
+    <!-- Initial Theme Color (Green to match new splash) -->
+    <meta name="theme-color" content="#10b981">
+    
+    <!-- Favicon & Icons -->
+    <link rel="icon" type="image/png" sizes="192x192" href="/android/android-launchericon-192-192.png">
+    <link rel="apple-touch-icon" href="/ios/180.png">
+
+    <!-- RAZORPAY SCRIPT -->
+    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+
+    <script>
+      (function() {
+        const savedTheme = localStorage.getItem('vidyasetu_theme');
+        const theme = savedTheme || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        if (theme === 'dark') {
+          document.documentElement.classList.add('dark');
+        } else {
+          document.documentElement.classList.remove('dark');
+        }
+      })();
+    </script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          extend: {
+            colors: {
+              brand: {
+                50: '#ecfdf5',
+                100: '#d1fae5',
+                500: '#10b981',
+                600: '#059669',
+                700: '#047857',
+              },
+              dark: {
+                950: '#020617',
+                900: '#0f172a',
+                800: '#1e293b',
+              }
+            },
+            fontFamily: {
+              sans: ['Inter', 'system-ui', 'sans-serif'],
+            },
+            animation: {
+              'glow-soft': 'glow-soft 3s ease-in-out infinite alternate',
+              'float': 'float 10s ease-in-out infinite',
+            },
+            keyframes: {
+              'glow-soft': {
+                'from': { 'filter': 'drop-shadow(0 0 1px rgba(16, 185, 129, 0.2))' },
+                'to': { 'filter': 'drop-shadow(0 0 4px rgba(16, 185, 129, 0.4))' }
+              },
+              float: {
+                '0%, 100%': { transform: 'translateY(0) scale(1)' },
+                '50%': { transform: 'translateY(-10px) scale(1.01)' },
+              }
+            }
+          }
+        }
+      }
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --safe-top: env(safe-area-inset-top, 0px);
+            --safe-bottom: env(safe-area-inset-bottom, 0px);
+            --brand-green: #10b981; /* Emerald 500 */
+        }
+        html, body {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            width: 100%;
+            overflow: hidden;
+            overscroll-behavior: none;
+            -webkit-tap-highlight-color: transparent;
+            background-color: #F8FAFC;
+        }
+        html.dark body {
+            background-color: #020617;
+        }
+
+        /* --- SPLASH SCREEN STYLES --- */
+        #splash-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #ffffff;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+        
+        html.dark #splash-screen {
+            background-color: #020617;
+        }
+
+        /* The SVG Logo Container */
+        #initial-logo-svg {
+            width: 120px;
+            height: 120px;
+            z-index: 2;
+            position: absolute;
+            background: #ecfdf5; /* Light Green Background */
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 10px 25px rgba(16, 185, 129, 0.2);
+            /* Fade out as green expands */
+            animation: fade-out 0.5s ease-out forwards;
+            animation-delay: 0.5s;
+        }
+
+        /* The Green Ripple Effect */
+        #color-expander {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 0px;
+            height: 0px;
+            background-color: var(--brand-green);
+            border-radius: 50%;
+            z-index: 1;
+            animation: expand-fill 1.2s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+            animation-delay: 0.1s; 
+        }
+
+        /* Container for Content */
+        #splash-content {
+            position: relative;
+            z-index: 10;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 40px;
+            opacity: 0;
+            animation: content-reveal 0.8s ease-out forwards;
+            animation-delay: 0.6s;
+        }
+
+        #app-title {
+            font-family: 'Inter', sans-serif;
+            font-weight: 800;
+            font-size: 24px;
+            color: #ffffff;
+            text-transform: uppercase;
+            letter-spacing: 0.2em;
+            text-align: center;
+            text-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        /* 2x2 GRID LAYOUT */
+        #feature-icons {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 30px;
+            padding: 20px;
+        }
+
+        .splash-icon-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            color: #ffffff;
+            animation: float-continuous 3s ease-in-out infinite;
+        }
+        
+        .splash-icon-wrapper:nth-child(1) { animation-delay: 0s; }
+        .splash-icon-wrapper:nth-child(2) { animation-delay: 0.3s; }
+        .splash-icon-wrapper:nth-child(3) { animation-delay: 0.6s; }
+        .splash-icon-wrapper:nth-child(4) { animation-delay: 0.9s; }
+
+        .splash-icon-bg {
+            width: 64px;
+            height: 64px;
+            background: rgba(255, 255, 255, 0.12);
+            backdrop-filter: blur(12px);
+            border-radius: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            position: relative;
+            transition: transform 0.3s ease;
+        }
+
+        .splash-label {
+            font-size: 9px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.15em;
+            opacity: 0.85;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        /* --- ANIMATIONS --- */
+        @keyframes expand-fill {
+            0% { width: 0; height: 0; opacity: 1; }
+            100% { width: 300vmax; height: 300vmax; opacity: 1; }
+        }
+
+        @keyframes fade-out {
+            to { opacity: 0; transform: scale(0.5); }
+        }
+
+        @keyframes content-reveal {
+            from { opacity: 0; transform: scale(0.95) translateY(10px); }
+            to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+
+        @keyframes float-continuous {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-6px); }
+        }
+
+        /* --- APP CSS --- */
+        .glass-card { background: #FFFFFF; border: 1px solid rgba(0, 0, 0, 0.05); }
+        html.dark .glass-card { background: #0f172a; border: 1px solid rgba(255, 255, 255, 0.05); }
+        .glass-header { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); }
+        html.dark .glass-header { background: rgba(2, 6, 23, 0.95); }
+        .glass-nav { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); }
+        html.dark .glass-nav { background: rgba(2, 6, 23, 0.95); }
+        .premium-modal-backdrop { animation: backdrop-fade 0.45s cubic-bezier(0.32, 0.72, 0, 1) both; }
+        @keyframes backdrop-fade { from { opacity: 0; backdrop-filter: blur(0px); } to { opacity: 1; backdrop-filter: blur(12px); } }
+        .premium-modal-content { animation: premium-pop 0.55s cubic-bezier(0.32, 0.72, 0, 1) both; will-change: transform, opacity; transform-origin: center center; -webkit-backface-visibility: hidden; backface-visibility: hidden; }
+        @keyframes premium-pop { 0% { opacity: 0; transform: scale(0.85) translateY(60px); } 100% { opacity: 1; transform: scale(1) translateY(0); } }
+        .premium-subview-enter { animation: premium-slide-in 0.45s cubic-bezier(0.32, 0.72, 0, 1) both; will-change: transform, opacity; }
+        @keyframes premium-slide-in { 0% { opacity: 0; transform: scale(0.96) translateX(30px); } 100% { opacity: 1; transform: scale(1) translateX(0); } }
+        .safe-padding-top { padding-top: var(--safe-top); }
+        .safe-padding-bottom { padding-bottom: var(--safe-bottom); }
+        .safe-margin-top { margin-top: var(--safe-top); }
+        * { scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+        *::-webkit-scrollbar { display: none; }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@^19.2.3",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "lucide-react": "https://esm.sh/lucide-react@^0.562.0",
+    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@^2.90.1",
+    "firebase/": "https://esm.sh/firebase@^12.7.0/",
+    "@google/genai": "https://esm.sh/@google/genai",
+    "vite": "https://esm.sh/vite@^7.3.1",
+    "path": "https://esm.sh/path@^0.12.7",
+    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2",
+    "jspdf": "https://esm.sh/jspdf@2.5.1",
+    "jspdf-autotable": "https://esm.sh/jspdf-autotable@3.8.1",
+    "vite-plugin-pwa": "https://esm.sh/vite-plugin-pwa@^1.2.0"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+  <body>
+    <!-- CUSTOM ANIMATED SPLASH SCREEN -->
+    <div id="splash-screen">
+        <!-- 1. The Expandable GREEN Circle -->
+        <div id="color-expander"></div>
+        
+        <!-- 2. The CODE-BASED LOGO (Replaces image file) -->
+        <div id="initial-logo-svg">
+            <!-- School Icon SVG -->
+            <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M14 22v-4a2 2 0 1 0-4 0v4"/>
+                <path d="m18 10 4 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-8l4-2"/>
+                <path d="M18 5v17"/>
+                <path d="m4 6 8-4 8 4"/>
+                <path d="M6 5v17"/>
+                <circle cx="12" cy="9" r="2"/>
+            </svg>
+        </div>
+        
+        <!-- 3. The Content on Green Screen -->
+        <div id="splash-content">
+            <h1 id="app-title">VidyaSetu AI</h1>
+            
+            <div id="feature-icons">
+                <!-- 1. Live GPS -->
+                <div class="splash-icon-wrapper">
+                    <div class="splash-icon-bg">
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="2" y="6" width="20" height="10" rx="2" fill="rgba(255,255,255,0.2)"/> 
+                            <path d="M4 16v2a1 1 0 0 0 1 1h1"/>
+                            <path d="M18 16v2a1 1 0 0 0 1 1h1"/>
+                            <circle cx="5.5" cy="16.5" r="1.5" fill="white"/>
+                            <circle cx="18.5" cy="16.5" r="1.5" fill="white"/>
+                            <path d="M12 2a3 3 0 0 1 3 3c0 2-3 5-3 5s-3-3-3-5a3 3 0 0 1 3-3z" fill="white" stroke="none" transform="translate(0, -4)"/>
+                        </svg>
+                    </div>
+                    <span class="splash-label">Live GPS</span>
+                </div>
+                
+                <!-- 2. Result -->
+                <div class="splash-icon-wrapper">
+                    <div class="splash-icon-bg">
+                        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                            <polyline points="14 2 14 8 20 8"/>
+                            <path d="M9 15l2 2 4-4" stroke="white" stroke-width="3"/>
+                        </svg>
+                    </div>
+                    <span class="splash-label">Result</span>
+                </div>
+
+                <!-- 3. Attendance -->
+                <div class="splash-icon-wrapper">
+                    <div class="splash-icon-bg">
+                        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                            <line x1="16" y1="2" x2="16" y2="6"/>
+                            <line x1="8" y1="2" x2="8" y2="6"/>
+                            <line x1="3" y1="10" x2="21" y2="10"/>
+                            <path d="M9 16l2 2 4-4"/>
+                        </svg>
+                    </div>
+                    <span class="splash-label">Present</span>
+                </div>
+
+                <!-- 4. Gallery -->
+                <div class="splash-icon-wrapper">
+                    <div class="splash-icon-bg">
+                        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect width="18" height="18" x="3" y="3" rx="2" ry="2"/>
+                            <circle cx="8.5" cy="8.5" r="1.5" fill="white"/>
+                            <path d="m21 15-5-5L5 21"/>
+                        </svg>
+                    </div>
+                    <span class="splash-label">Gallery</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="root"></div>
+  <script type="module" src="/index.tsx"></script>
+</body>
+</html>
