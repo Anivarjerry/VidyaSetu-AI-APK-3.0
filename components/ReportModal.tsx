@@ -1,14 +1,18 @@
 
 import React, { useState } from 'react';
 import { Modal } from './Modal';
-import { Button } from './Button';
-import { FileText, Download, Loader2, Users, Calendar, BookOpen, CheckCircle2 } from 'lucide-react';
+import { FileText, Download, Loader2, Users, Calendar, BookOpen, CheckCircle2, Sheet, FileSpreadsheet, Award } from 'lucide-react';
 import { Role } from '../types';
 import { 
     downloadPrincipalAttendance, 
+    downloadPrincipalAttendanceExcel,
     downloadPortalHistory, 
+    downloadPortalHistoryExcel,
     downloadLeaveReport, 
+    downloadLeaveReportExcel,
     downloadStudentDirectory,
+    downloadStudentDirectoryExcel,
+    downloadExamResultsExcel,
     downloadStudentReport,
     downloadStudentAttendanceReport
 } from '../services/reportService';
@@ -47,7 +51,7 @@ export const ReportModal: React.FC<ReportModalProps> = ({
       if (success) {
           if (window.navigator.vibrate) window.navigator.vibrate(50);
       } else {
-          alert("Failed to generate report. Please try again.");
+          alert("Failed to generate report or no data found.");
       }
   };
 
@@ -61,71 +65,61 @@ export const ReportModal: React.FC<ReportModalProps> = ({
             </div>
             <div>
                 <h4 className="font-black text-slate-800 dark:text-white uppercase text-sm">Official Reports</h4>
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">PDF Format • Excel-Ready</p>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">PDF & Excel Formats</p>
             </div>
         </div>
 
-        {/* DATE RANGE FILTER (For all users except Student Directory) */}
+        {/* DATE RANGE FILTER */}
         <div className="bg-slate-50 dark:bg-white/5 p-4 rounded-2xl border border-slate-100 dark:border-white/5 space-y-2">
             <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Report Period</p>
             <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
                     <label className="text-[8px] font-bold text-slate-400 uppercase">From</label>
-                    <input 
-                        type="date" 
-                        value={startDate}
-                        onChange={(e) => setStartDate(e.target.value)}
-                        className="w-full p-2 bg-white dark:bg-dark-900 border border-slate-200 dark:border-white/10 rounded-xl text-xs font-bold uppercase"
-                    />
+                    <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full p-2 bg-white dark:bg-dark-900 border border-slate-200 dark:border-white/10 rounded-xl text-xs font-bold uppercase" />
                 </div>
                 <div className="space-y-1">
                     <label className="text-[8px] font-bold text-slate-400 uppercase">To</label>
-                    <input 
-                        type="date" 
-                        value={endDate}
-                        onChange={(e) => setEndDate(e.target.value)}
-                        className="w-full p-2 bg-white dark:bg-dark-900 border border-slate-200 dark:border-white/10 rounded-xl text-xs font-bold uppercase"
-                    />
+                    <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full p-2 bg-white dark:bg-dark-900 border border-slate-200 dark:border-white/10 rounded-xl text-xs font-bold uppercase" />
                 </div>
             </div>
         </div>
 
         {/* PRINCIPAL OPTIONS */}
         {role === 'principal' && (
-            <div className="space-y-3 premium-subview-enter">
+            <div className="space-y-4 premium-subview-enter">
                 <div className="space-y-1">
-                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Filter Class (Optional)</label>
-                    <select 
-                        className="w-full p-3 bg-slate-50 dark:bg-dark-900 border border-slate-100 dark:border-white/10 rounded-xl text-xs font-bold uppercase"
-                        value={selectedClass}
-                        onChange={(e) => setSelectedClass(e.target.value)}
-                    >
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Filter Class</label>
+                    <select className="w-full p-3 bg-slate-50 dark:bg-dark-900 border border-slate-100 dark:border-white/10 rounded-xl text-xs font-bold uppercase" value={selectedClass} onChange={(e) => setSelectedClass(e.target.value)}>
                         <option value="">All Classes</option>
                         {classOptions?.map(c => <option key={c} value={c}>{c}</option>)}
                     </select>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                    <button onClick={() => handleDownload(() => downloadPrincipalAttendance(schoolId, selectedClass, startDate, endDate))} disabled={loading} className="p-4 bg-white dark:bg-dark-800 border border-slate-100 dark:border-white/5 rounded-2xl shadow-sm active:scale-95 transition-all text-left group hover:border-brand-500">
-                        <Calendar className="text-blue-500 mb-2" size={20} />
-                        <p className="font-black text-xs uppercase dark:text-white">Attendance</p>
-                        <p className="text-[9px] text-slate-400 uppercase tracking-tighter">Detailed Logs</p>
-                    </button>
-                    <button onClick={() => handleDownload(() => downloadStudentDirectory(schoolId, selectedClass))} disabled={loading} className="p-4 bg-white dark:bg-dark-800 border border-slate-100 dark:border-white/5 rounded-2xl shadow-sm active:scale-95 transition-all text-left group hover:border-brand-500">
-                        <Users className="text-purple-500 mb-2" size={20} />
-                        <p className="font-black text-xs uppercase dark:text-white">Students</p>
-                        <p className="text-[9px] text-slate-400 uppercase tracking-tighter">Complete Directory</p>
-                    </button>
-                    <button onClick={() => handleDownload(() => downloadPortalHistory(schoolId, 'principal', userId!, startDate, endDate))} disabled={loading} className="p-4 bg-white dark:bg-dark-800 border border-slate-100 dark:border-white/5 rounded-2xl shadow-sm active:scale-95 transition-all text-left group hover:border-brand-500">
-                        <BookOpen className="text-orange-500 mb-2" size={20} />
-                        <p className="font-black text-xs uppercase dark:text-white">Portal Log</p>
-                        <p className="text-[9px] text-slate-400 uppercase tracking-tighter">Teacher Activity</p>
-                    </button>
-                    <button onClick={() => handleDownload(() => downloadLeaveReport(schoolId, 'principal', userId!, startDate, endDate))} disabled={loading} className="p-4 bg-white dark:bg-dark-800 border border-slate-100 dark:border-white/5 rounded-2xl shadow-sm active:scale-95 transition-all text-left group hover:border-brand-500">
-                        <CheckCircle2 className="text-rose-500 mb-2" size={20} />
-                        <p className="font-black text-xs uppercase dark:text-white">Leave Data</p>
-                        <p className="text-[9px] text-slate-400 uppercase tracking-tighter">Staff History</p>
-                    </button>
+                <div className="grid grid-cols-1 gap-3">
+                    {[
+                        { icon: <Calendar size={20} className="text-blue-500" />, label: "Attendance Log", sub: "Daily Status Record", pdf: () => downloadPrincipalAttendance(schoolId, selectedClass, startDate, endDate), xls: () => downloadPrincipalAttendanceExcel(schoolId, selectedClass, startDate, endDate) },
+                        { icon: <Users size={20} className="text-purple-500" />, label: "Student Directory", sub: "Full Bio-Data & Contact", pdf: () => downloadStudentDirectory(schoolId, selectedClass), xls: () => downloadStudentDirectoryExcel(schoolId, selectedClass) },
+                        { icon: <BookOpen size={20} className="text-orange-500" />, label: "Portal Activity", sub: "Teacher Submissions", pdf: () => downloadPortalHistory(schoolId, 'principal', userId!, startDate, endDate), xls: () => downloadPortalHistoryExcel(schoolId, 'principal', userId!, startDate, endDate) },
+                        { icon: <CheckCircle2 size={20} className="text-rose-500" />, label: "Staff Leave Data", sub: "Requests & Status", pdf: () => downloadLeaveReport(schoolId, 'principal', userId!, startDate, endDate), xls: () => downloadLeaveReportExcel(schoolId, 'principal', userId!, startDate, endDate) },
+                        { icon: <Award size={20} className="text-emerald-500" />, label: "Exam Results", sub: "Detailed Marks & Grades", noPdf: true, xls: () => downloadExamResultsExcel(schoolId, selectedClass, startDate, endDate) }
+                    ].map((item, idx) => (
+                        <div key={idx} className="p-4 bg-white dark:bg-dark-800 border border-slate-100 dark:border-white/5 rounded-[1.5rem] shadow-sm flex flex-col gap-3">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-slate-50 dark:bg-white/5 rounded-xl">{item.icon}</div>
+                                <div><p className="font-black text-xs uppercase dark:text-white">{item.label}</p><p className="text-[9px] text-slate-400 uppercase tracking-tighter">{item.sub}</p></div>
+                            </div>
+                            <div className="flex gap-2">
+                                {!item.noPdf && (
+                                    <button onClick={() => handleDownload(item.pdf!)} disabled={loading} className="flex-1 py-2 bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400 rounded-xl text-[9px] font-black uppercase flex items-center justify-center gap-1 hover:bg-rose-100 transition-colors">
+                                        <FileText size={12} /> PDF
+                                    </button>
+                                )}
+                                <button onClick={() => handleDownload(item.xls)} disabled={loading} className="flex-1 py-2 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-xl text-[9px] font-black uppercase flex items-center justify-center gap-1 hover:bg-emerald-100 transition-colors">
+                                    <FileSpreadsheet size={12} /> Excel
+                                </button>
+                            </div>
+                        </div>
+                    ))}
                 </div>
             </div>
         )}
@@ -150,8 +144,6 @@ export const ReportModal: React.FC<ReportModalProps> = ({
                     </div>
                     {loading && <Loader2 className="ml-auto animate-spin" size={16} />}
                 </button>
-                
-                <p className="text-[9px] text-center text-slate-400 font-black uppercase opacity-60 pt-2">* Attendance reports are restricted to Principal access.</p>
             </div>
         )}
 
@@ -186,7 +178,7 @@ export const ReportModal: React.FC<ReportModalProps> = ({
 
         {loading && (
             <div className="text-center">
-                <p className="text-[10px] font-black uppercase tracking-widest text-brand-500 animate-pulse">Generating PDF...</p>
+                <p className="text-[10px] font-black uppercase tracking-widest text-brand-500 animate-pulse">Generating Report...</p>
             </div>
         )}
 
