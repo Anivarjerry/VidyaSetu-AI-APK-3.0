@@ -2,9 +2,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Modal } from './Modal';
 import { Button } from './Button';
-import { X, Check, Loader2, FileText, Download, TrendingUp, Users, RefreshCw, AlertCircle, Save, Plus, Search } from 'lucide-react';
+import { X, Check, Loader2, FileText, Download, TrendingUp, Users, RefreshCw, AlertCircle, Save, Plus, Search, FileSpreadsheet } from 'lucide-react';
 import { fetchSchoolClasses, fetchStudentsForClass, createExamRecord, submitExamResults, fetchExamRecords, fetchExamResultsByRecord } from '../services/dashboardService';
-import { downloadStudentReport } from '../services/reportService';
+import { downloadStudentReport, downloadExamResultsExcel } from '../services/reportService';
 import { Role, ExamRecord, Student, ExamMark } from '../types';
 
 interface ExamModalProps {
@@ -179,6 +179,15 @@ export const ExamModal: React.FC<ExamModalProps> = ({ isOpen, onClose, role, sch
       setDownloadingId(studentId);
       await downloadStudentReport(schoolId, studentId, studentName);
       setDownloadingId(null);
+  };
+
+  const handleExportExcel = async () => {
+      if (!selectedExam) return;
+      setLoading(true);
+      // Pass the specific Record ID to fetch only this exam's data
+      const success = await downloadExamResultsExcel(schoolId, selectedExam.class_name, undefined, undefined, selectedExam.id);
+      setLoading(false);
+      if(!success) alert("Failed to export excel. Please try again.");
   };
 
   const toggleAbsent = (studentId: string) => {
@@ -364,7 +373,21 @@ export const ExamModal: React.FC<ExamModalProps> = ({ isOpen, onClose, role, sch
         {/* VIEW 3: DETAILS */}
         {view === 'details' && selectedExam && (
             <div className="flex flex-col h-full premium-subview-enter">
-                <button onClick={() => setView('list')} className="mb-4 text-[10px] font-black uppercase text-slate-400 flex items-center gap-1 hover:text-emerald-500 w-fit"><X size={12} /> Back to List</button>
+                <div className="flex justify-between items-center mb-4">
+                    <button onClick={() => setView('list')} className="text-[10px] font-black uppercase text-slate-400 flex items-center gap-1 hover:text-emerald-500 w-fit">
+                        <X size={12} /> Back to List
+                    </button>
+                    
+                    {/* EXPORT EXCEL BUTTON */}
+                    <button 
+                        onClick={handleExportExcel} 
+                        disabled={loading}
+                        className="flex items-center gap-2 bg-emerald-500/10 text-emerald-600 px-4 py-2 rounded-xl text-[10px] font-black uppercase hover:bg-emerald-500 hover:text-white transition-all shadow-sm active:scale-95"
+                    >
+                        {loading ? <Loader2 size={16} className="animate-spin" /> : <FileSpreadsheet size={16} />}
+                        Export Excel
+                    </button>
+                </div>
                 
                 <div className="p-5 bg-emerald-50 dark:bg-emerald-500/10 rounded-[2rem] border border-emerald-100 dark:border-emerald-500/20 mb-4 text-center">
                     <h3 className="font-black text-lg text-slate-800 dark:text-white uppercase">{selectedExam.exam_title}</h3>

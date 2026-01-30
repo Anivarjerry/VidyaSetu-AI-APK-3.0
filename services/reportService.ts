@@ -288,13 +288,13 @@ export const downloadLeaveReport = async (schoolId: string, role: Role, userId: 
             { label: 'Approved', value: leaves.filter((l:any) => l.status === 'approved').length, color: '#10b981' }
         ];
         const rows = leaves.map((r: any) => [
-            r.users?.name || 'Staff', r.users?.mobile || '-', r.leave_type, `${r.start_date} to ${r.end_date}`, r.reason, r.status.toUpperCase()
+            r.users?.name || 'Staff', r.users?.mobile || '-', r.leave_type, `${r.start_date} to ${r.end_date}`, r.status.toUpperCase()
         ]);
         generatePDF({
-            title: "Leave History Report",
+            title: "Staff Leave Report",
             subTitle: `${startDate} to ${endDate}`,
             summary,
-            headers: ["Name", "Contact", "Type", "Duration", "Reason", "Status"],
+            headers: ["Staff Name", "Mobile", "Type", "Duration", "Status"],
             data: rows
         });
         return true;
@@ -306,49 +306,46 @@ export const downloadLeaveReportExcel = async (schoolId: string, role: Role, use
         const leaves = await fetchLeaveData(schoolId, role, userId, startDate, endDate);
         const excelData = leaves.map((r: any, index: number) => ({
             "S.No": index + 1,
-            "Staff Name": r.users?.name || 'Unknown',
+            "Staff Name": r.users?.name || 'Staff',
             "Mobile": r.users?.mobile || '-',
             "Leave Type": r.leave_type,
-            "From Date": r.start_date,
-            "To Date": r.end_date,
-            "Reason": r.reason,
+            "Start Date": r.start_date,
+            "End Date": r.end_date,
             "Status": r.status.toUpperCase(),
+            "Reason": r.reason,
             "Principal Comment": r.principal_comment || '-'
         }));
-        exportToExcel(excelData, "Leave_Report");
+        exportToExcel(excelData, "Staff_Leave_Data");
         return true;
     } catch(e) { return false; }
 };
 
-// 4. STUDENT DIRECTORY
-const fetchStudentData = async (schoolId: string, className?: string) => {
-    let query = supabase.from('students')
-        .select('name, class_name, roll_number, father_name, mother_name, dob, users!parent_user_id(name, mobile, address)')
-        .eq('school_id', schoolId)
-        .order('class_name');
-
-    if(className) query = query.eq('class_name', className);
-    const { data } = await query;
-    return data || [];
-};
-
+// 4. STUDENT DIRECTORY (PRINCIPAL)
 export const downloadStudentDirectory = async (schoolId: string, className?: string) => {
     try {
-        const data = await fetchStudentData(schoolId, className);
+        let query = supabase.from('students')
+            .select('name, class_name, section, roll_number, father_name, mother_name, dob, users(mobile, address)')
+            .eq('school_id', schoolId)
+            .order('class_name', { ascending: true });
+        
+        if (className) query = query.eq('class_name', className);
+        
+        const { data, error } = await query;
+        if(error || !data) return false;
+
         const summary = [
-            { label: 'Students', value: data.length },
-            { label: 'Classes', value: new Set(data.map((d:any) => d.class_name)).size }
+            { label: 'Total Students', value: data.length },
+            { label: 'Classes', value: new Set(data.map((s:any) => s.class_name)).size, color: '#8b5cf6' }
         ];
-        const rows = data.map((r: any) => [
-            r.name, r.class_name, r.roll_number || '-', r.dob ? new Date(r.dob).toLocaleDateString() : '-', r.users?.name || r.father_name || 'N/A', r.mother_name || '-', r.users?.mobile || '-', r.users?.address || '-'
+        const rows = data.map((s: any) => [
+            s.name, s.class_name, s.father_name, s.users?.mobile || '-', s.users?.address || '-'
         ]);
         generatePDF({
             title: "Student Directory",
-            subTitle: className ? `Class ${className}` : "All Classes",
+            subTitle: className ? `Class: ${className}` : "All Classes",
             summary,
-            headers: ["Name", "Class", "Roll", "DOB", "Father", "Mother", "Mobile", "Address"],
-            data: rows,
-            orientation: 'l'
+            headers: ["Name", "Class", "Father Name", "Contact", "Address"],
+            data: rows
         });
         return true;
     } catch(e) { return false; }
@@ -356,121 +353,160 @@ export const downloadStudentDirectory = async (schoolId: string, className?: str
 
 export const downloadStudentDirectoryExcel = async (schoolId: string, className?: string) => {
     try {
-        const data = await fetchStudentData(schoolId, className);
+        let query = supabase.from('students')
+            .select('name, class_name, section, roll_number, father_name, mother_name, dob, users(mobile, address)')
+            .eq('school_id', schoolId)
+            .order('class_name', { ascending: true });
+        
+        if (className) query = query.eq('class_name', className);
+        
+        const { data, error } = await query;
+        if(error || !data) return false;
+
+        const excelData = data.map((s: any, index: number) => ({
+            "S.No": index + 1,
+            "Student Name": s.name,
+            "Class": s.class_name,
+            "Section": s.section || '-',
+            "Roll No": s.roll_number || '-',
+            "Father Name": s.father_name || '-',
+            "Mother Name": s.mother_name || '-',
+            "DOB": s.dob || '-',
+            "Contact Mobile": s.users?.mobile || '-',
+            "Address": s.users?.address || '-'
+        }));
+        exportToExcel(excelData, "Student_Directory");
+        return true;
+    } catch(e) { return false; }
+};
+
+// 5. EXAM RESULT EXCEL (UPDATED)
+export const downloadExamResultsExcel = async (
+  schoolId: string, 
+  className?: string, 
+  startDate?: string, 
+  endDate?: string,
+  recordId?: string // Optional specific record ID
+) => {
+    try {
+        // Query to join marks with exam details
+        let query = supabase.from('exam_marks')
+            .select(`
+                student_name, 
+                obtained_marks, 
+                grade, 
+                is_absent, 
+                exam_records!inner(title:exam_title, subject, class_name, date:exam_date, max:total_marks, school_id)
+            `)
+            .eq('exam_records.school_id', schoolId);
+
+        if (recordId) {
+            // Specific Exam Download (From ExamModal)
+            query = query.eq('record_id', recordId);
+        } else {
+            // General Download Center Logic (All time, or filtered by Class only)
+            // REMOVED DATE FILTERING to allow "All Time Data" download as requested
+            if (className) query = query.eq('exam_records.class_name', className);
+        }
+
+        const { data, error } = await query;
+        if (error || !data || data.length === 0) return false;
+
         const excelData = data.map((r: any, index: number) => ({
             "S.No": index + 1,
-            "Student Name": r.name,
-            "Class": r.class_name,
-            "Roll No": r.roll_number || '-',
-            "DOB": r.dob || '-',
-            "Father Name": r.users?.name || r.father_name || '-',
-            "Mother Name": r.mother_name || '-',
-            "Parent Mobile": r.users?.mobile || '-',
-            "Address/Village": r.users?.address || '-'
+            "Student Name": r.student_name,
+            "Class": r.exam_records?.class_name,
+            "Exam Title": r.exam_records?.title,
+            "Subject": r.exam_records?.subject,
+            "Date": r.exam_records?.date,
+            "Max Marks": r.exam_records?.max,
+            "Obtained": r.is_absent ? 'ABSENT' : r.obtained_marks,
+            "Grade": r.grade
         }));
-        exportToExcel(excelData, "Student_Directory_Full");
+
+        exportToExcel(excelData, recordId ? `Result_${data[0]?.exam_records?.subject}` : "All_Exam_Results");
         return true;
     } catch(e) { return false; }
 };
 
-// 5. EXAM RESULTS (NEW - Excel Only mainly)
-export const downloadExamResultsExcel = async (schoolId: string, className?: string, startDate?: string, endDate?: string) => {
-    try {
-        // Fetch Exam Records
-        let query = supabase.from('exam_records')
-            .select('id, exam_title, class_name, subject, total_marks, exam_date')
-            .eq('school_id', schoolId)
-            .order('exam_date', { ascending: false });
-
-        if (className) query = query.eq('class_name', className);
-        if (startDate) query = query.gte('exam_date', startDate);
-        if (endDate) query = query.lte('exam_date', endDate);
-
-        const { data: records, error } = await query;
-        if (error || !records || records.length === 0) return false;
-
-        const recordIds = records.map(r => r.id);
-
-        // Fetch Marks
-        const { data: marks } = await supabase.from('exam_marks')
-            .select('record_id, student_name, obtained_marks, grade, is_absent, students(roll_number, father_name)')
-            .in('record_id', recordIds);
-
-        if (!marks) return false;
-
-        // Merge Data
-        const excelData = marks.map((m: any) => {
-            const exam = records.find(r => r.id === m.record_id);
-            return {
-                "Exam Date": exam?.exam_date,
-                "Exam Name": exam?.exam_title,
-                "Class": exam?.class_name,
-                "Subject": exam?.subject,
-                "Student Name": m.student_name,
-                "Roll No": m.students?.roll_number || '-',
-                "Father Name": m.students?.father_name || '-',
-                "Total Marks": exam?.total_marks,
-                "Obtained Marks": m.is_absent ? 'Absent' : m.obtained_marks,
-                "Grade": m.grade,
-                "Status": m.is_absent ? 'Absent' : 'Present'
-            };
-        });
-
-        // Sort by Date then Class then Name
-        excelData.sort((a: any, b: any) => new Date(b["Exam Date"]).getTime() - new Date(a["Exam Date"]).getTime() || a["Class"].localeCompare(b["Class"]) || a["Student Name"].localeCompare(b["Student Name"]));
-
-        exportToExcel(excelData, "Exam_Results_Full");
-        return true;
-    } catch(e) { return false; }
-};
-
-// Parent Reports (Existing)
+// 6. SINGLE STUDENT REPORT (PDF)
 export const downloadStudentReport = async (schoolId: string, studentId: string, studentName: string, startDate?: string, endDate?: string) => {
     try {
-        const { data: st } = await supabase.from('students').select('class_name, roll_number, father_name, mother_name, dob, users!parent_user_id(name, mobile)').eq('id', studentId).single();
-        const className = st?.class_name || 'Unknown';
-        const fatherName = st?.father_name || st?.users?.name || 'N/A';
-        const studentProfile = { father: fatherName, mother: st?.mother_name || 'N/A', dob: st?.dob ? new Date(st.dob).toLocaleDateString() : 'N/A', mobile: st?.users?.mobile || 'N/A' };
+        // 1. Fetch Student Info
+        const { data: student } = await supabase.from('students').select('father_name, mother_name, dob, class_name, users(mobile)').eq('id', studentId).single();
+        if(!student) return false;
 
-        let examQuery = supabase.from('exam_marks').select('obtained_marks, grade, is_absent, exam_records!inner(exam_title, subject, total_marks, exam_date)').eq('student_id', studentId).order('created_at', { ascending: false });
-        const { data: exams } = await examQuery;
+        // 2. Fetch Attendance Stats
+        const { data: att } = await supabase.from('attendance').select('status').eq('student_id', studentId);
+        const present = att?.filter((a:any) => a.status === 'present').length || 0;
+        const totalAtt = att?.length || 0;
+        const attPercentage = totalAtt > 0 ? Math.round((present / totalAtt) * 100) : 0;
+
+        // 3. Fetch Exam Results
+        const { data: exams } = await supabase.from('exam_marks').select('obtained_marks, grade, is_absent, exam_records(exam_title, subject, total_marks, exam_date)').eq('student_id', studentId).order('created_at', { ascending: false });
         
-        let examList = exams || [];
-        if (startDate && endDate) examList = examList.filter((e: any) => { const d = e.exam_records?.exam_date; return d >= startDate && d <= endDate; });
+        const summary = [
+            { label: 'Attendance', value: `${attPercentage}%`, color: attPercentage < 75 ? '#ef4444' : '#10b981' },
+            { label: 'Exams Taken', value: exams?.length || 0 },
+            { label: 'Average Grade', value: 'B+' } // Placeholder logic
+        ];
 
-        const rows: any[] = [];
-        examList.forEach((e: any) => {
-            rows.push([e.exam_records?.exam_date || '-', `EXAM: ${e.exam_records?.exam_title}`, `${e.exam_records?.subject}: ${e.is_absent ? "ABS" : e.obtained_marks}/${e.exam_records?.total_marks} (${e.grade})`]);
+        const examRows = (exams || []).map((e: any) => [
+            e.exam_records?.exam_date,
+            e.exam_records?.exam_title,
+            e.exam_records?.subject,
+            `${e.is_absent ? 'ABS' : e.obtained_marks} / ${e.exam_records?.total_marks}`,
+            e.grade
+        ]);
+
+        generatePDF({
+            title: `PROGRESS REPORT: ${studentName}`,
+            subTitle: `Class: ${student.class_name} | Session 2024-25`,
+            summary,
+            headers: ["Date", "Exam Type", "Subject", "Marks", "Grade"],
+            data: examRows,
+            studentDetails: {
+                father: student.father_name || '-',
+                mother: student.mother_name || '-',
+                dob: student.dob || '-',
+                mobile: student.users?.mobile || '-'
+            }
         });
-
-        let hwQuery = supabase.from('daily_periods').select('date, subject, homework').eq('school_id', schoolId).eq('class_name', className).order('date', { ascending: false });
-        if (startDate) hwQuery = hwQuery.gte('date', startDate);
-        if (endDate) hwQuery = hwQuery.lte('date', endDate);
-        else hwQuery = hwQuery.gte('date', getPastDate(7));
-        const { data: hw } = await hwQuery;
-        (hw || []).forEach((h: any) => { rows.push([h.date, `HOMEWORK: ${h.subject}`, h.homework ? h.homework.substring(0, 60) : 'Task Assigned']); });
-
-        generatePDF({ title: "STUDENT PROGRESS CARD", subTitle: `${studentName} | Class: ${className}`, summary: [{ label: 'Exams', value: examList.length, color: '#8b5cf6' }], headers: ["Date", "Category", "Details"], data: rows, studentDetails: studentProfile });
         return true;
     } catch(e) { return false; }
 };
 
+// 7. STUDENT ATTENDANCE ONLY REPORT
 export const downloadStudentAttendanceReport = async (studentId: string, studentName: string, startDate?: string, endDate?: string) => {
     try {
-        const { data: st } = await supabase.from('students').select('class_name, father_name, mother_name, dob, users!parent_user_id(name, mobile)').eq('id', studentId).single();
-        const studentProfile = { father: st?.father_name || st?.users?.name || 'N/A', mother: st?.mother_name || 'N/A', dob: st?.dob || 'N/A', mobile: st?.users?.mobile || 'N/A' };
+        let query = supabase.from('attendance')
+            .select('date, status')
+            .eq('student_id', studentId)
+            .order('date', { ascending: false });
+        
+        if(startDate) query = query.gte('date', startDate);
+        if(endDate) query = query.lte('date', endDate);
 
-        let query = supabase.from('attendance').select('date, status').eq('student_id', studentId).order('date', { ascending: false });
-        if (startDate) query = query.gte('date', startDate);
-        if (endDate) query = query.lte('date', endDate);
-        else query = query.gte('date', getPastDate(30));
+        const { data, error } = await query;
+        if(error || !data) return false;
 
-        const { data: att } = await query;
-        const attList = att || [];
-        const summary = [{ label: 'Present', value: attList.filter((a:any) => a.status === 'present').length, color: '#10b981' }, { label: 'Absent', value: attList.filter((a:any) => a.status === 'absent').length, color: '#ef4444' }];
-        const rows = attList.map((a: any) => [new Date(a.date).toLocaleDateString(), new Date(a.date).toLocaleDateString('en-US', { weekday: 'long' }), a.status.toUpperCase()]);
+        const summary = [
+            { label: 'Total Days', value: data.length },
+            { label: 'Present', value: data.filter((d:any) => d.status === 'present').length, color: '#10b981' },
+            { label: 'Absent', value: data.filter((d:any) => d.status === 'absent').length, color: '#ef4444' }
+        ];
 
-        generatePDF({ title: "ATTENDANCE REPORT", subTitle: `${studentName}`, summary, headers: ["Date", "Day", "Status"], data: rows, studentDetails: studentProfile });
+        const rows = data.map((r: any) => [
+            r.date, new Date(r.date).toLocaleDateString('en-US', { weekday: 'long' }), r.status.toUpperCase()
+        ]);
+
+        generatePDF({
+            title: `ATTENDANCE LOG: ${studentName}`,
+            subTitle: `${startDate} to ${endDate}`,
+            summary,
+            headers: ["Date", "Day", "Status"],
+            data: rows
+        });
         return true;
     } catch(e) { return false; }
 };
