@@ -6,6 +6,7 @@ import { Smartphone, Lock, AlertCircle, Sparkles, Info, HelpCircle, FileText, Us
 import { useThemeLanguage } from '../contexts/ThemeLanguageContext';
 import { AboutModal, HelpModal, PoliciesModal } from './MenuModals';
 import { SignUpModal } from './SignUpModal';
+import { ForgotPasswordModal } from './ForgotPasswordModal';
 
 interface LoginCardProps {
   onSubmit: (data: LoginRequest) => void;
@@ -21,6 +22,7 @@ export const LoginCard: React.FC<LoginCardProps> = ({ onSubmit, isLoading, error
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [isPoliciesOpen, setIsPoliciesOpen] = useState(false);
   const [isSignUpOpen, setIsSignUpOpen] = useState(false);
+  const [isForgotOpen, setIsForgotOpen] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
   const [formData, setFormData] = useState<LoginRequest>({
@@ -94,8 +96,16 @@ export const LoginCard: React.FC<LoginCardProps> = ({ onSubmit, isLoading, error
                   </button>
               </div>
 
-              <div className="text-right">
-                  <p className="text-[9px] font-bold text-slate-400">Admin? Enter Secret Code in Password field.</p>
+              {/* Forgot Password & Admin Hint */}
+              <div className="flex justify-between items-center px-1">
+                  <button 
+                    type="button" 
+                    onClick={() => setIsForgotOpen(true)}
+                    className="text-[9px] font-black text-brand-500 uppercase tracking-widest hover:underline"
+                  >
+                    Forgot Password?
+                  </button>
+                  <p className="text-[9px] font-bold text-slate-400">Admin? Use Secret Code.</p>
               </div>
 
               <Button 
@@ -139,6 +149,7 @@ export const LoginCard: React.FC<LoginCardProps> = ({ onSubmit, isLoading, error
       </div>
 
       <SignUpModal isOpen={isSignUpOpen} onClose={() => setIsSignUpOpen(false)} />
+      <ForgotPasswordModal isOpen={isForgotOpen} onClose={() => setIsForgotOpen(false)} />
       <AboutModal isOpen={isAboutOpen} onClose={() => setIsAboutOpen(false)} />
       <HelpModal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
       <PoliciesModal isOpen={isPoliciesOpen} onClose={() => setIsPoliciesOpen(false)} />
