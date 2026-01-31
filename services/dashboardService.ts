@@ -12,6 +12,14 @@ export const getISTDate = (): string => {
   return `${year}-${month}-${day}`;
 };
 
+// --- PUBLIC HELPERS FOR SIGNUP ---
+export const fetchSchoolsList = async () => {
+    try {
+        const { data } = await supabase.from('schools').select('id, name, school_code').eq('is_active', true).order('name');
+        return data || [];
+    } catch (e) { return []; }
+};
+
 // --- ROBUST SCHOOL ID HELPER ---
 const getSchoolUUID = async (schoolCode: string): Promise<string | null> => {
     try {

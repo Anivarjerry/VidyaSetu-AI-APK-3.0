@@ -2,9 +2,10 @@
 import React, { useState } from 'react';
 import { LoginRequest } from '../types';
 import { Button } from './Button';
-import { School, Smartphone, Eye, AlertCircle, Key, UserCog, Sparkles, Info, HelpCircle, FileText } from 'lucide-react';
+import { School, Smartphone, Eye, AlertCircle, Key, UserCog, Sparkles, Info, HelpCircle, FileText, UserPlus } from 'lucide-react';
 import { useThemeLanguage } from '../contexts/ThemeLanguageContext';
 import { AboutModal, HelpModal, PoliciesModal } from './MenuModals';
+import { SignUpModal } from './SignUpModal';
 
 interface LoginCardProps {
   onSubmit: (data: LoginRequest) => void;
@@ -17,7 +18,9 @@ export const LoginCard: React.FC<LoginCardProps> = ({ onSubmit, isLoading, error
   const [isAdminMode, setIsAdminMode] = useState(false);
   const [isAboutOpen, setIsAboutOpen] = useState(false);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
-  const [isPoliciesOpen, setIsPoliciesOpen] = useState(false); // New state for policies modal
+  const [isPoliciesOpen, setIsPoliciesOpen] = useState(false);
+  const [isSignUpOpen, setIsSignUpOpen] = useState(false); // New state for SignUp
+
   const [formData, setFormData] = useState<LoginRequest>({
     school_id: '',
     mobile: '',
@@ -136,6 +139,16 @@ export const LoginCard: React.FC<LoginCardProps> = ({ onSubmit, isLoading, error
             {isLoading ? (isAdminMode ? t('verifying') : t('syncing')) : (isAdminMode ? t('admin_login') : t('login_to_system'))}
           </Button>
 
+          {!isAdminMode && (
+              <button 
+                type="button"
+                onClick={() => setIsSignUpOpen(true)}
+                className="w-full py-4 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 hover:text-brand-500 transition-colors flex items-center justify-center gap-2 border border-dashed border-slate-200 dark:border-white/10 rounded-2xl mt-2 hover:border-brand-500/50"
+              >
+                  <UserPlus size={14} /> Don't have an account? Sign Up
+              </button>
+          )}
+
           <div className="text-center pt-6 space-y-5">
              <button type="button" onClick={() => setIsAdminMode(!isAdminMode)} className="text-[10px] font-black text-slate-400 hover:text-brand-500 uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-2 mx-auto active:scale-95">
                 <UserCog size={14} />
@@ -176,6 +189,7 @@ export const LoginCard: React.FC<LoginCardProps> = ({ onSubmit, isLoading, error
         </form>
       </div>
 
+      <SignUpModal isOpen={isSignUpOpen} onClose={() => setIsSignUpOpen(false)} />
       <AboutModal isOpen={isAboutOpen} onClose={() => setIsAboutOpen(false)} />
       <HelpModal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
       <PoliciesModal isOpen={isPoliciesOpen} onClose={() => setIsPoliciesOpen(false)} />
