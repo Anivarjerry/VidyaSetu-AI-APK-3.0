@@ -2,8 +2,8 @@
 import React, { useState, useEffect } from 'react';
 import { Modal } from './Modal';
 import { Button } from './Button';
-import { School, CheckCircle2, User, ChevronRight, Smartphone, Key, Lock, ArrowLeft, Loader2, MessageCircle, HelpCircle } from 'lucide-react';
-import { fetchSchoolsList } from '../services/dashboardService';
+import { School, CheckCircle2, User, ChevronRight, Smartphone, Key, Lock, ArrowLeft, Loader2, MessageCircle, HelpCircle, Plus, Trash2, GraduationCap } from 'lucide-react';
+import { fetchSchoolsList, fetchPublicParents } from '../services/dashboardService';
 import { supabase } from '../services/supabaseClient';
 import { useModalBackHandler } from '../hooks/useModalBackHandler';
 
@@ -23,6 +23,10 @@ export const SignUpModal: React.FC<SignUpModalProps> = ({ isOpen, onClose }) => 
   const [loading, setLoading] = useState(false);
   const [signupSuccess, setSignupSuccess] = useState(false);
 
+  // Parent Dropdown for Student Role
+  const [parentOptions, setParentOptions] = useState<any[]>([]);
+  const [loadingParents, setLoadingParents] = useState(false);
+
   // Form Data
   const [formData, setFormData] = useState({
       name: '',
@@ -30,26 +34,44 @@ export const SignUpModal: React.FC<SignUpModalProps> = ({ isOpen, onClose }) => 
       password: '',
       subject: '', // For teacher
       address: '', // For parent
-      class_name: '', // For student/parent
-      student_name: '', // For student father name / parent child name
-      child_dob: '',
-      mother_name: '',
-      father_mobile: '' // To link student to parent
+      dob: '', // For parent
+      class_name: '', // For student
+      student_name: '', // For student father name
+      selected_parent_id: '', // For student linking
   });
+
+  // Multiple Children for Parent Role
+  const [childrenList, setChildrenList] = useState([{ name: '', class_name: '', dob: '', mother_name: '' }]);
 
   useEffect(() => {
       if (isOpen) {
           loadSchools();
           setStep('school');
-          setFormData({ name: '', mobile: '', password: '', subject: '', address: '', class_name: '', student_name: '', child_dob: '', mother_name: '', father_mobile: '' });
+          // Reset all form states
+          setFormData({ name: '', mobile: '', password: '', subject: '', address: '', dob: '', class_name: '', student_name: '', selected_parent_id: '' });
+          setChildrenList([{ name: '', class_name: '', dob: '', mother_name: '' }]);
       }
   }, [isOpen]);
+
+  // Load Parents when switching to Student Role Form
+  useEffect(() => {
+      if (step === 'form' && role === 'student' && selectedSchool?.id) {
+          loadParentsForSchool(selectedSchool.id);
+      }
+  }, [step, role, selectedSchool]);
 
   const loadSchools = async () => {
       setLoading(true);
       const data = await fetchSchoolsList();
       setSchools(data);
       setLoading(false);
+  };
+
+  const loadParentsForSchool = async (schoolId: string) => {
+      setLoadingParents(true);
+      const data = await fetchPublicParents(schoolId);
+      setParentOptions(data);
+      setLoadingParents(false);
   };
 
   const handleSchoolVerify = () => {
@@ -66,11 +88,25 @@ export const SignUpModal: React.FC<SignUpModalProps> = ({ isOpen, onClose }) => 
       setStep('form');
   };
 
+  // --- CHILD LIST HANDLERS (PARENT ROLE) ---
+  const handleAddChild = () => {
+      setChildrenList([...childrenList, { name: '', class_name: '', dob: '', mother_name: '' }]);
+  };
+
+  const handleRemoveChild = (index: number) => {
+      const newList = [...childrenList];
+      newList.splice(index, 1);
+      setChildrenList(newList);
+  };
+
+  const updateChild = (index: number, field: string, value: string) => {
+      const newList = [...childrenList];
+      (newList[index] as any)[field] = value;
+      setChildrenList(newList);
+  };
+
   const handleManualHelp = () => {
-      // Pre-fill message for WhatsApp
       const text = `*New Registration Request*%0A%0AHello Admin, I am facing issues signing up.%0A%0A*Name:* ${formData.name || 'N/A'}%0A*Mobile:* ${formData.mobile || 'N/A'}%0A*Role:* ${role.toUpperCase() || 'N/A'}%0A*School:* ${selectedSchool?.name || 'N/A'}%0A%0APlease register me manually.`;
-      
-      // Open WhatsApp with Support Number
       window.open(`https://wa.me/918005833036?text=${text}`, '_blank');
   };
 
@@ -80,7 +116,7 @@ export const SignUpModal: React.FC<SignUpModalProps> = ({ isOpen, onClose }) => 
       
       setLoading(true);
       try {
-          // 1. Check if user already exists
+          // 1. Check existing
           const { data: existing } = await supabase.from('users').select('id').eq('mobile', formData.mobile).maybeSingle();
           if (existing) {
               alert("User already exists with this mobile number.");
@@ -88,7 +124,7 @@ export const SignUpModal: React.FC<SignUpModalProps> = ({ isOpen, onClose }) => 
               return;
           }
 
-          // 2. Insert User with 7 Days Trial
+          // 2. Insert User (User Table)
           const subscriptionEnd = new Date();
           subscriptionEnd.setDate(subscriptionEnd.getDate() + 7);
           
@@ -102,37 +138,41 @@ export const SignUpModal: React.FC<SignUpModalProps> = ({ isOpen, onClose }) => 
           };
 
           if (role === 'teacher') userPayload.assigned_subject = formData.subject;
-          if (role === 'parent') userPayload.address = formData.address;
+          if (role === 'parent') {
+              userPayload.address = formData.address;
+              if (formData.dob) userPayload.dob = formData.dob;
+          }
 
           const { data: newUser, error } = await supabase.from('users').insert([userPayload]).select().single();
-          
           if (error) throw error;
 
-          // 3. Handle Extra Tables (Students)
+          // 3. Handle Linked Tables
           if (role === 'parent') {
-              await supabase.from('students').insert([{
-                  school_id: selectedSchool.id,
-                  name: formData.student_name,
-                  class_name: formData.class_name,
-                  parent_user_id: newUser.id,
-                  dob: formData.child_dob,
-                  mother_name: formData.mother_name
-              }]);
-          } else if (role === 'student') {
-              // Try to find parent by father's mobile
-              let parentId = null;
-              if (formData.father_mobile) {
-                  const { data: p } = await supabase.from('users').select('id').eq('mobile', formData.father_mobile).eq('role', 'parent').maybeSingle();
-                  parentId = p?.id;
+              // Insert Multiple Children
+              for (const child of childrenList) {
+                  if (child.name && child.class_name) {
+                      await supabase.from('students').insert([{
+                          school_id: selectedSchool.id,
+                          name: child.name,
+                          class_name: child.class_name,
+                          parent_user_id: newUser.id,
+                          dob: child.dob,
+                          mother_name: child.mother_name,
+                          father_name: formData.name // Set Parent name as father name automatically
+                      }]);
+                  }
               }
+          } else if (role === 'student') {
+              // Student must be linked to parent
+              if (!formData.selected_parent_id) throw new Error("Parent linking is required for students.");
               
               await supabase.from('students').insert([{
                   school_id: selectedSchool.id,
                   name: formData.name,
                   class_name: formData.class_name,
                   student_user_id: newUser.id,
-                  father_name: formData.student_name,
-                  parent_user_id: parentId
+                  parent_user_id: formData.selected_parent_id,
+                  father_name: formData.student_name // Father name text input
               }]);
           }
 
@@ -219,30 +259,85 @@ export const SignUpModal: React.FC<SignUpModalProps> = ({ isOpen, onClose }) => 
                     <input type="text" placeholder="Mobile Number (10 Digits)" value={formData.mobile} onChange={e => setFormData({...formData, mobile: e.target.value.replace(/\D/g,'').slice(0,10)})} className="w-full p-4 rounded-2xl bg-slate-50 dark:bg-dark-900 border border-slate-200 dark:border-white/10 font-bold text-xs text-slate-800 dark:text-white outline-none" required />
                     <input type="text" placeholder="Create Password" value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} className="w-full p-4 rounded-2xl bg-slate-50 dark:bg-dark-900 border border-slate-200 dark:border-white/10 font-bold text-xs text-slate-800 dark:text-white outline-none" required />
 
+                    {/* ROLE SPECIFIC FIELDS */}
+                    
                     {role === 'teacher' && (
                         <input type="text" placeholder="Teaching Subject" value={formData.subject} onChange={e => setFormData({...formData, subject: e.target.value})} className="w-full p-4 rounded-2xl bg-slate-50 dark:bg-dark-900 border border-slate-200 dark:border-white/10 font-bold text-xs text-slate-800 dark:text-white outline-none" />
                     )}
 
                     {role === 'parent' && (
-                        <>
-                            <input type="text" placeholder="Address/Village" value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} className="w-full p-4 rounded-2xl bg-slate-50 dark:bg-dark-900 border border-slate-200 dark:border-white/10 font-bold text-xs text-slate-800 dark:text-white outline-none" />
-                            <p className="text-[10px] font-black uppercase text-slate-400 mt-2 pl-1">Child Details</p>
-                            <input type="text" placeholder="Child Name" value={formData.student_name} onChange={e => setFormData({...formData, student_name: e.target.value})} className="w-full p-4 rounded-2xl bg-slate-50 dark:bg-dark-900 border border-slate-200 dark:border-white/10 font-bold text-xs text-slate-800 dark:text-white outline-none" required />
-                            <input type="text" placeholder="Child Class (e.g. Class 5)" value={formData.class_name} onChange={e => setFormData({...formData, class_name: e.target.value})} className="w-full p-4 rounded-2xl bg-slate-50 dark:bg-dark-900 border border-slate-200 dark:border-white/10 font-bold text-xs text-slate-800 dark:text-white outline-none" required />
-                        </>
+                        <div className="space-y-4 pt-2">
+                            <div className="p-4 bg-slate-50 dark:bg-white/5 rounded-2xl border border-slate-100 dark:border-white/5 space-y-3">
+                                <p className="text-[9px] font-black uppercase text-slate-400">Parent Personal Info</p>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <input type="text" placeholder="Village/Address" value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} className="w-full p-3 rounded-xl bg-white dark:bg-dark-900 border border-slate-200 dark:border-white/10 font-bold text-xs text-slate-800 dark:text-white outline-none" required />
+                                    <div>
+                                        <label className="text-[8px] font-black uppercase text-slate-400 ml-1 mb-1 block">Date of Birth</label>
+                                        <input type="date" value={formData.dob} onChange={e => setFormData({...formData, dob: e.target.value})} className="w-full p-3 rounded-xl bg-white dark:bg-dark-900 border border-slate-200 dark:border-white/10 font-bold text-xs text-slate-800 dark:text-white outline-none" />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <p className="text-[9px] font-black uppercase text-slate-400 pl-1">Children Details</p>
+                                    <button type="button" onClick={handleAddChild} className="text-[9px] font-black text-brand-600 flex items-center gap-1 uppercase bg-brand-50 dark:bg-brand-500/10 px-2 py-1 rounded-lg"><Plus size={10} /> Add Child</button>
+                                </div>
+                                
+                                {childrenList.map((child, index) => (
+                                    <div key={index} className="p-4 bg-white dark:bg-dark-900 border border-slate-100 dark:border-white/10 rounded-2xl space-y-3 relative group">
+                                        {childrenList.length > 1 && (
+                                            <button type="button" onClick={() => handleRemoveChild(index)} className="absolute top-2 right-2 p-1.5 text-rose-400 hover:bg-rose-50 rounded-lg"><Trash2 size={14} /></button>
+                                        )}
+                                        <p className="text-[8px] font-black uppercase text-slate-300">Child {index + 1}</p>
+                                        
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <input type="text" placeholder="Student Name" value={child.name} onChange={e => updateChild(index, 'name', e.target.value)} className="w-full p-3 rounded-xl bg-slate-50 dark:bg-white/5 border-none font-bold text-xs outline-none" required />
+                                            <input type="text" placeholder="Class (e.g. 5)" value={child.class_name} onChange={e => updateChild(index, 'class_name', e.target.value)} className="w-full p-3 rounded-xl bg-slate-50 dark:bg-white/5 border-none font-bold text-xs outline-none" required />
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <input type="text" placeholder="Mother's Name" value={child.mother_name} onChange={e => updateChild(index, 'mother_name', e.target.value)} className="w-full p-3 rounded-xl bg-slate-50 dark:bg-white/5 border-none font-bold text-xs outline-none" />
+                                            <div>
+                                                <input type="date" value={child.dob} onChange={e => updateChild(index, 'dob', e.target.value)} className="w-full p-3 rounded-xl bg-slate-50 dark:bg-white/5 border-none font-bold text-xs outline-none" />
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
                     )}
 
                     {role === 'student' && (
-                        <>
+                        <div className="space-y-4 pt-2">
+                            <div className="p-4 bg-indigo-50 dark:bg-indigo-500/10 rounded-2xl border border-indigo-100 dark:border-white/10 space-y-3">
+                                <div className="flex items-center gap-2 text-indigo-600 dark:text-indigo-400">
+                                    <GraduationCap size={16} />
+                                    <p className="text-[10px] font-black uppercase tracking-widest">Link to Parent ID</p>
+                                </div>
+                                <p className="text-[9px] text-slate-500 font-bold leading-tight">You must select your registered parent to create a student account.</p>
+                                
+                                <select 
+                                    value={formData.selected_parent_id} 
+                                    onChange={e => setFormData({...formData, selected_parent_id: e.target.value})} 
+                                    className="w-full p-4 rounded-2xl bg-white dark:bg-dark-900 border border-indigo-200 dark:border-white/10 font-bold text-xs text-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500/20"
+                                    disabled={loadingParents}
+                                    required
+                                >
+                                    <option value="">{loadingParents ? 'Loading Parents...' : 'Select Parent Name'}</option>
+                                    {parentOptions.map(p => (
+                                        <option key={p.id} value={p.id}>{p.name} ({p.mobile})</option>
+                                    ))}
+                                </select>
+                            </div>
+
                             <input type="text" placeholder="Class (e.g. Class 10)" value={formData.class_name} onChange={e => setFormData({...formData, class_name: e.target.value})} className="w-full p-4 rounded-2xl bg-slate-50 dark:bg-dark-900 border border-slate-200 dark:border-white/10 font-bold text-xs text-slate-800 dark:text-white outline-none" required />
                             <input type="text" placeholder="Father's Name" value={formData.student_name} onChange={e => setFormData({...formData, student_name: e.target.value})} className="w-full p-4 rounded-2xl bg-slate-50 dark:bg-dark-900 border border-slate-200 dark:border-white/10 font-bold text-xs text-slate-800 dark:text-white outline-none" required />
-                            <input type="text" placeholder="Father's Mobile (For Linking)" value={formData.father_mobile} onChange={e => setFormData({...formData, father_mobile: e.target.value.replace(/\D/g,'').slice(0,10)})} className="w-full p-4 rounded-2xl bg-slate-50 dark:bg-dark-900 border border-slate-200 dark:border-white/10 font-bold text-xs text-slate-800 dark:text-white outline-none" />
-                        </>
+                        </div>
                     )}
                 </div>
 
                 <div className="pt-2 space-y-3">
-                    <Button type="submit" fullWidth disabled={loading} className="py-4 rounded-2xl font-black uppercase text-xs shadow-xl">
+                    <Button type="submit" fullWidth disabled={loading || (role === 'student' && !formData.selected_parent_id)} className="py-4 rounded-2xl font-black uppercase text-xs shadow-xl">
                         {loading ? <Loader2 className="animate-spin" /> : 'Complete Registration'}
                     </Button>
                     

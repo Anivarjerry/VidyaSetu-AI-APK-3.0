@@ -20,6 +20,19 @@ export const fetchSchoolsList = async () => {
     } catch (e) { return []; }
 };
 
+export const fetchPublicParents = async (schoolId: string) => {
+    try {
+        // Fetch parents for the dropdown in Student Signup
+        const { data } = await supabase
+            .from('users')
+            .select('id, name, mobile')
+            .eq('school_id', schoolId)
+            .eq('role', 'parent')
+            .order('name');
+        return data || [];
+    } catch (e) { return []; }
+};
+
 // --- ROBUST SCHOOL ID HELPER ---
 const getSchoolUUID = async (schoolCode: string): Promise<string | null> => {
     try {
