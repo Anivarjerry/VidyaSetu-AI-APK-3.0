@@ -24,6 +24,14 @@ export default defineConfig(({ mode }) => {
             navigateFallback: '/index.html', // Fix for offline navigation fallback
             runtimeCaching: [
               {
+                urlPattern: /^https:\/\/.*\.supabase\.co\/.*/i,
+                handler: 'NetworkOnly',
+                options: {
+                  cacheName: 'supabase-api-cache',
+                  networkTimeoutSeconds: 10
+                }
+              },
+              {
                 urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
                 handler: 'CacheFirst',
                 options: {
