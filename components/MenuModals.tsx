@@ -180,6 +180,17 @@ export const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
 
         {/* Team Grid */}
         <div className="space-y-3">
+            {/* Customer Care Card */}
+            <div className="bg-emerald-50 dark:bg-emerald-500/10 p-4 rounded-[1.8rem] border-2 border-emerald-100 dark:border-emerald-500/10 flex items-center gap-4 shadow-sm hover:border-emerald-400 transition-all">
+                <div className="w-10 h-10 rounded-xl bg-white dark:bg-dark-900 flex items-center justify-center text-emerald-600 shadow-sm shrink-0">
+                    <Phone size={20} strokeWidth={2.5} />
+                </div>
+                <div className="text-left">
+                    <p className="text-[9px] font-black text-emerald-600 uppercase tracking-widest mb-0.5">Customer Care</p>
+                    <p className="font-black text-slate-800 dark:text-white text-sm uppercase tracking-tight">9929922698</p>
+                </div>
+            </div>
+
             {/* Founder - Top Priority Card */}
             <div className="bg-brand-50 dark:bg-brand-500/10 p-5 rounded-[2rem] border-2 border-brand-100 dark:border-brand-500/10 flex items-center gap-4 group transition-all hover:border-brand-500 shadow-sm">
                 <div className="w-12 h-12 rounded-xl bg-white dark:bg-dark-900 flex items-center justify-center text-brand-600 shadow-sm shrink-0">
@@ -231,7 +242,7 @@ export const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose }) => {
   const { t } = useThemeLanguage();
   const [showCallChoice, setShowCallChoice] = useState(false);
 
-  const EMAIL = "vidyasetu.ai.india@gmail.com"; 
+  const EMAIL = "support@vidyasetuai.com"; 
   const WA_NUMBER_1 = "917340080094";
   const COMBO_NUMBER = "918005833036";
 
