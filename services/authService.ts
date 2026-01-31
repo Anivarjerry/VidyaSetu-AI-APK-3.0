@@ -19,78 +19,58 @@ const fetchWithRetry = async (fn: () => Promise<any>, retries = 3, delay = 1000)
   }
 };
 
-// NEW: Check if user exists and is approved BEFORE sending OTP
-export const checkUserStatus = async (mobile: string): Promise<{ exists: boolean; status: string; message?: string }> => {
-  try {
-    // First check admins (bypass approval logic for admins)
-    const { data: admin } = await supabase.from('admins').select('id').eq('mobile', mobile).maybeSingle();
-    if (admin) return { exists: true, status: 'approved' };
-
-    // Check Users
-    const { data: user } = await supabase
-      .from('users')
-      .select('approval_status')
-      .eq('mobile', mobile)
-      .maybeSingle();
-
-    if (!user) return { exists: false, status: 'not_found' };
-    
-    // Check Status
-    if (user.approval_status === 'pending') {
-      return { exists: true, status: 'pending', message: 'Account is awaiting Principal approval.' };
-    }
-    if (user.approval_status === 'rejected') {
-      return { exists: true, status: 'rejected', message: 'Account has been rejected by the school.' };
-    }
-
+// This function is no longer needed for OTP but kept empty to prevent import errors in other files if any
+export const checkUserStatus = async (mobile: string) => {
     return { exists: true, status: 'approved' };
-  } catch (e) {
-    console.error("Check Status Error", e);
-    return { exists: false, status: 'error' };
-  }
 };
 
 export const loginUser = async (credentials: LoginRequest): Promise<LoginResponse> => {
   try {
-    // Check if browser is offline
     if (!navigator.onLine) {
       return { status: 'error', message: 'You are offline. Please check your internet connection.' };
     }
 
-    // --- 1. CHECK FOR ADMIN (via Mobile) ---
-    // Now admins also log in via OTP, so we check the admins table using the mobile number first.
+    const { mobile, password } = credentials;
+
+    // --- 1. CHECK FOR ADMIN ---
+    // Logic: If mobile matches admin, treat 'password' input as 'secret_code'
     let adminResult;
     try {
         adminResult = await fetchWithRetry(() => 
           supabase
           .from('admins')
           .select('*')
-          .eq('mobile', credentials.mobile)
+          .eq('mobile', mobile)
           .maybeSingle()
         );
     } catch (err: any) { adminResult = { error: err, data: null }; }
 
     if (adminResult.data) {
-      console.log("Admin identified via mobile.");
-      return {
-        status: 'success',
-        role: 'admin',
-        user_role: 'admin',
-        user_name: adminResult.data.name,
-        user_id: adminResult.data.id
-      };
+      // Check Secret Code
+      if (adminResult.data.secret_code === password) {
+          console.log("Admin Login Successful");
+          return {
+            status: 'success',
+            role: 'admin',
+            user_role: 'admin',
+            user_name: adminResult.data.name,
+            user_id: adminResult.data.id
+          };
+      } else {
+          // Found admin but wrong code
+          return { status: 'error', message: 'Invalid Admin Secret Code.' };
+      }
     }
 
     // --- 2. CHECK FOR STANDARD USER ---
-    // If not an admin, proceed to check the users table.
-    
+    // If not admin, check users table and verify password
     let userResult;
     try {
         userResult = await fetchWithRetry(() => 
             supabase
               .from('users')
-              .select('id, name, role, subscription_end_date, school_id, approval_status, schools:school_id (id, name, is_active, subscription_end_date, school_code)')
-              .eq('mobile', credentials.mobile)
+              .select('id, name, role, password, subscription_end_date, school_id, approval_status, schools:school_id (id, name, is_active, subscription_end_date, school_code)')
+              .eq('mobile', mobile)
               .maybeSingle()
         );
     } catch (e: any) {
@@ -100,14 +80,23 @@ export const loginUser = async (credentials: LoginRequest): Promise<LoginRespons
     const { data: userData, error: userError } = userResult;
 
     if (userError) return { status: 'error', message: `Login failed: ${userError.message}` };
-    if (!userData) return { status: 'error', message: 'Mobile number not registered.' };
+    
+    if (!userData) {
+        return { status: 'error', message: 'Account not found. Please Register first.' };
+    }
 
-    // Double Check Approval Status (Security Layer)
+    // Verify Password
+    // Note: In production, passwords should be hashed. For this stage, we compare directly.
+    if (userData.password !== password) {
+        return { status: 'error', message: 'Incorrect Password.' };
+    }
+
+    // Check Approval Status
     if (userData.approval_status === 'pending') {
-        return { status: 'error', message: 'Account is pending approval from Principal.' };
+        return { status: 'error', message: 'Account awaiting Principal approval.' };
     }
     if (userData.approval_status === 'rejected') {
-        return { status: 'blocked', message: 'Account access blocked by administration.' };
+        return { status: 'blocked', message: 'Account rejected by administration.' };
     }
 
     // Extract School Data
@@ -139,7 +128,6 @@ export const updateUserToken = async (userId: string, token: string) => {
   } catch (error) {}
 };
 
-// NEW: Fetch pending users for Principal Approval
 export const fetchPendingApprovals = async (schoolId: string) => {
     try {
         const { data, error } = await supabase
@@ -157,7 +145,6 @@ export const fetchPendingApprovals = async (schoolId: string) => {
     }
 };
 
-// NEW: Approve or Reject user
 export const updateUserApprovalStatus = async (userId: string, status: 'approved' | 'rejected') => {
     try {
         const { error } = await supabase
