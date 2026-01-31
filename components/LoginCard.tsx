@@ -108,8 +108,8 @@ export const LoginCard: React.FC<LoginCardProps> = ({ onSubmit, isLoading, error
           return;
       }
 
-      // 2. Demo Account Bypass
-      if (mobile === '9876543210') {
+      // 2. Demo Account Bypass (UPDATED NUMBER)
+      if (mobile === '1000000001') {
           // Bypass OTP for demo account
           onSubmit(formData); // Directly submit logic will handle standard fetch
           setIsSendingOtp(false);
