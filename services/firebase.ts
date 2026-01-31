@@ -1,6 +1,7 @@
 
 import { initializeApp, getApp, getApps } from "firebase/app";
 import { getMessaging, getToken, onMessage, Messaging } from "firebase/messaging";
+import { getAuth, Auth } from "firebase/auth";
 
 // Updated Configuration provided by user
 const firebaseConfig = {
@@ -15,6 +16,14 @@ const firebaseConfig = {
 const VAPID_KEY = "BHICTM0s7nowrVwtsDP65Blrl0RKE7nC34L1z5mfxtt9WILgTnPuIrmc3q9H_HR6ojdE6CoqwAMcIzGL1f69XOM";
 
 let messagingInstance: Messaging | null = null;
+let authInstance: Auth | null = null;
+
+// Initialize App
+const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+
+// Initialize Auth
+authInstance = getAuth(app);
+authInstance.languageCode = 'en'; // Force English for SMS templates or auto-detect
 
 const isSupported = () => 
   typeof window !== 'undefined' && 
@@ -27,7 +36,6 @@ const getMessagingSafe = (): Messaging | null => {
   if (!isSupported()) return null;
 
   try {
-    const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
     messagingInstance = getMessaging(app);
     return messagingInstance;
   } catch (e) {
@@ -61,4 +69,4 @@ export const onMessageListener = () =>
     });
   });
 
-export { getMessagingSafe as messaging };
+export { getMessagingSafe as messaging, authInstance as auth };

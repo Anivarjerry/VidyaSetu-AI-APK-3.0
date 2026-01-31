@@ -19,6 +19,37 @@ const fetchWithRetry = async (fn: () => Promise<any>, retries = 3, delay = 1000)
   }
 };
 
+// NEW: Check if user exists and is approved BEFORE sending OTP
+export const checkUserStatus = async (mobile: string): Promise<{ exists: boolean; status: string; message?: string }> => {
+  try {
+    // First check admins (bypass approval logic for admins)
+    const { data: admin } = await supabase.from('admins').select('id').eq('mobile', mobile).maybeSingle();
+    if (admin) return { exists: true, status: 'approved' };
+
+    // Check Users
+    const { data: user } = await supabase
+      .from('users')
+      .select('approval_status')
+      .eq('mobile', mobile)
+      .maybeSingle();
+
+    if (!user) return { exists: false, status: 'not_found' };
+    
+    // Check Status
+    if (user.approval_status === 'pending') {
+      return { exists: true, status: 'pending', message: 'Account is awaiting Principal approval.' };
+    }
+    if (user.approval_status === 'rejected') {
+      return { exists: true, status: 'rejected', message: 'Account has been rejected by the school.' };
+    }
+
+    return { exists: true, status: 'approved' };
+  } catch (e) {
+    console.error("Check Status Error", e);
+    return { exists: false, status: 'error' };
+  }
+};
+
 export const loginUser = async (credentials: LoginRequest): Promise<LoginResponse> => {
   try {
     // Check if browser is offline
@@ -26,12 +57,10 @@ export const loginUser = async (credentials: LoginRequest): Promise<LoginRespons
       return { status: 'error', message: 'You are offline. Please check your internet connection.' };
     }
 
-    // --- ADMIN LOGIN LOGIC ---
+    // --- ADMIN LOGIN LOGIC (Secret Code) ---
     if (credentials.secret_code && credentials.secret_code.trim() !== '') {
       console.log("Connecting to Supabase for Admin login...");
-      
       let adminData, adminError;
-      
       try {
           const result = await fetchWithRetry(() => 
             supabase
@@ -43,24 +72,10 @@ export const loginUser = async (credentials: LoginRequest): Promise<LoginRespons
           );
           adminData = result.data;
           adminError = result.error;
-      } catch (err: any) {
-          adminError = err;
-      }
+      } catch (err: any) { adminError = err; }
 
-      if (adminError) {
-        console.error("Supabase Admin Login Error:", JSON.stringify(adminError, null, 2));
-        if (adminError.message?.includes('fetch') || adminError.code === '') {
-          return { 
-            status: 'error', 
-            message: 'Connection Failed: ISP blocking, AdBlocker active, or Supabase Project Paused.' 
-          };
-        }
-        return { status: 'error', message: `Database Error: ${adminError.message}` };
-      }
-
-      if (!adminData) {
-        return { status: 'error', message: 'Invalid Admin Credentials' };
-      }
+      if (adminError) return { status: 'error', message: `Database Error: ${adminError.message}` };
+      if (!adminData) return { status: 'error', message: 'Invalid Admin Credentials' };
 
       return {
         status: 'success',
@@ -71,16 +86,16 @@ export const loginUser = async (credentials: LoginRequest): Promise<LoginRespons
       };
     }
 
-    // --- GLOBAL USER LOGIN LOGIC (No School ID) ---
-    // 1. Fetch User and join School details in one go
+    // --- USER LOGIN LOGIC (OTP Verified) ---
+    // Note: Password check is removed for standard users as they are verified via OTP.
+    
     let userResult;
     try {
         userResult = await fetchWithRetry(() => 
             supabase
               .from('users')
-              .select('id, name, role, subscription_end_date, school_id, schools:school_id (id, name, is_active, subscription_end_date, school_code)')
+              .select('id, name, role, subscription_end_date, school_id, approval_status, schools:school_id (id, name, is_active, subscription_end_date, school_code)')
               .eq('mobile', credentials.mobile)
-              .eq('password', credentials.password)
               .maybeSingle()
         );
     } catch (e: any) {
@@ -89,27 +104,22 @@ export const loginUser = async (credentials: LoginRequest): Promise<LoginRespons
 
     const { data: userData, error: userError } = userResult;
 
-    if (userError) {
-        console.error("User Fetch Error:", JSON.stringify(userError, null, 2));
-        if (userError.message?.includes('fetch')) {
-             return { status: 'error', message: 'Network Error. Check Internet.' };
-        }
-        return { status: 'error', message: `Login failed: ${userError.message}` };
-    }
+    if (userError) return { status: 'error', message: `Login failed: ${userError.message}` };
+    if (!userData) return { status: 'error', message: 'Mobile number not registered.' };
 
-    if (!userData) {
-      return { status: 'error', message: 'Invalid Mobile Number or Password' };
+    // Double Check Approval Status (Security Layer)
+    if (userData.approval_status === 'pending') {
+        return { status: 'error', message: 'Account is pending approval from Principal.' };
+    }
+    if (userData.approval_status === 'rejected') {
+        return { status: 'blocked', message: 'Account access blocked by administration.' };
     }
 
     // Extract School Data
-    // @ts-ignore - Supabase types join sometimes tricky
+    // @ts-ignore
     const schoolData = userData.schools;
+    if (!schoolData) return { status: 'error', message: 'Account not linked to any valid school.' };
 
-    if (!schoolData) {
-        return { status: 'error', message: 'Account not linked to any valid school.' };
-    }
-
-    // Inject school_id back into credentials object for local storage consistency if needed later
     credentials.school_id = schoolData.school_code;
 
     return {
@@ -130,9 +140,37 @@ export const loginUser = async (credentials: LoginRequest): Promise<LoginRespons
 
 export const updateUserToken = async (userId: string, token: string) => {
   try {
-    await supabase
-      .from('users')
-      .update({ fcm_token: token })
-      .eq('id', userId);
+    await supabase.from('users').update({ fcm_token: token }).eq('id', userId);
   } catch (error) {}
+};
+
+// NEW: Fetch pending users for Principal Approval
+export const fetchPendingApprovals = async (schoolId: string) => {
+    try {
+        const { data, error } = await supabase
+            .from('users')
+            .select('id, name, role, mobile, created_at, students!parent_user_id(name, class_name)')
+            .eq('school_id', schoolId)
+            .eq('approval_status', 'pending')
+            .order('created_at', { ascending: false });
+        
+        if (error) throw error;
+        return data || [];
+    } catch (e) {
+        console.error("Fetch Pending Error", e);
+        return [];
+    }
+};
+
+// NEW: Approve or Reject user
+export const updateUserApprovalStatus = async (userId: string, status: 'approved' | 'rejected') => {
+    try {
+        const { error } = await supabase
+            .from('users')
+            .update({ approval_status: status })
+            .eq('id', userId);
+        return !error;
+    } catch (e) {
+        return false;
+    }
 };
