@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { LoginRequest } from '../types';
 import { Button } from './Button';
-import { Smartphone, AlertCircle, Key, UserCog, Sparkles, Info, HelpCircle, FileText, UserPlus, Lock, ArrowRight, Loader2, CheckCircle2 } from 'lucide-react';
+import { Smartphone, AlertCircle, Sparkles, Info, HelpCircle, FileText, UserPlus, Lock, Loader2 } from 'lucide-react';
 import { useThemeLanguage } from '../contexts/ThemeLanguageContext';
 import { AboutModal, HelpModal, PoliciesModal } from './MenuModals';
 import { SignUpModal } from './SignUpModal';
@@ -24,7 +24,6 @@ interface LoginCardProps {
 
 export const LoginCard: React.FC<LoginCardProps> = ({ onSubmit, isLoading, error }) => {
   const { t } = useThemeLanguage();
-  const [isAdminMode, setIsAdminMode] = useState(false);
   
   // OTP States
   const [otpStep, setOtpStep] = useState<'mobile' | 'otp'>('mobile');
@@ -93,7 +92,7 @@ export const LoginCard: React.FC<LoginCardProps> = ({ onSubmit, isLoading, error
 
       setIsSendingOtp(true);
 
-      // 1. Check User Status in Supabase First
+      // 1. Check User Status in Supabase First (Checks both Admins and Users)
       const statusCheck = await checkUserStatus(mobile);
       
       if (!statusCheck.exists) {
@@ -157,13 +156,6 @@ export const LoginCard: React.FC<LoginCardProps> = ({ onSubmit, isLoading, error
       }
   };
 
-  const handleAdminSubmit = (e: React.FormEvent) => {
-      e.preventDefault();
-      if (formData.mobile && formData.secret_code) {
-          onSubmit(formData);
-      }
-  };
-
   return (
     <div className="w-full h-full min-h-screen flex flex-col bg-white dark:bg-dark-950 overflow-y-auto no-scrollbar relative">
       <div className="flex-1 flex flex-col items-center justify-start pt-16 sm:justify-center sm:pt-0 px-8 pb-10 z-10 relative max-w-md mx-auto w-full">
@@ -178,93 +170,74 @@ export const LoginCard: React.FC<LoginCardProps> = ({ onSubmit, isLoading, error
            
            <h2 className="text-2xl font-black text-slate-900 dark:text-white tracking-tighter uppercase leading-none text-center">VidyaSetu AI</h2>
            <p className="text-slate-400 dark:text-brand-500/60 text-[10px] font-black uppercase tracking-[0.3em] text-center mt-2">
-             {isAdminMode ? t('system_administrator') : t('secure_login_portal')}
+             {t('secure_login_portal')}
            </p>
         </div>
 
         {/* --- FORM SECTION --- */}
         <div className="w-full space-y-3">
           
-          {/* USER OTP LOGIN FLOW */}
-          {!isAdminMode ? (
-            <>
-                {otpStep === 'mobile' ? (
-                    <form onSubmit={handleGetOtp} className="space-y-4">
-                        <div className="relative group">
-                            <Smartphone className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-brand-500 transition-colors" size={20} />
-                            <input 
-                            type="text" 
-                            name="mobile" 
-                            value={formData.mobile} 
-                            onChange={handleChange} 
-                            className="w-full pl-12 pr-6 py-4 bg-slate-50 dark:bg-dark-900 border border-slate-100 dark:border-white/5 rounded-2xl text-sm font-black text-slate-800 dark:text-white focus:ring-2 focus:ring-brand-500/20 outline-none transition-all placeholder:text-slate-400 h-14 shadow-sm" 
-                            placeholder={t('mobile_placeholder')} 
-                            inputMode="numeric" 
-                            maxLength={10}
-                            disabled={isSendingOtp}
-                            />
-                        </div>
-                        <Button 
-                            type="submit" 
-                            fullWidth 
-                            disabled={isSendingOtp || formData.mobile.length !== 10} 
-                            className="py-6 rounded-2xl shadow-xl shadow-brand-500/20 h-auto text-xs font-black uppercase tracking-[0.2em] bg-brand-500 hover:bg-brand-600 text-white border-none active:scale-[0.97] transition-all"
-                        >
-                            {isSendingOtp ? <Loader2 className="animate-spin" /> : "GET OTP"}
-                        </Button>
-                    </form>
-                ) : (
-                    <form onSubmit={handleVerifyOtp} className="space-y-4 premium-subview-enter">
-                        <div className="text-center mb-2">
-                            <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">OTP sent to +91 {formData.mobile}</p>
-                            <button type="button" onClick={() => { setOtpStep('mobile'); setOtp(''); }} className="text-[9px] text-brand-500 font-bold underline mt-1">Change Number</button>
-                        </div>
-                        
-                        <div className="relative group">
-                            <Lock className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-brand-500 transition-colors" size={20} />
-                            <input 
-                            type="text" 
-                            value={otp} 
-                            onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))} 
-                            className="w-full pl-12 pr-6 py-4 bg-slate-50 dark:bg-dark-900 border border-slate-100 dark:border-white/5 rounded-2xl text-lg font-black text-slate-800 dark:text-white focus:ring-2 focus:ring-brand-500/20 outline-none transition-all placeholder:text-slate-400 h-14 shadow-sm tracking-widest" 
-                            placeholder="• • • • • •" 
-                            inputMode="numeric" 
-                            autoFocus
-                            />
-                        </div>
-
-                        <Button 
-                            type="submit" 
-                            fullWidth 
-                            disabled={isSendingOtp || otp.length !== 6} 
-                            className="py-6 rounded-2xl shadow-xl shadow-brand-500/20 h-auto text-xs font-black uppercase tracking-[0.2em] bg-brand-500 hover:bg-brand-600 text-white border-none active:scale-[0.97] transition-all"
-                        >
-                            {isSendingOtp ? <Loader2 className="animate-spin" /> : "VERIFY & LOGIN"}
-                        </Button>
-
-                        {otpTimer > 0 ? (
-                            <p className="text-center text-[10px] font-bold text-slate-400">Resend in {otpTimer}s</p>
-                        ) : (
-                            <button type="button" onClick={handleGetOtp} className="w-full text-center text-[10px] font-black text-brand-600 uppercase tracking-widest">Resend OTP</button>
-                        )}
-                    </form>
-                )}
-            </>
+          {/* UNIFIED OTP LOGIN FLOW */}
+          {otpStep === 'mobile' ? (
+              <form onSubmit={handleGetOtp} className="space-y-4">
+                  <div className="relative group">
+                      <Smartphone className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-brand-500 transition-colors" size={20} />
+                      <input 
+                      type="text" 
+                      name="mobile" 
+                      value={formData.mobile} 
+                      onChange={handleChange} 
+                      className="w-full pl-12 pr-6 py-4 bg-slate-50 dark:bg-dark-900 border border-slate-100 dark:border-white/5 rounded-2xl text-sm font-black text-slate-800 dark:text-white focus:ring-2 focus:ring-brand-500/20 outline-none transition-all placeholder:text-slate-400 h-14 shadow-sm" 
+                      placeholder={t('mobile_placeholder')} 
+                      inputMode="numeric" 
+                      maxLength={10}
+                      disabled={isSendingOtp}
+                      />
+                  </div>
+                  <Button 
+                      type="submit" 
+                      fullWidth 
+                      disabled={isSendingOtp || formData.mobile.length !== 10} 
+                      className="py-6 rounded-2xl shadow-xl shadow-brand-500/20 h-auto text-xs font-black uppercase tracking-[0.2em] bg-brand-500 hover:bg-brand-600 text-white border-none active:scale-[0.97] transition-all"
+                  >
+                      {isSendingOtp ? <Loader2 className="animate-spin" /> : "GET OTP"}
+                  </Button>
+              </form>
           ) : (
-            // ADMIN LOGIN FORM (No changes here, kept secret code)
-            <form onSubmit={handleAdminSubmit} className="space-y-3 premium-subview-enter">
-              <div className="relative group">
-                <Smartphone className="absolute left-5 top-1/2 -translate-y-1/2 text-brand-500/60" size={20} />
-                <input type="text" name="mobile" value={formData.mobile} onChange={handleChange} className="w-full pl-12 pr-6 py-4 bg-brand-500/5 dark:bg-dark-900 border border-brand-500/20 rounded-2xl text-sm font-black text-slate-800 dark:text-white focus:ring-2 focus:ring-brand-500/20 outline-none transition-all placeholder:text-slate-400 h-14 shadow-sm" placeholder={t('admin_mobile_placeholder')} />
-              </div>
-              <div className="relative group">
-                <Key className="absolute left-5 top-1/2 -translate-y-1/2 text-brand-500/60" size={20} />
-                <input type="password" name="secret_code" value={formData.secret_code} onChange={handleChange} className="w-full pl-12 pr-6 py-4 bg-brand-500/5 dark:bg-dark-900 border border-brand-500/20 rounded-2xl text-sm font-bold text-slate-800 dark:text-white focus:ring-2 focus:ring-brand-500/20 outline-none transition-all placeholder:text-slate-400 h-14 shadow-sm" placeholder={t('secret_code_placeholder')} />
-              </div>
-              <Button type="submit" fullWidth disabled={isLoading} className="mt-4 py-6 rounded-2xl shadow-xl shadow-brand-500/20 h-auto text-xs font-black uppercase tracking-[0.2em] bg-brand-500 hover:bg-brand-600 text-white border-none active:scale-[0.97] transition-all">
-                {isLoading ? t('verifying') : t('admin_login')}
-              </Button>
-            </form>
+              <form onSubmit={handleVerifyOtp} className="space-y-4 premium-subview-enter">
+                  <div className="text-center mb-2">
+                      <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">OTP sent to +91 {formData.mobile}</p>
+                      <button type="button" onClick={() => { setOtpStep('mobile'); setOtp(''); }} className="text-[9px] text-brand-500 font-bold underline mt-1">Change Number</button>
+                  </div>
+                  
+                  <div className="relative group">
+                      <Lock className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-brand-500 transition-colors" size={20} />
+                      <input 
+                      type="text" 
+                      value={otp} 
+                      onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))} 
+                      className="w-full pl-12 pr-6 py-4 bg-slate-50 dark:bg-dark-900 border border-slate-100 dark:border-white/5 rounded-2xl text-lg font-black text-slate-800 dark:text-white focus:ring-2 focus:ring-brand-500/20 outline-none transition-all placeholder:text-slate-400 h-14 shadow-sm tracking-widest" 
+                      placeholder="• • • • • •" 
+                      inputMode="numeric" 
+                      autoFocus
+                      />
+                  </div>
+
+                  <Button 
+                      type="submit" 
+                      fullWidth 
+                      disabled={isSendingOtp || otp.length !== 6} 
+                      className="py-6 rounded-2xl shadow-xl shadow-brand-500/20 h-auto text-xs font-black uppercase tracking-[0.2em] bg-brand-500 hover:bg-brand-600 text-white border-none active:scale-[0.97] transition-all"
+                  >
+                      {isSendingOtp ? <Loader2 className="animate-spin" /> : "VERIFY & LOGIN"}
+                  </Button>
+
+                  {otpTimer > 0 ? (
+                      <p className="text-center text-[10px] font-bold text-slate-400">Resend in {otpTimer}s</p>
+                  ) : (
+                      <button type="button" onClick={handleGetOtp} className="w-full text-center text-[10px] font-black text-brand-600 uppercase tracking-widest">Resend OTP</button>
+                  )}
+              </form>
           )}
 
           {/* ERROR DISPLAY */}
@@ -275,7 +248,7 @@ export const LoginCard: React.FC<LoginCardProps> = ({ onSubmit, isLoading, error
             </div>
           )}
 
-          {!isAdminMode && otpStep === 'mobile' && (
+          {otpStep === 'mobile' && (
               <button 
                 type="button"
                 onClick={() => setIsSignUpOpen(true)}
@@ -286,10 +259,7 @@ export const LoginCard: React.FC<LoginCardProps> = ({ onSubmit, isLoading, error
           )}
 
           <div className="text-center pt-6 space-y-5">
-             <button type="button" onClick={() => { setIsAdminMode(!isAdminMode); setOtpStep('mobile'); setLocalError(null); }} className="text-[10px] font-black text-slate-400 hover:text-brand-500 uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-2 mx-auto active:scale-95">
-                <UserCog size={14} />
-                {isAdminMode ? t('staff_mode') : t('admin_port')}
-             </button>
+             {/* Admin Toggle removed as requested */}
 
              <div className="flex items-center justify-center gap-6 border-t border-slate-50 dark:border-white/5 pt-5">
                 <button type="button" onClick={() => setIsAboutOpen(true)} className="flex items-center gap-1.5 text-[9px] font-black text-slate-400 dark:text-slate-500 hover:text-brand-500 uppercase tracking-[0.2em] transition-all active:scale-95"><Info size={12} /> {t('about')}</button>

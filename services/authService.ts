@@ -57,37 +57,32 @@ export const loginUser = async (credentials: LoginRequest): Promise<LoginRespons
       return { status: 'error', message: 'You are offline. Please check your internet connection.' };
     }
 
-    // --- ADMIN LOGIN LOGIC (Secret Code) ---
-    if (credentials.secret_code && credentials.secret_code.trim() !== '') {
-      console.log("Connecting to Supabase for Admin login...");
-      let adminData, adminError;
-      try {
-          const result = await fetchWithRetry(() => 
-            supabase
-            .from('admins')
-            .select('*')
-            .eq('mobile', credentials.mobile)
-            .eq('secret_code', credentials.secret_code)
-            .maybeSingle()
-          );
-          adminData = result.data;
-          adminError = result.error;
-      } catch (err: any) { adminError = err; }
+    // --- 1. CHECK FOR ADMIN (via Mobile) ---
+    // Now admins also log in via OTP, so we check the admins table using the mobile number first.
+    let adminResult;
+    try {
+        adminResult = await fetchWithRetry(() => 
+          supabase
+          .from('admins')
+          .select('*')
+          .eq('mobile', credentials.mobile)
+          .maybeSingle()
+        );
+    } catch (err: any) { adminResult = { error: err, data: null }; }
 
-      if (adminError) return { status: 'error', message: `Database Error: ${adminError.message}` };
-      if (!adminData) return { status: 'error', message: 'Invalid Admin Credentials' };
-
+    if (adminResult.data) {
+      console.log("Admin identified via mobile.");
       return {
         status: 'success',
         role: 'admin',
         user_role: 'admin',
-        user_name: adminData.name,
-        user_id: adminData.id
+        user_name: adminResult.data.name,
+        user_id: adminResult.data.id
       };
     }
 
-    // --- USER LOGIN LOGIC (OTP Verified) ---
-    // Note: Password check is removed for standard users as they are verified via OTP.
+    // --- 2. CHECK FOR STANDARD USER ---
+    // If not an admin, proceed to check the users table.
     
     let userResult;
     try {
