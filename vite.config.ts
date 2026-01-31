@@ -27,8 +27,8 @@ export default defineConfig(({ mode }) => {
                 urlPattern: /^https:\/\/.*\.supabase\.co\/.*/i,
                 handler: 'NetworkOnly',
                 options: {
-                  cacheName: 'supabase-api-cache',
-                  networkTimeoutSeconds: 10
+                  cacheName: 'supabase-api-cache'
+                  // Removed networkTimeoutSeconds as it is not supported with NetworkOnly strategy
                 }
               },
               {
@@ -118,7 +118,6 @@ export default defineConfig(({ mode }) => {
                 purpose: 'maskable'
               }
             ],
-            // Added the 9 screenshots you uploaded
             screenshots: [
               {
                 src: 'screenshot1.png',
