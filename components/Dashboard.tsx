@@ -277,14 +277,23 @@ export const Dashboard: React.FC<DashboardProps> = ({ credentials, role, userNam
 
   return (
     <div className="fixed inset-0 h-screen w-screen bg-[#F8FAFC] dark:bg-dark-950 flex flex-col overflow-hidden transition-colors">
-      <Header onRefresh={handleManualRefresh} onOpenSettings={() => setActiveMenuModal('settings')} onOpenAbout={() => setActiveMenuModal('about')} onOpenHelp={() => setActiveMenuModal('help')} onOpenNotices={() => setIsNoticeListOpen(true)} onLogout={onLogout} />
+      <Header 
+        onRefresh={handleManualRefresh} 
+        onOpenSettings={() => setActiveMenuModal('settings')} 
+        onOpenAbout={() => setActiveMenuModal('about')} 
+        onOpenHelp={() => setActiveMenuModal('help')} 
+        onOpenNotices={() => setIsNoticeListOpen(true)} 
+        onLogout={onLogout} 
+        currentView={currentView}
+        onChangeView={handleViewChange}
+      />
 
-      {/* Main Container - Adjusted marginBottom to 5.5rem */}
-      <main className="flex-1 w-full flex flex-col overflow-hidden relative" style={{ marginTop: 'calc(5.5rem + env(safe-area-inset-top, 0px))', marginBottom: 'calc(5.5rem + env(safe-area-inset-bottom, 0px))' }}>
+      {/* Main Container - Adjusted marginBottom to 5.5rem ONLY for Mobile */}
+      <main className="flex-1 w-full flex flex-col overflow-hidden relative" style={{ marginTop: 'calc(5.5rem + env(safe-area-inset-top, 0px))', marginBottom: window.innerWidth < 768 ? 'calc(5.5rem + env(safe-area-inset-bottom, 0px))' : '0' }}>
         {currentView === 'home' ? (
             <>
                 <div className="w-full px-4 pt-3 pb-0.5 z-[40] flex-shrink-0">
-                    <div className="max-w-4xl mx-auto w-full">
+                    <div className="max-w-4xl md:max-w-7xl mx-auto w-full">
                         {initialLoading && !data ? <SkeletonSchoolCard /> : <SchoolInfoCard schoolName={data?.school_name || ''} schoolCode={data?.school_code || ''} onClick={handleSchoolCardClick} />}
                         
                         <div className="flex items-center justify-between mt-1 mb-2.5 px-1.5">
@@ -306,84 +315,114 @@ export const Dashboard: React.FC<DashboardProps> = ({ credentials, role, userNam
                 </div>
 
                 <div className="flex-1 overflow-y-auto w-full px-4 pb-4 no-scrollbar">
-                    <div className="max-w-4xl mx-auto w-full">
-                         <div className={`space-y-3 w-full transition-opacity duration-300 pb-10 ${isRefreshing ? 'opacity-40' : 'opacity-100'}`}>
+                    <div className="max-w-4xl md:max-w-7xl mx-auto w-full">
+                         {/* GRID LAYOUT WRAPPER */}
+                         <div className={`space-y-3 md:space-y-0 w-full transition-opacity duration-300 pb-10 ${isRefreshing ? 'opacity-40' : 'opacity-100'}`}>
                             
-                            {/* SHARED: GALLERY CARD */}
-                            <div 
-                                onClick={() => {
-                                    if (isFeatureLocked) {
-                                        if (!isSchoolActive) showLockedFeature('school');
-                                        else showLockedFeature('parent');
-                                    } else {
-                                        setIsGalleryOpen(true);
-                                    }
-                                }} 
-                                className={`glass-card p-5 rounded-[2.5rem] flex items-center justify-between cursor-pointer group active:scale-[0.98] transition-all shadow-sm ${isFeatureLocked ? 'bg-rose-50 dark:bg-rose-950/10 border-rose-100 dark:border-rose-900/20' : ''}`}
-                            >
-                                <div className="flex items-center gap-4 text-left">
-                                    <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-inner transition-all group-hover:scale-105 ${isFeatureLocked ? 'bg-rose-500 text-white' : 'bg-brand-500/10 text-brand-600'}`}>
-                                        <ImageIcon size={24} />
-                                    </div>
-                                    <div>
-                                        <h3 className={`font-black uppercase text-base leading-tight ${isFeatureLocked ? 'text-rose-600' : 'text-slate-800 dark:text-white'}`}>Photo Gallery</h3>
-                                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Events & Memories</p>
-                                    </div>
-                                </div>
-                                {isFeatureLocked ? <Lock size={20} className="text-rose-400" /> : <ChevronRight size={22} className="text-slate-200 group-hover:text-brand-500 transition-colors" />}
-                            </div>
-
-                            {/* EXAMINATION PORTAL (Principal/Teacher Upload) */}
-                            {(role === 'principal' || role === 'teacher') && (
-                                <div 
-                                    onClick={() => {
-                                        if (isFeatureLocked) showLockedFeature('school');
-                                        else setIsExamModalOpen(true);
-                                    }} 
-                                    className={`glass-card p-5 rounded-[2.5rem] flex items-center justify-between cursor-pointer group active:scale-[0.98] transition-all shadow-sm ${isFeatureLocked ? 'bg-rose-50 dark:bg-rose-950/10 border-rose-100 dark:border-rose-900/20' : ''}`}
-                                >
-                                    <div className="flex items-center gap-4 text-left">
-                                        <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-inner transition-all group-hover:scale-105 ${isFeatureLocked ? 'bg-rose-500 text-white' : 'bg-brand-500/10 text-brand-600'}`}>
-                                            <FileCheck size={24} />
-                                        </div>
-                                        <div>
-                                            <h3 className={`font-black uppercase text-base leading-tight ${isFeatureLocked ? 'text-rose-600' : 'text-slate-800 dark:text-white'}`}>Result Management</h3>
-                                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Upload Marks & Reports</p>
-                                        </div>
-                                    </div>
-                                    {isFeatureLocked ? <Lock size={20} className="text-rose-400" /> : <ChevronRight size={22} className="text-slate-200 group-hover:text-brand-500 transition-colors" />}
-                                </div>
-                            )}
-
-                            {/* EXAM RESULT ANALYTICS (Parent/Student View) - NEW ADDITION */}
-                            {(role === 'parent' || role === 'student') && data?.student_id && (
+                            {/* SHARED CARDS GRID ROW */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4 mb-3 md:mb-6">
+                                {/* GALLERY CARD */}
                                 <div 
                                     onClick={() => {
                                         if (isFeatureLocked) {
                                             if (!isSchoolActive) showLockedFeature('school');
                                             else showLockedFeature('parent');
                                         } else {
-                                            setIsReportOpen(true);
+                                            setIsGalleryOpen(true);
                                         }
                                     }} 
                                     className={`glass-card p-5 rounded-[2.5rem] flex items-center justify-between cursor-pointer group active:scale-[0.98] transition-all shadow-sm ${isFeatureLocked ? 'bg-rose-50 dark:bg-rose-950/10 border-rose-100 dark:border-rose-900/20' : ''}`}
                                 >
                                     <div className="flex items-center gap-4 text-left">
                                         <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-inner transition-all group-hover:scale-105 ${isFeatureLocked ? 'bg-rose-500 text-white' : 'bg-brand-500/10 text-brand-600'}`}>
-                                            <PieChart size={24} />
+                                            <ImageIcon size={24} />
                                         </div>
                                         <div>
-                                            <h3 className={`font-black uppercase text-base leading-tight ${isFeatureLocked ? 'text-rose-600' : 'text-slate-800 dark:text-white'}`}>Result Analytics</h3>
-                                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Download Report Cards</p>
+                                            <h3 className={`font-black uppercase text-base leading-tight ${isFeatureLocked ? 'text-rose-600' : 'text-slate-800 dark:text-white'}`}>Photo Gallery</h3>
+                                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Events & Memories</p>
                                         </div>
                                     </div>
                                     {isFeatureLocked ? <Lock size={20} className="text-rose-400" /> : <ChevronRight size={22} className="text-slate-200 group-hover:text-brand-500 transition-colors" />}
                                 </div>
-                            )}
+
+                                {/* EXAMINATION PORTAL (Principal/Teacher Upload) */}
+                                {(role === 'principal' || role === 'teacher') && (
+                                    <div 
+                                        onClick={() => {
+                                            if (isFeatureLocked) showLockedFeature('school');
+                                            else setIsExamModalOpen(true);
+                                        }} 
+                                        className={`glass-card p-5 rounded-[2.5rem] flex items-center justify-between cursor-pointer group active:scale-[0.98] transition-all shadow-sm ${isFeatureLocked ? 'bg-rose-50 dark:bg-rose-950/10 border-rose-100 dark:border-rose-900/20' : ''}`}
+                                    >
+                                        <div className="flex items-center gap-4 text-left">
+                                            <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-inner transition-all group-hover:scale-105 ${isFeatureLocked ? 'bg-rose-500 text-white' : 'bg-brand-500/10 text-brand-600'}`}>
+                                                <FileCheck size={24} />
+                                            </div>
+                                            <div>
+                                                <h3 className={`font-black uppercase text-base leading-tight ${isFeatureLocked ? 'text-rose-600' : 'text-slate-800 dark:text-white'}`}>Result Management</h3>
+                                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Upload Marks & Reports</p>
+                                            </div>
+                                        </div>
+                                        {isFeatureLocked ? <Lock size={20} className="text-rose-400" /> : <ChevronRight size={22} className="text-slate-200 group-hover:text-brand-500 transition-colors" />}
+                                    </div>
+                                )}
+
+                                {/* EXAM RESULT ANALYTICS (Parent/Student View) */}
+                                {(role === 'parent' || role === 'student') && data?.student_id && (
+                                    <div 
+                                        onClick={() => {
+                                            if (isFeatureLocked) {
+                                                if (!isSchoolActive) showLockedFeature('school');
+                                                else showLockedFeature('parent');
+                                            } else {
+                                                setIsReportOpen(true);
+                                            }
+                                        }} 
+                                        className={`glass-card p-5 rounded-[2.5rem] flex items-center justify-between cursor-pointer group active:scale-[0.98] transition-all shadow-sm ${isFeatureLocked ? 'bg-rose-50 dark:bg-rose-950/10 border-rose-100 dark:border-rose-900/20' : ''}`}
+                                    >
+                                        <div className="flex items-center gap-4 text-left">
+                                            <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-inner transition-all group-hover:scale-105 ${isFeatureLocked ? 'bg-rose-500 text-white' : 'bg-brand-500/10 text-brand-600'}`}>
+                                                <PieChart size={24} />
+                                            </div>
+                                            <div>
+                                                <h3 className={`font-black uppercase text-base leading-tight ${isFeatureLocked ? 'text-rose-600' : 'text-slate-800 dark:text-white'}`}>Result Analytics</h3>
+                                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Download Report Cards</p>
+                                            </div>
+                                        </div>
+                                        {isFeatureLocked ? <Lock size={20} className="text-rose-400" /> : <ChevronRight size={22} className="text-slate-200 group-hover:text-brand-500 transition-colors" />}
+                                    </div>
+                                )}
+
+                                {/* DOWNLOAD CENTER */}
+                                {role !== 'admin' && role !== 'driver' && role !== 'parent' && role !== 'student' as any && (
+                                    <div 
+                                        onClick={() => {
+                                            if (isFeatureLocked) {
+                                                if (!isSchoolActive) showLockedFeature('school');
+                                                else showLockedFeature('parent');
+                                            } else {
+                                                setIsReportOpen(true);
+                                            }
+                                        }} 
+                                        className={`glass-card p-5 rounded-[2.5rem] flex items-center justify-between cursor-pointer group active:scale-[0.98] transition-all shadow-sm ${isFeatureLocked ? 'bg-rose-50 dark:bg-rose-950/10 border-rose-100 dark:border-rose-900/20' : ''}`}
+                                    >
+                                        <div className="flex items-center gap-4 text-left">
+                                            <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-inner transition-all group-hover:scale-105 ${isFeatureLocked ? 'bg-rose-500 text-white' : 'bg-brand-500/10 text-brand-600'}`}>
+                                                <FileText size={24} />
+                                            </div>
+                                            <div>
+                                                <h3 className={`font-black uppercase text-base leading-tight ${isFeatureLocked ? 'text-rose-600' : 'text-slate-800 dark:text-white'}`}>Download History</h3>
+                                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Report Center (PDF)</p>
+                                            </div>
+                                        </div>
+                                        {isFeatureLocked ? <Lock size={20} className="text-rose-400" /> : <ChevronRight size={22} className="text-slate-200 group-hover:text-brand-500 transition-colors" />}
+                                    </div>
+                                )}
+                            </div>
 
                             {/* PRINCIPAL HUB */}
                             {role === 'principal' && (
-                              <div className="grid grid-cols-1 gap-3 w-full">
+                              <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4 w-full">
                                 {[
                                     { key: "notice", title: t('publish_notice'), subtitle: 'Global Academic Broadcast', icon: <Megaphone size={24} /> },
                                     { key: "transport", title: t('transport_tracking'), subtitle: 'Live Vehicle Map Engine', icon: <MapPin size={24} /> },
@@ -399,7 +438,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ credentials, role, userNam
 
                             {/* TEACHER HUB */}
                             {role === 'teacher' && (
-                               <div className="space-y-3">
+                               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
                                   {[
                                       { key: 'attendance', icon: <UserCheck size={28} />, title: t('attendance'), sub: t('digital_register') },
                                       { key: 'leave', icon: <CalendarRange size={28} />, title: t('staff_leave'), sub: t('apply_absence') },
@@ -422,7 +461,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ credentials, role, userNam
                             {/* STUDENT / PARENT HUB */}
                             {(role === 'parent' || role === 'student') && (
                               data?.student_id ? (
-                                <div className="space-y-3">
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
                                   <div onClick={() => isSchoolActive ? setParentStack(prev => [...prev, 'attendance_history']) : showLockedFeature('school')} className={`glass-card p-5 rounded-[2.5rem] flex items-center justify-between active:scale-[0.98] transition-all cursor-pointer shadow-sm ${!isSchoolActive ? 'bg-rose-50 dark:bg-rose-950/10 border-rose-100 dark:border-rose-900/20' : ''}`}>
                                     <div className="flex items-center gap-4">
                                       <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-inner ${!isSchoolActive ? 'bg-rose-500 text-white' : 'bg-brand-500/10 text-brand-600'}`}><UserCheck size={28} /></div>
@@ -450,39 +489,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ credentials, role, userNam
                               )
                             )}
 
-                            {/* DOWNLOAD CENTER (Principal/Teacher - kept for history reference) */}
-                            {role !== 'admin' && role !== 'driver' && role !== 'parent' && role !== 'student' as any && (
-                                <div 
-                                    onClick={() => {
-                                        if (isFeatureLocked) {
-                                            if (!isSchoolActive) showLockedFeature('school');
-                                            else showLockedFeature('parent');
-                                        } else {
-                                            setIsReportOpen(true);
-                                        }
-                                    }} 
-                                    className={`glass-card p-5 rounded-[2.5rem] flex items-center justify-between cursor-pointer group active:scale-[0.98] transition-all shadow-sm ${isFeatureLocked ? 'bg-rose-50 dark:bg-rose-950/10 border-rose-100 dark:border-rose-900/20' : ''}`}
-                                >
-                                    <div className="flex items-center gap-4 text-left">
-                                        <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-inner transition-all group-hover:scale-105 ${isFeatureLocked ? 'bg-rose-500 text-white' : 'bg-brand-500/10 text-brand-600'}`}>
-                                            <FileText size={24} />
-                                        </div>
-                                        <div>
-                                            <h3 className={`font-black uppercase text-base leading-tight ${isFeatureLocked ? 'text-rose-600' : 'text-slate-800 dark:text-white'}`}>Download History</h3>
-                                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Report Center (PDF)</p>
-                                        </div>
-                                    </div>
-                                    {isFeatureLocked ? <Lock size={20} className="text-rose-400" /> : <ChevronRight size={22} className="text-slate-200 group-hover:text-brand-500 transition-colors" />}
-                                </div>
-                            )}
-
                          </div>
                     </div>
                 </div>
             </>
         ) : (
             <div className="flex-1 overflow-y-auto px-4 w-full no-scrollbar">
-                <div className="max-w-4xl mx-auto w-full pt-4">
+                <div className="max-w-4xl md:max-w-7xl mx-auto w-full pt-4">
                     <ProfileView data={data} isLoading={initialLoading} onLogout={onLogout} credentials={credentials} onOpenSubscription={() => { if ((role === 'parent' || role === 'student') && !isSchoolActive) setShowLockPopup(t('upgrade_school_first')); else setShowPayModal(true); }} onOpenHelp={() => setActiveMenuModal('help')} onOpenAbout={() => setActiveMenuModal('about')} />
                 </div>
             </div>

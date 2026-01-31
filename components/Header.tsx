@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { GraduationCap, MoreVertical, Settings, Info, HelpCircle, Bell, LogOut } from 'lucide-react';
+import { GraduationCap, MoreVertical, Settings, Info, HelpCircle, Bell, LogOut, LayoutDashboard, User } from 'lucide-react';
 import { useThemeLanguage } from '../contexts/ThemeLanguageContext';
 import { useModalBackHandler } from '../hooks/useModalBackHandler';
 
@@ -11,9 +11,11 @@ interface HeaderProps {
   onOpenHelp: () => void;
   onOpenNotices?: () => void;
   onLogout: () => void;
+  currentView?: 'home' | 'profile';
+  onChangeView?: (view: 'home' | 'profile') => void;
 }
 
-export const Header: React.FC<HeaderProps> = ({ onOpenSettings, onOpenAbout, onOpenHelp, onOpenNotices, onLogout }) => {
+export const Header: React.FC<HeaderProps> = ({ onOpenSettings, onOpenAbout, onOpenHelp, onOpenNotices, onLogout, currentView, onChangeView }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const { t } = useThemeLanguage();
 
@@ -34,6 +36,24 @@ export const Header: React.FC<HeaderProps> = ({ onOpenSettings, onOpenAbout, onO
           </div>
           <span className="font-black text-slate-800 dark:text-white text-lg tracking-tight uppercase">VidyaSetu</span>
         </div>
+
+        {/* DESKTOP NAVIGATION (Visible only on md+) */}
+        {onChangeView && (
+            <div className="hidden md:flex items-center gap-2 absolute left-1/2 -translate-x-1/2 bottom-4 bg-slate-100 dark:bg-white/5 p-1 rounded-2xl border border-slate-200 dark:border-white/10">
+                <button 
+                    onClick={() => onChangeView('home')}
+                    className={`flex items-center gap-2 px-6 py-2 rounded-xl text-xs font-black uppercase transition-all ${currentView === 'home' ? 'bg-white dark:bg-dark-900 text-brand-600 shadow-sm' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}
+                >
+                    <LayoutDashboard size={16} /> Dashboard
+                </button>
+                <button 
+                    onClick={() => onChangeView('profile')}
+                    className={`flex items-center gap-2 px-6 py-2 rounded-xl text-xs font-black uppercase transition-all ${currentView === 'profile' ? 'bg-white dark:bg-dark-900 text-brand-600 shadow-sm' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}
+                >
+                    <User size={16} /> Profile
+                </button>
+            </div>
+        )}
 
         <div className="flex items-center gap-2">
           {onOpenNotices && (
