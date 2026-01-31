@@ -49,18 +49,12 @@ export const loginUser = async (credentials: LoginRequest): Promise<LoginRespons
 
       if (adminError) {
         console.error("Supabase Admin Login Error:", JSON.stringify(adminError, null, 2));
-        
-        // Specific check for fetch failures or missing tables
         if (adminError.message?.includes('fetch') || adminError.code === '') {
           return { 
             status: 'error', 
-            message: 'Connection Failed: ISP blocking, AdBlocker active, or Supabase Project Paused. Check console.' 
+            message: 'Connection Failed: ISP blocking, AdBlocker active, or Supabase Project Paused.' 
           };
         }
-        if (adminError.code === '42P01') {
-             return { status: 'error', message: 'System Error: Admins table not found.' };
-        }
-        
         return { status: 'error', message: `Database Error: ${adminError.message}` };
       }
 
@@ -77,44 +71,14 @@ export const loginUser = async (credentials: LoginRequest): Promise<LoginRespons
       };
     }
 
-    // --- NORMAL USER LOGIN LOGIC ---
-    
-    // 1. Fetch School with Retry
-    let schoolResult;
-    try {
-        schoolResult = await fetchWithRetry(() => 
-            supabase
-              .from('schools')
-              .select('id, name, is_active, subscription_end_date')
-              .eq('school_code', credentials.school_id)
-              .maybeSingle()
-        );
-    } catch (e: any) {
-        schoolResult = { error: e, data: null };
-    }
-
-    const { data: schoolData, error: schoolError } = schoolResult;
-
-    if (schoolError) {
-        console.error("School Fetch Error:", JSON.stringify(schoolError, null, 2));
-        if (schoolError.message?.includes('fetch') || schoolError.message?.includes('Failed to fetch')) {
-             return { status: 'error', message: 'Network Error: Cannot connect to server. Check internet or disable AdBlocker.' };
-        }
-        return { status: 'error', message: `School lookup failed: ${schoolError.message}` };
-    }
-
-    if (!schoolData) {
-      return { status: 'error', message: 'Invalid School Code' };
-    }
-
-    // 2. Fetch User with Retry
+    // --- GLOBAL USER LOGIN LOGIC (No School ID) ---
+    // 1. Fetch User and join School details in one go
     let userResult;
     try {
         userResult = await fetchWithRetry(() => 
             supabase
               .from('users')
-              .select('id, name, role, subscription_end_date')
-              .eq('school_id', schoolData.id)
+              .select('id, name, role, subscription_end_date, school_id, schools:school_id (id, name, is_active, subscription_end_date, school_code)')
               .eq('mobile', credentials.mobile)
               .eq('password', credentials.password)
               .maybeSingle()
@@ -128,14 +92,25 @@ export const loginUser = async (credentials: LoginRequest): Promise<LoginRespons
     if (userError) {
         console.error("User Fetch Error:", JSON.stringify(userError, null, 2));
         if (userError.message?.includes('fetch')) {
-             return { status: 'error', message: 'Network Error during user login.' };
+             return { status: 'error', message: 'Network Error. Check Internet.' };
         }
-        return { status: 'error', message: `User lookup failed: ${userError.message}` };
+        return { status: 'error', message: `Login failed: ${userError.message}` };
     }
 
     if (!userData) {
       return { status: 'error', message: 'Invalid Mobile Number or Password' };
     }
+
+    // Extract School Data
+    // @ts-ignore - Supabase types join sometimes tricky
+    const schoolData = userData.schools;
+
+    if (!schoolData) {
+        return { status: 'error', message: 'Account not linked to any valid school.' };
+    }
+
+    // Inject school_id back into credentials object for local storage consistency if needed later
+    credentials.school_id = schoolData.school_code;
 
     return {
       status: 'success',

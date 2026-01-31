@@ -2,14 +2,14 @@
 import { initializeApp, getApp, getApps } from "firebase/app";
 import { getMessaging, getToken, onMessage, Messaging } from "firebase/messaging";
 
+// Updated Configuration provided by user
 const firebaseConfig = {
-  apiKey: "AIzaSyBX8SHAdbLPxJnFSF02sXcb4E5JBFbxyOI",
-  authDomain: "vidyasetu-ai.firebaseapp.com",
-  projectId: "vidyasetu-ai",
-  storageBucket: "vidyasetu-ai.firebasestorage.app",
-  messagingSenderId: "780313942096",
-  appId: "1:780313942096:web:b0749c355fae48e38d5955",
-  measurementId: "G-TTPBZM3XX3"
+  apiKey: "AIzaSyDgUJ_-mq-i2JgwyzVKwmocRso6IUxVnvw",
+  authDomain: "vidyasetu-ai-adc1e.firebaseapp.com",
+  projectId: "vidyasetu-ai-adc1e",
+  storageBucket: "vidyasetu-ai-adc1e.firebasestorage.app",
+  messagingSenderId: "109380207060",
+  appId: "1:109380207060:web:a52990df319c6a7a5d5641"
 };
 
 const VAPID_KEY = "BHICTM0s7nowrVwtsDP65Blrl0RKE7nC34L1z5mfxtt9WILgTnPuIrmc3q9H_HR6ojdE6CoqwAMcIzGL1f69XOM";

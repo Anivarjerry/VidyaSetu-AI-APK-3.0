@@ -4,7 +4,7 @@ export type Role = 'principal' | 'teacher' | 'parent' | 'admin' | 'driver' | 'st
 export type LoginStatus = 'success' | 'subscription_required' | 'blocked' | 'error';
 
 export interface LoginRequest {
-  school_id: string; // This is actually school_code in the DB
+  school_id?: string; // Made optional as we now login via mobile only
   mobile: string;
   password: string;
   secret_code?: string; // For Admin

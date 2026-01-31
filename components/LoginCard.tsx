@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { LoginRequest } from '../types';
 import { Button } from './Button';
-import { School, Smartphone, Eye, AlertCircle, Key, UserCog, Sparkles, Info, HelpCircle, FileText, UserPlus } from 'lucide-react';
+import { Smartphone, Eye, AlertCircle, Key, UserCog, Sparkles, Info, HelpCircle, FileText, UserPlus } from 'lucide-react';
 import { useThemeLanguage } from '../contexts/ThemeLanguageContext';
 import { AboutModal, HelpModal, PoliciesModal } from './MenuModals';
 import { SignUpModal } from './SignUpModal';
@@ -19,10 +19,9 @@ export const LoginCard: React.FC<LoginCardProps> = ({ onSubmit, isLoading, error
   const [isAboutOpen, setIsAboutOpen] = useState(false);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [isPoliciesOpen, setIsPoliciesOpen] = useState(false);
-  const [isSignUpOpen, setIsSignUpOpen] = useState(false); // New state for SignUp
+  const [isSignUpOpen, setIsSignUpOpen] = useState(false);
 
   const [formData, setFormData] = useState<LoginRequest>({
-    school_id: '',
     mobile: '',
     password: '',
     secret_code: ''
@@ -32,7 +31,8 @@ export const LoginCard: React.FC<LoginCardProps> = ({ onSubmit, isLoading, error
     if (isAdminMode) {
       return formData.mobile.trim() !== '' && (formData.secret_code?.trim() || '') !== '';
     } else {
-      return formData.school_id.trim() !== '' && /^\d{10}$/.test(formData.mobile) && formData.password !== '';
+      // School ID Removed, only Mobile & Password check
+      return /^\d{10}$/.test(formData.mobile) && formData.password !== '';
     }
   };
 
@@ -53,10 +53,8 @@ export const LoginCard: React.FC<LoginCardProps> = ({ onSubmit, isLoading, error
 
   return (
     <div className="w-full h-full min-h-screen flex flex-col bg-white dark:bg-dark-950 overflow-y-auto no-scrollbar relative">
-      {/* Changed justify-center to justify-start and added pt-16 to shift content UP */}
       <div className="flex-1 flex flex-col items-center justify-start pt-16 sm:justify-center sm:pt-0 px-8 pb-10 z-10 relative max-w-md mx-auto w-full">
         
-        {/* Reduced bottom margin to make it compact */}
         <div className="flex flex-col items-center mb-6">
            <div className="w-16 h-16 bg-brand-500/10 rounded-3xl flex items-center justify-center text-brand-500 shadow-inner mb-4">
               <Sparkles size={32} strokeWidth={2.5} />
@@ -68,22 +66,10 @@ export const LoginCard: React.FC<LoginCardProps> = ({ onSubmit, isLoading, error
            </p>
         </div>
 
-        {/* Reduced space-y from 4 to 3 for compactness */}
         <form onSubmit={handleSubmit} className="w-full space-y-3">
           {!isAdminMode ? (
             <>
-              <div className="relative group">
-                <School className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-brand-500 transition-colors" size={20} />
-                {/* Compact Height h-14 and reduced padding py-4 */}
-                <input 
-                  type="text" 
-                  name="school_id" 
-                  value={formData.school_id} 
-                  onChange={handleChange} 
-                  className="w-full pl-12 pr-6 py-4 bg-slate-50 dark:bg-dark-900 border border-slate-100 dark:border-white/5 rounded-2xl text-sm font-bold text-slate-800 dark:text-white focus:ring-2 focus:ring-brand-500/20 outline-none transition-all uppercase placeholder:text-slate-400 h-14 shadow-sm" 
-                  placeholder={t('school_id_placeholder')} 
-                />
-              </div>
+              {/* School ID Input REMOVED */}
 
               <div className="relative group">
                 <Smartphone className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-brand-500 transition-colors" size={20} />
@@ -155,7 +141,6 @@ export const LoginCard: React.FC<LoginCardProps> = ({ onSubmit, isLoading, error
                 {isAdminMode ? t('staff_mode') : t('admin_port')}
              </button>
 
-             {/* Footer Links: About, Help & Legal */}
              <div className="flex items-center justify-center gap-6 border-t border-slate-50 dark:border-white/5 pt-5">
                 <button 
                   type="button" 
@@ -180,7 +165,6 @@ export const LoginCard: React.FC<LoginCardProps> = ({ onSubmit, isLoading, error
                 </button>
              </div>
 
-             {/* Static Bio / Terms Text - As requested */}
              <p className="text-[9px] text-slate-300 dark:text-slate-700 font-medium leading-relaxed px-4 opacity-80 cursor-default select-none">
                 By accessing this system, you agree to our Terms of Service & Privacy Policy. 
                 This application is designed solely for authorized educational management purposes.
