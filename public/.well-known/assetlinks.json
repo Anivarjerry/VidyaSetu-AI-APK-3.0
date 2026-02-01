@@ -1,0 +1,9 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "com.vidyasetuai.app.twa",
+        "sha256_cert_fingerprints": ["65:D7:E9:C6:FE:FF:34:64:90:CA:BD:3D:F0:10:1B:BF:7D:2E:7A:70:26:8E:A2:A3:54:87:A1:3B:12:B6:E4:B4"]
+      }
+    }]
+
