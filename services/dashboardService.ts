@@ -33,6 +33,20 @@ export const fetchPublicParents = async (schoolId: string) => {
     } catch (e) { return []; }
 };
 
+export const fetchStudentOptionsForParent = async (parentId: string) => {
+    try {
+        // Fetch children linked to the selected parent
+        const { data } = await supabase
+            .from('students')
+            .select('id, name, class_name')
+            .eq('parent_user_id', parentId)
+            // Filter only those who haven't signed up yet (optional, but good practice)
+            // .is('student_user_id', null) 
+            .order('name');
+        return data || [];
+    } catch (e) { return []; }
+};
+
 // --- ROBUST SCHOOL ID HELPER ---
 const getSchoolUUID = async (schoolCode: string): Promise<string | null> => {
     try {
@@ -318,7 +332,7 @@ export const fetchDashboardData = async ( sc: string, mob: string, role: Role, p
       return { ...base, periods: (ps || []).map((p: any) => ({ id: p.id, period_number: p.period_number, status: 'submitted', class_name: p.class_name, subject: p.subject, lesson: p.lesson, homework: p.homework, homework_type: p.homework_type })) };
     }
     if (role === 'parent') {
-      const { data: kids } = await supabase.from('students').select('id, name, class_name, section').eq('parent_user_id', user.id);
+      const { data: kids } = await supabase.from('students').select('id, name, class_name, section, dob').eq('parent_user_id', user.id);
       const target = sid ? kids?.find(k => k.id === sid) : kids?.[0];
       const { data: att } = await supabase.from('attendance').select('status').eq('student_id', target?.id).eq('date', getISTDate()).maybeSingle();
       return { ...base, student_id: target?.id, student_name: target?.name, class_name: target?.class_name, section: target?.section || '', today_attendance: (att?.status as any) || 'pending', siblings: kids || [] };

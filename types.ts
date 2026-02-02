@@ -40,6 +40,8 @@ export interface Student {
   name: string;
   class_name: string;
   roll_number?: string;
+  dob?: string;        // NEW
+  mother_name?: string; // NEW
 }
 
 export interface Vehicle {
@@ -76,6 +78,7 @@ export interface SiblingInfo {
   id: string;
   name: string;
   class_name: string;
+  dob?: string; // NEW
 }
 
 export interface DashboardData {
