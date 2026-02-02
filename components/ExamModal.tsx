@@ -3,7 +3,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Modal } from './Modal';
 import { Button } from './Button';
 import { X, Check, Loader2, FileText, Download, TrendingUp, Users, RefreshCw, AlertCircle, Save, Plus, Search, FileSpreadsheet } from 'lucide-react';
-import { fetchSchoolClasses, fetchStudentsForClass, createExamRecord, submitExamResults, fetchExamRecords, fetchExamResultsByRecord } from '../services/dashboardService';
+import { fetchSchoolClasses, fetchStudentsForClass, createExamRecord, submitExamResults, fetchExamRecords, fetchExamResultsByRecord, fetchClassSubjects } from '../services/dashboardService';
 import { downloadStudentReport, downloadExamResultsExcel } from '../services/reportService';
 import { Role, ExamRecord, Student, ExamMark } from '../types';
 
@@ -34,6 +34,7 @@ export const ExamModal: React.FC<ExamModalProps> = ({ isOpen, onClose, role, sch
       exam_date: new Date().toISOString().split('T')[0]
   });
   const [classes, setClasses] = useState<any[]>([]);
+  const [subjects, setSubjects] = useState<any[]>([]); // New State for Subjects
   const [students, setStudents] = useState<Student[]>([]);
   const [marksEntry, setMarksEntry] = useState<Record<string, string>>({}); // ID -> Mark
   const [absentEntry, setAbsentEntry] = useState<Record<string, boolean>>({}); // ID -> Is Absent
@@ -85,11 +86,13 @@ export const ExamModal: React.FC<ExamModalProps> = ({ isOpen, onClose, role, sch
   };
 
   // --- VIEW 2: CREATE EXAM HANDLERS ---
-  const handleClassChange = async (cls: string) => {
-      setFormData(prev => ({...prev, class_name: cls}));
-      if (cls) {
-          const stList = await fetchStudentsForClass(schoolId, cls);
+  const handleClassChange = async (clsName: string) => {
+      setFormData(prev => ({...prev, class_name: clsName, subject: ''}));
+      if (clsName) {
+          // 1. Fetch Students
+          const stList = await fetchStudentsForClass(schoolId, clsName);
           setStudents(stList);
+          
           const initialMarks: Record<string, string> = {};
           const initialAbsent: Record<string, boolean> = {};
           stList.forEach(s => {
@@ -98,8 +101,16 @@ export const ExamModal: React.FC<ExamModalProps> = ({ isOpen, onClose, role, sch
           });
           setMarksEntry(initialMarks);
           setAbsentEntry(initialAbsent);
+
+          // 2. Fetch Subjects linked to this class
+          const selectedClassObj = classes.find(c => c.class_name === clsName);
+          if (selectedClassObj) {
+              const subData = await fetchClassSubjects(selectedClassObj.id);
+              setSubjects(subData);
+          }
       } else {
           setStudents([]);
+          setSubjects([]);
       }
   };
 
@@ -290,14 +301,16 @@ export const ExamModal: React.FC<ExamModalProps> = ({ isOpen, onClose, role, sch
                                 {classes.map(c => <option key={c.id} value={c.class_name}>{c.class_name}</option>)}
                             </select>
                             
-                            <input 
-                                type="text" 
-                                placeholder="Subject" 
-                                value={formData.subject} 
-                                onChange={e => setFormData({...formData, subject: e.target.value})} 
+                            {/* NEW: SUBJECT DROPDOWN */}
+                            <select
+                                value={formData.subject}
+                                onChange={e => setFormData({...formData, subject: e.target.value})}
                                 className="p-3 rounded-xl bg-white dark:bg-dark-900 border border-slate-200 dark:border-white/10 text-xs font-bold uppercase"
-                                readOnly={!!assignedSubject}
-                            />
+                                disabled={!formData.class_name}
+                            >
+                                <option value="">{assignedSubject || 'Select Subject'}</option>
+                                {subjects.map(s => <option key={s.id} value={s.subject_name}>{s.subject_name}</option>)}
+                            </select>
                         </div>
 
                         <div className="grid grid-cols-2 gap-3">

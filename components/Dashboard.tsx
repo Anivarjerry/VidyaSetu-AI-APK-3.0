@@ -231,7 +231,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ credentials, role, userNam
                             {role === 'principal' && (
                               <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4 w-full">
                                 {[
-                                    { key: "approvals", title: "Identity Approvals", subtitle: "Verify New Signups", icon: <Users size={24} />, special: true },
+                                    { key: "approvals", title: "Identity Approvals", subtitle: "Verify New Signups", icon: <Users size={24} /> }, // Removed special: true
                                     { key: "notice", title: t('publish_notice'), subtitle: 'Global Academic Broadcast', icon: <Megaphone size={24} /> },
                                     { key: "transport", title: t('transport_tracking'), subtitle: 'Live Vehicle Map Engine', icon: <MapPin size={24} /> },
                                     { key: "teacher_analytics", title: t('teacher_report'), subtitle: 'Staff Efficiency Monitor', icon: <BarChart2 size={24} /> },
@@ -239,9 +239,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ credentials, role, userNam
                                     { key: "leave_management", title: t('leave_portal'), subtitle: 'Administrative Leave Hub', icon: <CalendarRange size={24} /> },
                                     { key: "attendance", title: t('global_attendance'), subtitle: 'Central Attendance Registry', icon: <UserCheck size={24} /> }
                                 ].map((item, index) => (
-                                  <div key={index} onClick={() => isSchoolActive ? setPrincipalStack(prev => [...prev, item.key]) : setShowPayModal(true)} className={`glass-card p-5 rounded-[2.5rem] flex items-center justify-between cursor-pointer group active:scale-[0.98] transition-all shadow-sm ${!isSchoolActive ? 'bg-rose-50 dark:bg-rose-950/10 border-rose-100 dark:border-rose-900/20' : item.special ? 'bg-indigo-50 dark:bg-indigo-500/10 border-indigo-100 dark:border-indigo-500/20' : ''}`}>
+                                  <div key={index} onClick={() => isSchoolActive ? setPrincipalStack(prev => [...prev, item.key]) : setShowPayModal(true)} className={`glass-card p-5 rounded-[2.5rem] flex items-center justify-between cursor-pointer group active:scale-[0.98] transition-all shadow-sm ${!isSchoolActive ? 'bg-rose-50 dark:bg-rose-950/10 border-rose-100 dark:border-rose-900/20' : ''}`}>
                                       <div className="flex items-center gap-4 text-left">
-                                          <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-inner transition-all group-hover:scale-105 ${!isSchoolActive ? 'bg-rose-500 text-white' : item.special ? 'bg-indigo-500 text-white' : 'bg-brand-500/10 text-brand-600'}`}>{item.icon}</div>
+                                          <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-inner transition-all group-hover:scale-105 ${!isSchoolActive ? 'bg-rose-500 text-white' : 'bg-brand-500/10 text-brand-600'}`}>{item.icon}</div>
                                           <div>
                                               <h3 className={`font-black uppercase text-base leading-tight ${!isSchoolActive ? 'text-rose-600' : 'text-slate-800 dark:text-white'}`}>{item.title}</h3>
                                               <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{item.subtitle}</p>
