@@ -93,21 +93,57 @@ export const GalleryModal: React.FC<GalleryModalProps> = ({ isOpen, onClose, sch
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       if (e.target.files && e.target.files[0]) {
           const file = e.target.files[0];
-          // Limit 800KB client check to avoid Supabase payload limits
-          if (file.size > 800000) { 
-              alert("Image too large. Please pick under 800KB.");
-              return;
-          }
+          // REMOVED 800KB LIMIT: Now we accept any image size and compress it later
           setUploadFile(file);
       }
   };
 
-  const convertBase64 = (file: File): Promise<string> => {
+  // SMART COMPRESSION FUNCTION
+  const compressImage = (file: File): Promise<string> => {
       return new Promise((resolve, reject) => {
           const reader = new FileReader();
           reader.readAsDataURL(file);
-          reader.onload = () => resolve(reader.result as string);
-          reader.onerror = error => reject(error);
+          reader.onload = (event) => {
+              const img = new Image();
+              img.src = event.target?.result as string;
+              img.onload = () => {
+                  const canvas = document.createElement('canvas');
+                  let width = img.width;
+                  let height = img.height;
+                  
+                  // Target Max Dimension (HD Quality)
+                  const MAX_DIMENSION = 1280; 
+
+                  // Calculate new dimensions while maintaining aspect ratio
+                  if (width > height) {
+                      if (width > MAX_DIMENSION) {
+                          height *= MAX_DIMENSION / width;
+                          width = MAX_DIMENSION;
+                      }
+                  } else {
+                      if (height > MAX_DIMENSION) {
+                          width *= MAX_DIMENSION / height;
+                          height = MAX_DIMENSION;
+                      }
+                  }
+
+                  canvas.width = width;
+                  canvas.height = height;
+                  
+                  const ctx = canvas.getContext('2d');
+                  if (ctx) {
+                      ctx.drawImage(img, 0, 0, width, height);
+                      // Compress to JPEG with 0.7 quality (Good balance)
+                      // This usually reduces a 5MB file to ~150-200KB
+                      const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+                      resolve(dataUrl);
+                  } else {
+                      reject(new Error("Compression failed"));
+                  }
+              };
+              img.onerror = (error) => reject(error);
+          };
+          reader.onerror = (error) => reject(error);
       });
   };
 
@@ -115,10 +151,12 @@ export const GalleryModal: React.FC<GalleryModalProps> = ({ isOpen, onClose, sch
       if (!uploadFile || !caption) return;
       setUploading(true);
       try {
-          const base64 = await convertBase64(uploadFile);
+          // Use the new compressImage function instead of raw base64
+          const compressedBase64 = await compressImage(uploadFile);
+          
           const result = await uploadGalleryPhoto({
               school_id: schoolId,
-              image_data: base64,
+              image_data: compressedBase64,
               caption: caption,
               tag: tag,
               month_year: selectedMonth,
@@ -239,11 +277,13 @@ export const GalleryModal: React.FC<GalleryModalProps> = ({ isOpen, onClose, sch
                             <div className="text-center">
                                 <ImageIcon size={32} className="mx-auto mb-2 text-brand-500" />
                                 <span className="text-xs font-bold text-brand-600">Image Selected</span>
+                                <p className="text-[9px] font-black text-slate-400 mt-1 uppercase">Ready to Compress</p>
                             </div>
                         ) : (
                             <>
                                 <Camera size={32} className="mb-2" />
                                 <span className="text-[10px] font-black uppercase tracking-widest">Tap to Pick Photo</span>
+                                <p className="text-[8px] font-bold text-slate-300 mt-1 uppercase">Supports High Res</p>
                             </>
                         )}
                         <input type="file" ref={fileInputRef} onChange={handleFileChange} accept="image/*" className="hidden" />
@@ -267,7 +307,7 @@ export const GalleryModal: React.FC<GalleryModalProps> = ({ isOpen, onClose, sch
                     </div>
 
                     <button onClick={handleUpload} disabled={uploading || !uploadFile} className="w-full py-4 bg-emerald-500 text-white rounded-[2rem] font-black uppercase text-xs shadow-xl active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2">
-                        {uploading ? <Loader2 className="animate-spin" /> : "Upload to Gallery"}
+                        {uploading ? <><Loader2 className="animate-spin" /> Processing...</> : "Upload to Gallery"}
                     </button>
                 </div>
             )}
