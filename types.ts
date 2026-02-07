@@ -1,5 +1,5 @@
 
-export type Role = 'principal' | 'teacher' | 'parent' | 'admin' | 'driver' | 'student';
+export type Role = 'principal' | 'teacher' | 'parent' | 'admin' | 'driver' | 'student' | 'gatekeeper';
 
 export type LoginStatus = 'success' | 'subscription_required' | 'blocked' | 'error';
 
@@ -237,4 +237,19 @@ export interface ExamMark {
   obtained_marks: number;
   grade: string;
   is_absent?: boolean; // NEW: Added support for absent status
+}
+
+// --- VISITOR ENTRY TYPE ---
+export interface VisitorEntry {
+  id?: string;
+  school_id: string;
+  gatekeeper_id: string;
+  visitor_name: string;
+  mobile: string;
+  village?: string;
+  visitor_count: number;
+  visiting_purpose: string;
+  meet_person?: string;
+  photo_data?: string; // Base64
+  entry_time?: string;
 }

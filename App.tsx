@@ -3,6 +3,7 @@ import React, { useState, useMemo } from 'react';
 import { LoginCard } from './components/LoginCard';
 import { Dashboard } from './components/Dashboard';
 import { AdminDashboard } from './components/AdminDashboard';
+import { GatekeeperDashboard } from './components/GatekeeperDashboard'; // Import Gatekeeper Dashboard
 import { loginUser } from './services/authService';
 import { LoginRequest, Role } from './types';
 import { ThemeLanguageProvider } from './contexts/ThemeLanguageContext';
@@ -15,18 +16,32 @@ const AppContent: React.FC = () => {
     credentials: LoginRequest | null;
     userRole: Role | null;
     userName: string;
+    userId?: string; // Add userId to state to pass to Gatekeeper
+    schoolDbId?: string; // Add schoolDbId
   }>(() => {
     try {
       const savedCreds = localStorage.getItem('vidyasetu_creds');
       const savedRole = localStorage.getItem('vidyasetu_role');
       const savedName = localStorage.getItem('vidyasetu_name');
+      const savedData = localStorage.getItem('vidyasetu_dashboard_data'); // Try to get cached dashboard data for IDs
+
+      let userId = '';
+      let schoolDbId = '';
+
+      if (savedData) {
+          const parsed = JSON.parse(savedData);
+          userId = parsed.user_id;
+          schoolDbId = parsed.school_db_id;
+      }
 
       if (savedCreds && savedRole) {
         return {
           view: savedRole === 'admin' ? 'admin' : 'dashboard',
           credentials: JSON.parse(savedCreds),
           userRole: savedRole as Role,
-          userName: savedName || ''
+          userName: savedName || '',
+          userId,
+          schoolDbId
         };
       }
     } catch (e) {
@@ -52,11 +67,22 @@ const AppContent: React.FC = () => {
           localStorage.setItem('vidyasetu_role', role);
           localStorage.setItem('vidyasetu_name', name);
           
+          // For Gatekeeper specifically, we need these immediately
+          if (role === 'gatekeeper') {
+             // We can store minimal data to allow immediate re-render
+             localStorage.setItem('vidyasetu_dashboard_data', JSON.stringify({
+                 user_id: response.user_id,
+                 school_db_id: response.school_db_id
+             }));
+          }
+          
           setAuthData({
             view: role === 'admin' ? 'admin' : 'dashboard',
             credentials: creds,
             userRole: role,
-            userName: name
+            userName: name,
+            userId: response.user_id,
+            schoolDbId: response.school_db_id
           });
       } else {
           setLoginError(response.message || 'Invalid credentials');
@@ -82,6 +108,17 @@ const AppContent: React.FC = () => {
       return <AdminDashboard onLogout={handleLogout} userName={authData.userName} />;
     case 'dashboard':
       if (authData.credentials && authData.userRole) {
+        // --- GATEKEEPER ROUTING ---
+        if (authData.userRole === 'gatekeeper') {
+            // Ensure we have IDs, if not (e.g. fresh reload without full cache), standard Dashboard might handle it or we might need to rely on Dashboard fetching first.
+            // But loginUser returns them. 
+            // Fallback: If IDs missing here, Dashboard component usually fetches them. 
+            // But GatekeeperDashboard is standalone.
+            // We pass what we have; GatekeeperDashboard might need to fetch schoolId if missing, 
+            // but login response provided it.
+            return <GatekeeperDashboard onLogout={handleLogout} schoolId={authData.schoolDbId || ''} userId={authData.userId || ''} />;
+        }
+
         return <Dashboard credentials={authData.credentials} role={authData.userRole} userName={authData.userName} onLogout={handleLogout} />;
       }
       return <LoginCard onSubmit={handleLogin} isLoading={isLoggingIn} error={loginError} />;

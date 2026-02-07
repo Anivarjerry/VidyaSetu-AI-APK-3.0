@@ -1,5 +1,5 @@
 
-import { DashboardData, PeriodData, Role, ParentHomework, NoticeItem, NoticeRequest, AnalyticsSummary, TeacherProgress, HomeworkAnalyticsData, StudentHomeworkStatus, Student, AttendanceStatus, Vehicle, StaffLeave, AttendanceHistoryItem, StudentLeave, SchoolSummary, SchoolUser, SiblingInfo, GalleryItem, ExamRecord, ExamMark } from '../types';
+import { DashboardData, PeriodData, Role, ParentHomework, NoticeItem, NoticeRequest, AnalyticsSummary, TeacherProgress, HomeworkAnalyticsData, StudentHomeworkStatus, Student, AttendanceStatus, Vehicle, StaffLeave, AttendanceHistoryItem, StudentLeave, SchoolSummary, SchoolUser, SiblingInfo, GalleryItem, ExamRecord, ExamMark, VisitorEntry } from '../types';
 import { supabase } from './supabaseClient';
 
 export const getISTDate = (): string => {
@@ -327,6 +327,8 @@ export const fetchDashboardData = async ( sc: string, mob: string, role: Role, p
 
     const base: DashboardData = { user_id: user.id, school_db_id: school.id, user_name: user.name, user_role: user.role as Role, mobile_number: user.mobile, school_name: school.name, school_code: school.school_code, subscription_status: isClient ? (schoolActive && userActive ? 'active' : 'inactive') : (schoolActive ? 'active' : 'inactive'), school_subscription_status: schoolActive ? 'active' : 'inactive', subscription_end_date: displayDate, total_periods: school.total_periods || 8, assigned_subject: user.assigned_subject };
 
+    if (role === 'gatekeeper') return base; // Gatekeeper uses separate flow
+
     if (role === 'teacher') {
       const { data: ps } = await supabase.from('daily_periods').select('*').eq('school_id', school.id).eq('teacher_user_id', user.id).eq('date', getISTDate());
       return { ...base, periods: (ps || []).map((p: any) => ({ id: p.id, period_number: p.period_number, status: 'submitted', class_name: p.class_name, subject: p.subject, lesson: p.lesson, homework: p.homework, homework_type: p.homework_type })) };
@@ -470,4 +472,25 @@ export const fetchStudentExamResults = async (studentId: string): Promise<any[]>
             is_absent: d.is_absent
         }));
     } catch (e) { return []; }
+};
+
+// --- VISITOR MANAGEMENT SERVICES (GATEKEEPER) ---
+export const addVisitorEntry = async (entry: VisitorEntry) => {
+    const { error } = await supabase.from('visitor_entries').insert([entry]);
+    return !error;
+};
+
+export const fetchVisitorEntries = async (schoolId: string, date: string) => {
+    const startDate = `${date}T00:00:00`;
+    const endDate = `${date}T23:59:59`;
+
+    const { data, error } = await supabase
+        .from('visitor_entries')
+        .select('*')
+        .eq('school_id', schoolId)
+        .gte('entry_time', startDate)
+        .lte('entry_time', endDate)
+        .order('entry_time', { ascending: false });
+
+    return data || [];
 };
