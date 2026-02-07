@@ -312,7 +312,19 @@ export const fetchAIContextData = async (role: Role, schoolIdCode: string, userI
 // --- DASHBOARD DATA FETCH ---
 export const fetchDashboardData = async ( sc: string, mob: string, role: Role, pw?: string, sid?: string ): Promise<DashboardData | null> => {
   try {
-    const { data: school } = await supabase.from('schools').select('id, name, school_code, is_active, subscription_end_date, total_periods').ilike('school_code', sc.trim()).maybeSingle();
+    // FIX: Check if 'sc' is a UUID (from internal navigation) or a Code (from login input)
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(sc.trim());
+    
+    let schoolQuery = supabase.from('schools').select('id, name, school_code, is_active, subscription_end_date, total_periods');
+    
+    if (isUUID) {
+        schoolQuery = schoolQuery.eq('id', sc.trim());
+    } else {
+        schoolQuery = schoolQuery.ilike('school_code', sc.trim());
+    }
+
+    const { data: school } = await schoolQuery.maybeSingle();
+    
     if (!school) return null;
     let uQ = supabase.from('users').select('id, name, role, mobile, subscription_end_date, assigned_subject').eq('school_id', school.id).eq('mobile', mob);
     if (pw) uQ = uQ.eq('password', pw);

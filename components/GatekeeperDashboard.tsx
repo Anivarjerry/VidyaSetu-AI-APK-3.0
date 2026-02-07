@@ -49,7 +49,7 @@ export const GatekeeperDashboard: React.FC<GatekeeperDashboardProps> = ({ onLogo
       visitor_name: '',
       mobile: '',
       village: '',
-      visitor_count: 1,
+      visitor_count: 1 as number | string, // CHANGED: Allow string for empty input handling
       visiting_purpose: 'Principal/Enquiry',
       meet_person: 'Principal'
   });
@@ -171,7 +171,14 @@ export const GatekeeperDashboard: React.FC<GatekeeperDashboardProps> = ({ onLogo
       e.preventDefault();
       if (!photoData) { alert("Visitor photo is mandatory for security."); return; }
       setSubmitting(true);
-      const payload: VisitorEntry = { school_id: schoolId, gatekeeper_id: userId, ...formData, photo_data: photoData };
+      // Ensure visitor_count is a number on submit
+      const payload: VisitorEntry = { 
+          school_id: schoolId, 
+          gatekeeper_id: userId, 
+          ...formData, 
+          visitor_count: Number(formData.visitor_count) || 1, 
+          photo_data: photoData 
+      };
       const success = await addVisitorEntry(payload);
       if (success) {
           alert("Entry Logged Successfully");
@@ -213,7 +220,7 @@ export const GatekeeperDashboard: React.FC<GatekeeperDashboardProps> = ({ onLogo
                     <div className="flex justify-center mb-2"><div onClick={() => fileInputRef.current?.click()} className={`w-36 h-36 rounded-[2rem] border-2 border-dashed flex flex-col items-center justify-center cursor-pointer overflow-hidden relative shadow-sm transition-all active:scale-95 group ${photoData ? 'border-emerald-500' : 'border-slate-300 dark:border-white/10 bg-slate-50 dark:bg-white/5 hover:bg-slate-100 dark:hover:bg-white/10'}`}>{photoData ? (<img src={photoData} alt="Preview" className="w-full h-full object-cover" />) : (<><Camera size={32} className="text-slate-400 mb-2 group-hover:text-emerald-500 transition-colors" /><span className="text-[9px] font-black uppercase text-slate-400 tracking-widest">Take Photo</span></>)}<input type="file" ref={fileInputRef} accept="image/*" capture="user" onChange={handlePhotoCapture} className="hidden" /></div></div>
                     <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase ml-1 flex items-center gap-1"><Phone size={10} /> Mobile Number</label><input type="tel" value={formData.mobile} onChange={e => setFormData({...formData, mobile: e.target.value})} className="w-full p-4 rounded-2xl bg-slate-50 dark:bg-dark-900 border border-slate-200 dark:border-white/10 font-bold text-sm text-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500/20 transition-all uppercase tracking-widest" placeholder="10-DIGIT NUMBER" required /></div>
                     <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase ml-1 flex items-center gap-1"><User size={10} /> Visitor Name</label><input type="text" value={formData.visitor_name} onChange={e => setFormData({...formData, visitor_name: e.target.value})} className="w-full p-4 rounded-2xl bg-slate-50 dark:bg-dark-900 border border-slate-200 dark:border-white/10 font-bold text-sm text-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500/20 transition-all uppercase" placeholder="FULL NAME" required /></div>
-                    <div className="grid grid-cols-2 gap-3"><div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase ml-1 flex items-center gap-1"><MapPin size={10} /> Village/Area</label><input type="text" value={formData.village} onChange={e => setFormData({...formData, village: e.target.value})} className="w-full p-4 rounded-2xl bg-slate-50 dark:bg-dark-900 border border-slate-200 dark:border-white/10 font-bold text-sm text-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500/20 uppercase" placeholder="LOCATION" /></div><div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase ml-1 flex items-center gap-1"><Users size={10} /> Count</label><input type="number" min="1" value={formData.visitor_count} onChange={e => setFormData({...formData, visitor_count: parseInt(e.target.value) || 1})} className="w-full p-4 rounded-2xl bg-slate-50 dark:bg-dark-900 border border-slate-200 dark:border-white/10 font-bold text-sm text-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500/20" /></div></div>
+                    <div className="grid grid-cols-2 gap-3"><div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase ml-1 flex items-center gap-1"><MapPin size={10} /> Village/Area</label><input type="text" value={formData.village} onChange={e => setFormData({...formData, village: e.target.value})} className="w-full p-4 rounded-2xl bg-slate-50 dark:bg-dark-900 border border-slate-200 dark:border-white/10 font-bold text-sm text-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500/20 uppercase" placeholder="LOCATION" /></div><div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase ml-1 flex items-center gap-1"><Users size={10} /> Count</label><input type="number" min="1" value={formData.visitor_count} onChange={e => setFormData({...formData, visitor_count: e.target.value})} className="w-full p-4 rounded-2xl bg-slate-50 dark:bg-dark-900 border border-slate-200 dark:border-white/10 font-bold text-sm text-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500/20" /></div></div>
                     <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase ml-1 flex items-center gap-1"><Target size={10} /> Purpose</label><select value={formData.visiting_purpose} onChange={e => setFormData({...formData, visiting_purpose: e.target.value})} className="w-full p-4 rounded-2xl bg-slate-50 dark:bg-dark-900 border border-slate-200 dark:border-white/10 font-bold text-sm text-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500/20 uppercase"><option>Admission Enquiry</option><option>Fee Payment</option><option>Meeting (Principal)</option><option>Meeting (Teacher)</option><option>Pick Up Student</option><option>Vendor/Supply</option><option>Other</option></select></div>
                 </div>
                 <div className="pt-2"><button type="submit" disabled={submitting} className="w-full py-5 bg-emerald-500 text-white rounded-[1.8rem] font-black uppercase text-xs shadow-xl shadow-emerald-500/20 active:scale-95 transition-all flex items-center justify-center gap-2">{submitting ? <Loader2 className="animate-spin" /> : <><Save size={16} /> Save Entry Log</>}</button></div>
