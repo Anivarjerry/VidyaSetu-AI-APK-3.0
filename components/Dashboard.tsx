@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { DashboardData, LoginRequest, Role, PeriodData, ParentHomework, SchoolSummary, SchoolUser } from '../types';
-import { fetchDashboardData, submitPeriodData, updateParentHomeworkStatus, getISTDate, updateVehicleLocation, fetchSchoolSummary, fetchSchoolUserList, fetchSchoolClasses } from '../services/dashboardService';
+import { fetchDashboardData, submitPeriodData, updateParentHomeworkStatus, getISTDate, updateVehicleLocation, fetchSchoolSummary, fetchSchoolUserList, fetchSchoolClasses, fetchVisitorEntries } from '../services/dashboardService';
 import { fetchPendingApprovals, updateUserApprovalStatus } from '../services/authService';
 import { Header } from './Header';
 import { BottomNav } from './BottomNav';
@@ -25,7 +25,7 @@ import { GalleryModal } from './GalleryModal';
 import { ReportModal } from './ReportModal';
 import { ExamModal } from './ExamModal';
 import { useThemeLanguage } from '../contexts/ThemeLanguageContext';
-import { ChevronRight, CheckCircle2, RefreshCw, UserCheck, Bell, BarChart2, BookOpen, MapPin, Truck, CalendarRange, Play, Square, Loader2, Megaphone, GraduationCap, School as SchoolIcon, Sparkles, User, Smartphone, ChevronLeft, History, Lock, AlertCircle, Zap, ShieldCheck, MoreHorizontal, X, LayoutGrid, Image as ImageIcon, FileText, Download, FileCheck, Trophy, PieChart, Users, Check, UserX } from 'lucide-react';
+import { ChevronRight, CheckCircle2, RefreshCw, UserCheck, Bell, BarChart2, BookOpen, MapPin, Truck, CalendarRange, Play, Square, Loader2, Megaphone, GraduationCap, School as SchoolIcon, Sparkles, User, Smartphone, ChevronLeft, History, Lock, AlertCircle, Zap, ShieldCheck, MoreHorizontal, X, LayoutGrid, Image as ImageIcon, FileText, Download, FileCheck, Trophy, PieChart, Users, Check, UserX, Shield } from 'lucide-react';
 import { SubscriptionModal } from './SubscriptionModal';
 import { Modal } from './Modal';
 import { useModalBackHandler } from '../hooks/useModalBackHandler';
@@ -48,6 +48,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ credentials, role, userNam
   const [principalStack, setPrincipalStack] = useState<string[]>([]);
   const [teacherStack, setTeacherStack] = useState<string[]>([]);
   const [parentStack, setParentStack] = useState<string[]>([]); 
+
+  // --- GATE ENTRY STATE ---
+  const [visitorLogs, setVisitorLogs] = useState<any[]>([]);
+  const [loadingVisitors, setLoadingVisitors] = useState(false);
 
   useModalBackHandler(
       (role === 'principal' && principalStack.length > 0) || 
@@ -201,6 +205,19 @@ export const Dashboard: React.FC<DashboardProps> = ({ credentials, role, userNam
       if (principalStack.includes('approvals')) handleLoadApprovals();
   }, [principalStack]);
 
+  // NEW: Visitor Logs Logic
+  const handleLoadVisitorLogs = async () => {
+      if (!data?.school_db_id) return;
+      setLoadingVisitors(true);
+      const logs = await fetchVisitorEntries(data.school_db_id, getISTDate());
+      setVisitorLogs(logs);
+      setLoadingVisitors(false);
+  };
+
+  useEffect(() => {
+      if (principalStack.includes('visitor_logs')) handleLoadVisitorLogs();
+  }, [principalStack]);
+
   return (
     <div className="fixed inset-0 h-screen w-screen bg-[#F8FAFC] dark:bg-dark-950 flex flex-col overflow-hidden transition-colors">
       <Header onRefresh={handleManualRefresh} onOpenSettings={() => setActiveMenuModal('settings')} onOpenAbout={() => setActiveMenuModal('about')} onOpenHelp={() => setActiveMenuModal('help')} onOpenNotices={() => setIsNoticeListOpen(true)} onLogout={onLogout} currentView={currentView} onChangeView={handleViewChange} />
@@ -227,11 +244,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ credentials, role, userNam
                                 {role !== 'admin' && role !== 'driver' && role !== 'parent' && role !== 'student' as any && (<div onClick={() => { if (isFeatureLocked) { if (!isSchoolActive) showLockedFeature('school'); else showLockedFeature('parent'); } else { setIsReportOpen(true); } }} className={`glass-card p-5 rounded-[2.5rem] flex items-center justify-between cursor-pointer group active:scale-[0.98] transition-all shadow-sm ${isFeatureLocked ? 'bg-rose-50 dark:bg-rose-950/10 border-rose-100 dark:border-rose-900/20' : ''}`}><div className="flex items-center gap-4 text-left"><div className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-inner transition-all group-hover:scale-105 ${isFeatureLocked ? 'bg-rose-500 text-white' : 'bg-brand-500/10 text-brand-600'}`}><FileText size={24} /></div><div><h3 className={`font-black uppercase text-base leading-tight ${isFeatureLocked ? 'text-rose-600' : 'text-slate-800 dark:text-white'}`}>Download History</h3><p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Report Center (PDF)</p></div></div>{isFeatureLocked ? <Lock size={20} className="text-rose-400" /> : <ChevronRight size={22} className="text-slate-200 group-hover:text-brand-500 transition-colors" />}</div>)}
                             </div>
 
-                            {/* PRINCIPAL HUB WITH NEW APPROVAL CARD */}
+                            {/* PRINCIPAL HUB WITH NEW APPROVAL CARD AND GATEKEEPER CARD */}
                             {role === 'principal' && (
                               <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4 w-full">
                                 {[
-                                    { key: "approvals", title: "Identity Approvals", subtitle: "Verify New Signups", icon: <Users size={24} /> }, // Removed special: true
+                                    { key: "approvals", title: "Identity Approvals", subtitle: "Verify New Signups", icon: <Users size={24} /> },
+                                    { key: "visitor_logs", title: t('gate_security'), subtitle: t('view_visitors'), icon: <ShieldCheck size={24} /> }, // NEW CARD
                                     { key: "notice", title: t('publish_notice'), subtitle: 'Global Academic Broadcast', icon: <Megaphone size={24} /> },
                                     { key: "transport", title: t('transport_tracking'), subtitle: 'Live Vehicle Map Engine', icon: <MapPin size={24} /> },
                                     { key: "teacher_analytics", title: t('teacher_report'), subtitle: 'Staff Efficiency Monitor', icon: <BarChart2 size={24} /> },
@@ -287,8 +305,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ credentials, role, userNam
       {data && (<ReportModal isOpen={isReportOpen} onClose={() => setIsReportOpen(false)} role={role} schoolId={data.school_db_id} userId={data.user_id} classOptions={reportClasses} studentId={data.student_id} studentName={data.student_name} />)}
       {data && (<ExamModal isOpen={isExamModalOpen} onClose={() => setIsExamModalOpen(false)} role={role} schoolId={data.school_db_id || ''} userId={data.user_id || ''} assignedSubject={data.assigned_subject} />)}
       <LeaveRequestModal isOpen={role === 'driver' && isLeaveModalOpen} onClose={() => setIsLeaveModalOpen(false)} userId={data?.user_id || ''} schoolId={data?.school_db_id || ''} />
+      
       {/* ... (School Detail Modal) ... */}
       <Modal isOpen={isSchoolDetailOpen} onClose={() => setIsSchoolDetailOpen(false)} title="INSTITUTION PROFILE"><div className="flex flex-col h-[70vh]">{!listCategory ? (<div className="space-y-6 overflow-y-auto no-scrollbar pb-4 flex-1 relative"><button onClick={handleSyncSchoolSummary} disabled={schoolSummaryRefreshing} className={`absolute top-0 right-0 p-2.5 rounded-full bg-slate-100 dark:bg-white/10 text-slate-500 z-20 active:scale-90 transition-all ${schoolSummaryRefreshing ? 'animate-spin text-brand-500' : 'hover:text-brand-500'}`}><RefreshCw size={18} /></button><div className="p-6 rounded-[2.5rem] bg-slate-900 dark:bg-slate-800 text-white shadow-xl relative overflow-hidden mt-2"><div className="relative z-10 text-center"><div className="w-16 h-16 bg-white/10 rounded-2xl flex items-center justify-center mx-auto mb-3 backdrop-blur-md border border-white/20"><SchoolIcon size={32} /></div><h2 className="text-xl font-black uppercase tracking-tight leading-tight">{schoolSummary?.school_name || (loadingSchoolSummary ? 'Loading...' : 'Unknown')}</h2><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Code: {schoolSummary?.school_code || '---'}</p></div></div><div className="p-5 rounded-[2rem] bg-brand-50 dark:bg-brand-500/10 border border-brand-100 dark:border-brand-500/20 flex items-center gap-4"><div className="w-12 h-12 rounded-2xl bg-brand-500 text-white flex items-center justify-center shadow-lg shadow-brand-500/20"><User size={24} /></div><div><p className="text-[9px] font-black text-brand-600 uppercase tracking-widest mb-0.5">Principal</p><h4 className="text-sm font-black text-slate-800 dark:text-white uppercase">{schoolSummary?.principal_name || 'Not Assigned'}</h4></div></div><div className="grid grid-cols-2 gap-3"><div onClick={() => handleCategoryClick('teachers')} className="p-4 rounded-[2rem] bg-white dark:bg-white/5 border border-slate-100 dark:border-white/10 shadow-sm cursor-pointer active:scale-95 transition-all"><p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">Teaching Staff</p><div className="flex items-end gap-2"><span className="text-3xl font-black text-slate-800 dark:text-white">{schoolSummary?.total_teachers || 0}</span><ChevronRight size={16} className="text-slate-300 mb-1" /></div></div><div onClick={() => handleCategoryClick('drivers')} className="p-4 rounded-[2rem] bg-white dark:bg-white/5 border border-slate-100 dark:border-white/10 shadow-sm cursor-pointer active:scale-95 transition-all"><p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">Transport</p><div className="flex items-end gap-2"><span className="text-3xl font-black text-slate-800 dark:text-white">{schoolSummary?.total_drivers || 0}</span><ChevronRight size={16} className="text-slate-300 mb-1" /></div></div></div></div>) : (<div className="flex flex-col h-full premium-subview-enter"><button onClick={() => setListCategory(null)} className="flex items-center gap-2 text-slate-400 font-black text-[10px] uppercase tracking-widest mb-4 hover:text-brand-500 transition-colors"><ChevronLeft size={14} /> Back to Summary</button><h3 className="text-lg font-black text-slate-800 dark:text-white uppercase mb-4 pl-1">{listCategory} Directory</h3><div className="flex-1 overflow-y-auto pr-1 space-y-3 no-scrollbar">{loadingUserList ? (<div className="text-center py-10"><Loader2 className="animate-spin mx-auto text-brand-500" /></div>) : categoryUserList.length === 0 ? (<div className="text-center py-10 opacity-30 text-[10px] font-black uppercase tracking-widest">No records found</div>) : (categoryUserList.map((user, i) => (<div key={i} className="p-4 bg-white dark:bg-white/5 rounded-[1.5rem] border border-slate-100 dark:border-white/5 flex items-center gap-3 shadow-sm"><div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-white/10 flex items-center justify-center font-black text-slate-500 dark:text-slate-300">{user.name.charAt(0)}</div><div><p className="font-black text-sm text-slate-800 dark:text-white uppercase truncate">{user.name}</p><p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{user.mobile}</p></div></div>)))}</div></div>)}</div></Modal>
+      
       {/* ... (Other Stack Modals) ... */}
       <NoticeModal isOpen={principalStack[principalStack.length-1] === 'notice'} onClose={() => setPrincipalStack(prev => prev.slice(0, -1))} credentials={credentials} />
       <TransportTrackerModal isOpen={principalStack[principalStack.length-1] === 'transport'} onClose={() => setPrincipalStack(prev => prev.slice(0, -1))} schoolId={data?.school_db_id || ''} />
@@ -297,7 +317,43 @@ export const Dashboard: React.FC<DashboardProps> = ({ credentials, role, userNam
       <StaffLeaveManagementModal isOpen={principalStack[principalStack.length-1] === 'leave_management'} onClose={() => setPrincipalStack(prev => prev.slice(0, -1))} schoolId={data?.school_db_id || ''} />
       <AttendanceModal isOpen={principalStack[principalStack.length-1] === 'attendance'} onClose={() => setPrincipalStack(prev => prev.slice(0, -1))} schoolId={data?.school_db_id || ''} teacherId={data?.user_id || ''} />
       
-      {/* NEW: APPROVAL MODAL */}
+      {/* NEW: VISITOR LOGS MODAL (PRINCIPAL) */}
+      <Modal isOpen={principalStack.includes('visitor_logs')} onClose={() => setPrincipalStack(prev => prev.filter(k => k !== 'visitor_logs'))} title="VISITOR LOGS">
+          <div className="flex flex-col h-[70vh]">
+              {loadingVisitors ? (
+                  <div className="flex items-center justify-center h-full"><Loader2 className="animate-spin text-emerald-500" size={32} /></div>
+              ) : visitorLogs.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-full opacity-40">
+                      <ShieldCheck size={48} className="text-slate-300 mb-2" />
+                      <p className="text-[10px] font-black uppercase tracking-widest">No entries today</p>
+                  </div>
+              ) : (
+                  <div className="space-y-3 overflow-y-auto no-scrollbar flex-1 pb-4">
+                      {visitorLogs.map((v) => (
+                          <div key={v.id} className="bg-white dark:bg-dark-900 p-4 rounded-[2rem] border border-slate-100 dark:border-white/5 shadow-sm flex items-center gap-4 premium-subview-enter">
+                              <div className="w-16 h-16 rounded-2xl bg-slate-100 dark:bg-white/5 overflow-hidden shrink-0 border border-slate-200 dark:border-white/10">
+                                  {v.photo_data ? (
+                                      <img src={v.photo_data} alt="Visitor" className="w-full h-full object-cover" />
+                                  ) : (
+                                      <div className="w-full h-full flex items-center justify-center text-slate-300"><User size={24} /></div>
+                                  )}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                  <div className="flex justify-between items-start">
+                                      <h4 className="font-black text-slate-800 dark:text-white uppercase text-sm truncate">{v.visitor_name}</h4>
+                                      <span className="text-[10px] font-bold text-slate-400">{new Date(v.entry_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                                  </div>
+                                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wide truncate">{v.visiting_purpose} • {v.visitor_count} Person(s)</p>
+                                  <p className="text-[10px] font-bold text-emerald-500 uppercase mt-1 truncate">Meeting: {v.meet_person || 'Principal'}</p>
+                              </div>
+                          </div>
+                      ))}
+                  </div>
+              )}
+          </div>
+      </Modal>
+
+      {/* APPROVAL MODAL */}
       <Modal isOpen={principalStack[principalStack.length-1] === 'approvals'} onClose={() => setPrincipalStack(prev => prev.slice(0, -1))} title="PENDING APPROVALS">
           <div className="flex flex-col h-[70vh]">
               {isLoadingApprovals ? (

@@ -20,6 +20,10 @@ const translations: Record<string, Record<Language, string>> = {
   'parent': { en: 'Parent', hi: 'अभिभावक' },
   'admin': { en: 'Admin', hi: 'एडमिन' },
   'driver': { en: 'Driver', hi: 'ड्राइवर' },
+  'gatekeeper': { en: 'Gatekeeper', hi: 'द्वारपाल (गार्ड)' }, // NEW
+  'visitor_logs': { en: 'Visitor Logs', hi: 'आगंतुक रजिस्टर' }, // NEW
+  'gate_security': { en: 'Gate Security', hi: 'गेट सुरक्षा' }, // NEW
+  'view_visitors': { en: 'View Visitors', hi: 'आगंतुक देखें' }, // NEW
   'school_id_placeholder': { en: 'School ID', hi: 'स्कूल आईडी' },
   'mobile_placeholder': { en: 'Mobile Number', hi: 'मोबाइल नंबर' },
   'password_placeholder': { en: 'Password', hi: 'पासवर्ड' },

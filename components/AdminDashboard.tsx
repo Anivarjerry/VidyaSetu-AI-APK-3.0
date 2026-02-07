@@ -7,7 +7,7 @@ import {
   Users, Trash2, ChevronRight, Check, 
   X, AlertCircle, ShieldAlert, Key, Star, Clock, MoreVertical, Settings, Info, LogOut,
   UserCheck, UserPlus, Mail, Hash, Layers, LayoutGrid, GraduationCap, MapPin, Truck,
-  ShieldCheck, BookOpen, RefreshCw, Home, Zap, ArrowLeft, Loader2, MinusCircle, PlusCircle, HelpCircle, Save, Lock, Unlock, Phone, Eye, EyeOff
+  ShieldCheck, BookOpen, RefreshCw, Home, Zap, ArrowLeft, Loader2, MinusCircle, PlusCircle, HelpCircle, Save, Lock, Unlock, Phone, Eye, EyeOff, Shield
 } from 'lucide-react';
 import { Modal } from './Modal';
 import { SettingsModal, AboutModal, HelpModal } from './MenuModals';
@@ -103,8 +103,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, userNa
     school_id: string;
     driver_id: string;
   }>({ vehicle_number: '', vehicle_type: 'bus', school_id: '', driver_id: '' });
+  
+  // ROLE CHECKS
   const [hasPrincipal, setHasPrincipal] = useState(false);
-  const [checkingPrincipal, setCheckingPrincipal] = useState(false);
+  const [hasGatekeeper, setHasGatekeeper] = useState(false); // NEW
+  const [checkingRoles, setCheckingRoles] = useState(false);
   
   // Deletion/Action Helpers
   const [itemToDelete, setItemToDelete] = useState<{id: string, name: string, type: 'school' | 'user' | 'vehicle'} | null>(null);
@@ -304,7 +307,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, userNa
           } else if (itemToDelete.type === 'user') {
               const userObj = users.find(u => u.id === itemToDelete.id);
               const role = userObj?.role || 'teacher';
-              if (role === 'parent' || role === 'teacher' || role === 'principal') {
+              if (role === 'parent' || role === 'teacher' || role === 'principal' || role === 'gatekeeper') {
                   await supabase.from('users').delete().eq('id', itemToDelete.id);
               } else if (role === 'student' as any) {
                   await supabase.from('users').delete().eq('id', itemToDelete.id);
@@ -426,22 +429,32 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, userNa
       fetchData();
   };
 
-  const checkPrincipalStatus = async (schoolId: string) => {
+  // CHECK ROLES: Principal AND Gatekeeper
+  const checkRoleAvailability = async (schoolId: string) => {
       if(!schoolId) return;
-      setCheckingPrincipal(true);
-      const { data } = await supabase.from('users').select('id').eq('school_id', schoolId).eq('role', 'principal').maybeSingle();
-      setHasPrincipal(!!data);
-      if(!!data && newUser.role === 'principal') {
+      setCheckingRoles(true);
+      
+      const { data } = await supabase.from('users').select('role').eq('school_id', schoolId).in('role', ['principal', 'gatekeeper']);
+      
+      const pFound = data?.some(u => u.role === 'principal');
+      const gFound = data?.some(u => u.role === 'gatekeeper');
+
+      setHasPrincipal(!!pFound);
+      setHasGatekeeper(!!gFound);
+
+      if((!!pFound && newUser.role === 'principal') || (!!gFound && newUser.role === 'gatekeeper')) {
           setNewUser(prev => ({...prev, role: ''}));
       }
-      setTimeout(() => setCheckingPrincipal(false), 500);
+      
+      setTimeout(() => setCheckingRoles(false), 500);
   };
 
   useEffect(() => {
       if(newUser.school_id) {
-          checkPrincipalStatus(newUser.school_id);
+          checkRoleAvailability(newUser.school_id);
       } else {
           setHasPrincipal(false);
+          setHasGatekeeper(false);
       }
   }, [newUser.school_id]);
 
@@ -656,6 +669,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, userNa
                       <select value={newUser.role} onChange={e => setNewUser({...newUser, role: e.target.value, parent_id: '', selected_student_id: ''})} className="flex-1 p-3 rounded-xl border border-slate-200 dark:bg-dark-900 dark:border-white/10 text-slate-800 dark:text-white font-bold" required>
                           <option value="">Select Role</option>
                           <option value="principal" disabled={hasPrincipal}>Principal {hasPrincipal ? '(Exists)' : ''}</option>
+                          <option value="gatekeeper" disabled={hasGatekeeper}>Gatekeeper {hasGatekeeper ? '(Exists)' : ''}</option> 
                           <option value="teacher">Teacher</option>
                           <option value="student">Student</option>
                           <option value="parent">Parent</option>
@@ -665,8 +679,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, userNa
                       {newUser.school_id && (
                           <button 
                               type="button" 
-                              onClick={() => checkPrincipalStatus(newUser.school_id)} 
-                              className={`p-3 rounded-xl bg-slate-100 dark:bg-white/10 text-slate-500 hover:text-emerald-500 border border-slate-200 dark:border-white/10 transition-all ${checkingPrincipal ? 'animate-spin text-emerald-500' : ''}`}
+                              onClick={() => checkRoleAvailability(newUser.school_id)} 
+                              className={`p-3 rounded-xl bg-slate-100 dark:bg-white/10 text-slate-500 hover:text-emerald-500 border border-slate-200 dark:border-white/10 transition-all ${checkingRoles ? 'animate-spin text-emerald-500' : ''}`}
                               title="Refresh Principal Check"
                           >
                               <RefreshCw size={18} />
