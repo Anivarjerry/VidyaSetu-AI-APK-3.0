@@ -327,7 +327,7 @@ export const fetchDashboardData = async ( sc: string, mob: string, role: Role, p
 
     const base: DashboardData = { user_id: user.id, school_db_id: school.id, user_name: user.name, user_role: user.role as Role, mobile_number: user.mobile, school_name: school.name, school_code: school.school_code, subscription_status: isClient ? (schoolActive && userActive ? 'active' : 'inactive') : (schoolActive ? 'active' : 'inactive'), school_subscription_status: schoolActive ? 'active' : 'inactive', subscription_end_date: displayDate, total_periods: school.total_periods || 8, assigned_subject: user.assigned_subject };
 
-    if (role === 'gatekeeper') return base; // Gatekeeper uses separate flow
+    if (role === 'gatekeeper') return base; 
 
     if (role === 'teacher') {
       const { data: ps } = await supabase.from('daily_periods').select('*').eq('school_id', school.id).eq('teacher_user_id', user.id).eq('date', getISTDate());
@@ -480,16 +480,18 @@ export const addVisitorEntry = async (entry: VisitorEntry) => {
     return !error;
 };
 
-export const fetchVisitorEntries = async (schoolId: string, date: string) => {
-    const startDate = `${date}T00:00:00`;
-    const endDate = `${date}T23:59:59`;
+// Updated fetchVisitorEntries to support Date Range
+export const fetchVisitorEntries = async (schoolId: string, startDate: string, endDate?: string) => {
+    const start = `${startDate}T00:00:00`;
+    // If no endDate provided, assume single day query (end of startDate)
+    const end = `${endDate || startDate}T23:59:59`;
 
     const { data, error } = await supabase
         .from('visitor_entries')
         .select('*')
         .eq('school_id', schoolId)
-        .gte('entry_time', startDate)
-        .lte('entry_time', endDate)
+        .gte('entry_time', start)
+        .lte('entry_time', end)
         .order('entry_time', { ascending: false });
 
     return data || [];

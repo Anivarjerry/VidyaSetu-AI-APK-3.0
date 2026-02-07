@@ -1,11 +1,15 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Shield, Plus, History, Camera, User, Phone, MapPin, Users, Target, Save, X, Loader2, ShieldCheck, Sparkles } from 'lucide-react';
+import { Shield, Plus, History, Camera, User, Phone, MapPin, Users, Target, Save, X, Loader2, ShieldCheck, Sparkles, School, CalendarRange, ChevronRight, Calendar } from 'lucide-react';
 import { useModalBackHandler } from '../hooks/useModalBackHandler';
-import { fetchVisitorEntries, addVisitorEntry, getISTDate } from '../services/dashboardService';
-import { VisitorEntry } from '../types';
+import { fetchVisitorEntries, addVisitorEntry, getISTDate, fetchDashboardData } from '../services/dashboardService';
+import { VisitorEntry, DashboardData } from '../types';
 import { Modal } from './Modal';
 import { Header } from './Header';
+import { BottomNav } from './BottomNav';
+import { SchoolInfoCard } from './SchoolInfoCard';
+import { ProfileView } from './ProfileView';
+import { LeaveRequestModal } from './LeaveModals';
 import { SettingsModal, AboutModal, HelpModal } from './MenuModals';
 import { useThemeLanguage } from '../contexts/ThemeLanguageContext';
 
@@ -17,10 +21,20 @@ interface GatekeeperDashboardProps {
 
 export const GatekeeperDashboard: React.FC<GatekeeperDashboardProps> = ({ onLogout, schoolId, userId }) => {
   const { t } = useThemeLanguage();
-  const [view, setView] = useState<'home' | 'entry'>('home');
+  
+  // Navigation State
+  const [currentView, setCurrentView] = useState<'home' | 'profile'>('home');
+  const [modalStack, setModalStack] = useState<string[]>([]); // 'entry', 'history', 'leave'
+
+  // Data State
+  const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
   const [visitors, setVisitors] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   
+  // History Filter State
+  const [historyFilter, setHistoryFilter] = useState<'today' | 'yesterday' | 'week' | 'custom'>('today');
+  const [customDate, setCustomDate] = useState(getISTDate());
+
   // Menu State
   const [activeMenuModal, setActiveMenuModal] = useState<'settings' | 'about' | 'help' | null>(null);
 
@@ -38,22 +52,74 @@ export const GatekeeperDashboard: React.FC<GatekeeperDashboardProps> = ({ onLogo
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  useModalBackHandler(view === 'entry', () => setView('home'));
-  useModalBackHandler(!!activeMenuModal, () => setActiveMenuModal(null));
+  // Back Handler
+  useModalBackHandler(
+      modalStack.length > 0 || !!activeMenuModal, 
+      () => {
+          if (activeMenuModal) setActiveMenuModal(null);
+          else setModalStack(prev => prev.slice(0, -1));
+      }
+  );
 
   useEffect(() => {
-      loadTodaysVisitors();
+      loadInitialData();
   }, []);
 
-  const loadTodaysVisitors = async () => {
+  // Fetch Full Dashboard Data for Profile & School Info
+  const loadInitialData = async () => {
+      // We need to fetch basic user info to populate the ProfileView properly.
+      // Since gatekeeper login creates basic local storage, we try to fetch extended details.
+      // Re-using fetchDashboardData but specific to gatekeeper context
+      const storedMobile = JSON.parse(localStorage.getItem('vidyasetu_creds') || '{}').mobile;
+      if (storedMobile) {
+          const data = await fetchDashboardData(schoolId, storedMobile, 'gatekeeper'); 
+          if(data) setDashboardData(data);
+      }
+      loadVisitors();
+  };
+
+  const loadVisitors = async () => {
       setLoading(true);
-      const data = await fetchVisitorEntries(schoolId, getISTDate());
+      
+      let startDate = getISTDate();
+      let endDate: string | undefined = undefined;
+      const today = new Date();
+
+      if (historyFilter === 'yesterday') {
+          const y = new Date(today);
+          y.setDate(today.getDate() - 1);
+          startDate = y.toISOString().split('T')[0];
+          endDate = startDate;
+      } else if (historyFilter === 'week') {
+          const w = new Date(today);
+          w.setDate(today.getDate() - 7);
+          startDate = w.toISOString().split('T')[0];
+          endDate = getISTDate();
+      } else if (historyFilter === 'custom') {
+          startDate = customDate;
+          endDate = customDate;
+      }
+
+      const data = await fetchVisitorEntries(schoolId, startDate, endDate);
       setVisitors(data);
       setLoading(false);
   };
 
+  // Reload visitors when filter changes
+  useEffect(() => {
+      if (modalStack.includes('history')) {
+          loadVisitors();
+      }
+  }, [historyFilter, customDate, modalStack]);
+
   const handleRefresh = () => {
-      loadTodaysVisitors();
+      loadInitialData();
+  };
+
+  const handleViewChange = (view: 'home' | 'profile') => {
+      if (view === currentView) return;
+      setModalStack([]);
+      setCurrentView(view);
   };
 
   // Image Compression Utility
@@ -131,8 +197,7 @@ export const GatekeeperDashboard: React.FC<GatekeeperDashboardProps> = ({ onLogo
               meet_person: 'Principal'
           });
           setPhotoData('');
-          setView('home');
-          loadTodaysVisitors();
+          setModalStack([]); // Close modal
       } else {
           alert("Failed to log entry. Please check internet or contact admin.");
       }
@@ -149,88 +214,99 @@ export const GatekeeperDashboard: React.FC<GatekeeperDashboardProps> = ({ onLogo
             onOpenAbout={() => setActiveMenuModal('about')}
             onOpenHelp={() => setActiveMenuModal('help')}
             onLogout={onLogout}
+            currentView={currentView}
+            onChangeView={handleViewChange}
         />
 
-        <main className="flex-1 overflow-y-auto p-4 space-y-5 no-scrollbar" style={{ marginTop: 'calc(5.5rem + env(safe-area-inset-top, 0px))' }}>
+        <main className="flex-1 w-full flex flex-col overflow-hidden relative" style={{ marginTop: 'calc(5.5rem + env(safe-area-inset-top, 0px))', marginBottom: 'calc(5.5rem + env(safe-area-inset-bottom, 0px))' }}>
             
-            {/* WELCOME / STATUS CARD */}
-            <div className="flex items-center justify-between px-2">
-                <div>
-                    <h2 className="text-xl font-black text-slate-800 dark:text-white uppercase tracking-tight">Gate Security</h2>
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-0.5">Visitor Management System</p>
-                </div>
-                <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center shadow-inner">
-                    <ShieldCheck size={20} />
-                </div>
-            </div>
+            {currentView === 'home' ? (
+                <div className="flex-1 overflow-y-auto px-4 pb-4 no-scrollbar">
+                    <div className="max-w-4xl mx-auto w-full pt-3">
+                        
+                        {/* 1. School Info Card */}
+                        <SchoolInfoCard schoolName={dashboardData?.school_name || 'My School'} schoolCode={dashboardData?.school_code || '---'} />
 
-            {/* ACTION CARD (GLOSSY GREEN) */}
-            <div 
-                onClick={() => setView('entry')}
-                className="w-full bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-[2.5rem] p-6 text-white shadow-xl shadow-emerald-500/30 flex items-center justify-between cursor-pointer active:scale-95 transition-all relative overflow-hidden group"
-            >
-                <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-3xl pointer-events-none group-hover:scale-150 transition-transform duration-700"></div>
-                <div className="flex items-center gap-5 relative z-10">
-                    <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center backdrop-blur-md shadow-inner border border-white/10">
-                        <Plus size={32} strokeWidth={3} />
-                    </div>
-                    <div>
-                        <h2 className="text-xl font-black uppercase leading-tight">New Entry</h2>
-                        <p className="text-emerald-100 text-[10px] font-bold uppercase tracking-widest mt-1 opacity-90 flex items-center gap-1">
-                            <Sparkles size={10} /> Log Incoming Visitor
-                        </p>
-                    </div>
-                </div>
-            </div>
+                        <div className="flex items-center justify-between mb-4 px-1">
+                            <h3 className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em]">Gate Operations</h3>
+                            <div className="px-2 py-1 bg-emerald-50 dark:bg-emerald-500/10 rounded-lg text-[9px] font-black text-emerald-600 uppercase flex items-center gap-1">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> Active
+                            </div>
+                        </div>
 
-            {/* HISTORY SECTION */}
-            <div className="space-y-4 pb-20">
-                <div className="flex items-center justify-between px-2 pt-2 border-t border-slate-200 dark:border-white/5">
-                    <h3 className="text-xs font-black uppercase text-slate-400 tracking-[0.2em] flex items-center gap-2">
-                        <History size={12} /> Today's Log
-                    </h3>
-                    <span className="text-[10px] font-black bg-slate-100 dark:bg-white/10 px-3 py-1 rounded-lg text-slate-500 dark:text-slate-300">{visitors.length} Entries</span>
-                </div>
-
-                {loading ? (
-                    <div className="text-center py-10"><Loader2 className="animate-spin mx-auto text-emerald-500" /></div>
-                ) : visitors.length === 0 ? (
-                    <div className="text-center py-12 opacity-40">
-                        <Shield size={48} className="mx-auto mb-2 text-slate-300" />
-                        <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">No visitors recorded today</p>
-                    </div>
-                ) : (
-                    <div className="space-y-3">
-                        {visitors.map((v) => (
-                            <div key={v.id} className="bg-white dark:bg-dark-900 p-4 rounded-[2rem] border border-slate-100 dark:border-white/5 shadow-sm flex items-center gap-4 active:scale-[0.98] transition-all">
-                                <div className="w-16 h-16 rounded-2xl bg-slate-100 dark:bg-white/5 overflow-hidden shrink-0 border border-slate-200 dark:border-white/10 shadow-inner">
-                                    {v.photo_data ? (
-                                        <img src={v.photo_data} alt="Visitor" className="w-full h-full object-cover" />
-                                    ) : (
-                                        <div className="w-full h-full flex items-center justify-center text-slate-300"><User size={24} /></div>
-                                    )}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                    <div className="flex justify-between items-start">
-                                        <h4 className="font-black text-slate-800 dark:text-white uppercase text-sm truncate">{v.visitor_name}</h4>
-                                        <span className="text-[10px] font-black text-slate-400 bg-slate-50 dark:bg-white/5 px-2 py-0.5 rounded-lg">{new Date(v.entry_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                        <div className="space-y-4 pb-10">
+                            {/* 2. Leave Portal Card */}
+                            <div onClick={() => setModalStack(prev => [...prev, 'leave'])} className="glass-card p-5 rounded-[2.5rem] flex items-center justify-between active:scale-[0.98] transition-all cursor-pointer shadow-sm border-slate-100 dark:border-white/5 group">
+                                <div className="flex items-center gap-4">
+                                    <div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-inner bg-brand-500/10 text-brand-600">
+                                        <CalendarRange size={28} />
                                     </div>
-                                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wide truncate mt-0.5">{v.visiting_purpose} • {v.visitor_count} Person(s)</p>
-                                    <p className="text-[9px] font-black text-emerald-600 uppercase mt-1 truncate bg-emerald-50 dark:bg-emerald-500/10 px-2 py-0.5 rounded-md w-fit">To Meet: {v.meet_person || 'Principal'}</p>
+                                    <div className="text-left">
+                                        <h3 className="font-black uppercase text-base leading-tight text-slate-800 dark:text-white">Apply Leave</h3>
+                                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Staff Request Portal</p>
+                                    </div>
+                                </div>
+                                <ChevronRight size={22} className="text-slate-200 group-hover:text-emerald-500 transition-colors" />
+                            </div>
+
+                            {/* 3. New Entry Card (Large, Highlighted) */}
+                            <div 
+                                onClick={() => setModalStack(prev => [...prev, 'entry'])}
+                                className="w-full bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-[2.5rem] p-6 text-white shadow-xl shadow-emerald-500/30 flex items-center justify-between cursor-pointer active:scale-95 transition-all relative overflow-hidden group"
+                            >
+                                <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-3xl pointer-events-none group-hover:scale-150 transition-transform duration-700"></div>
+                                <div className="flex items-center gap-5 relative z-10">
+                                    <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center backdrop-blur-md shadow-inner border border-white/10">
+                                        <Plus size={32} strokeWidth={3} />
+                                    </div>
+                                    <div>
+                                        <h2 className="text-xl font-black uppercase leading-tight">New Visitor</h2>
+                                        <p className="text-emerald-100 text-[10px] font-bold uppercase tracking-widest mt-1 opacity-90 flex items-center gap-1">
+                                            <Sparkles size={10} /> Log Entry
+                                        </p>
+                                    </div>
                                 </div>
                             </div>
-                        ))}
+
+                            {/* 4. History Card */}
+                            <div onClick={() => setModalStack(prev => [...prev, 'history'])} className="glass-card p-5 rounded-[2.5rem] flex items-center justify-between active:scale-[0.98] transition-all cursor-pointer shadow-sm border-slate-100 dark:border-white/5 group">
+                                <div className="flex items-center gap-4">
+                                    <div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-inner bg-slate-100 dark:bg-white/5 text-slate-500">
+                                        <History size={28} />
+                                    </div>
+                                    <div className="text-left">
+                                        <h3 className="font-black uppercase text-base leading-tight text-slate-800 dark:text-white">Visitor Logs</h3>
+                                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">View Past Records</p>
+                                    </div>
+                                </div>
+                                <ChevronRight size={22} className="text-slate-200 group-hover:text-emerald-500 transition-colors" />
+                            </div>
+                        </div>
                     </div>
-                )}
-            </div>
+                </div>
+            ) : (
+                <div className="flex-1 overflow-y-auto px-4 w-full no-scrollbar">
+                    <div className="max-w-4xl mx-auto w-full pt-4">
+                        <ProfileView 
+                            data={dashboardData} 
+                            isLoading={!dashboardData} 
+                            onLogout={onLogout} 
+                            onOpenHelp={() => setActiveMenuModal('help')}
+                            onOpenAbout={() => setActiveMenuModal('about')}
+                        />
+                    </div>
+                </div>
+            )}
         </main>
 
-        {/* ENTRY MODAL */}
-        <Modal isOpen={view === 'entry'} onClose={() => setView('home')} title="VISITOR ENTRY">
+        <BottomNav currentView={currentView} onChangeView={handleViewChange} />
+
+        {/* --- MODALS --- */}
+
+        {/* 1. ENTRY MODAL */}
+        <Modal isOpen={modalStack[modalStack.length-1] === 'entry'} onClose={() => setModalStack(prev => prev.slice(0, -1))} title="VISITOR ENTRY">
             <form onSubmit={handleSubmit} className="flex flex-col h-[75vh]">
                 <div className="flex-1 overflow-y-auto no-scrollbar space-y-4 pb-4">
-                    
-                    {/* PHOTO CAPTURE */}
                     <div className="flex justify-center mb-2">
                         <div 
                             onClick={() => fileInputRef.current?.click()}
@@ -244,14 +320,7 @@ export const GatekeeperDashboard: React.FC<GatekeeperDashboardProps> = ({ onLogo
                                     <span className="text-[9px] font-black uppercase text-slate-400 tracking-widest">Take Photo</span>
                                 </>
                             )}
-                            <input 
-                                type="file" 
-                                ref={fileInputRef} 
-                                accept="image/*" 
-                                capture="user" // Force camera on mobile
-                                onChange={handlePhotoCapture} 
-                                className="hidden" 
-                            />
+                            <input type="file" ref={fileInputRef} accept="image/*" capture="user" onChange={handlePhotoCapture} className="hidden" />
                         </div>
                     </div>
 
@@ -297,6 +366,56 @@ export const GatekeeperDashboard: React.FC<GatekeeperDashboardProps> = ({ onLogo
                 </div>
             </form>
         </Modal>
+
+        {/* 2. HISTORY MODAL WITH FILTERS */}
+        <Modal isOpen={modalStack[modalStack.length-1] === 'history'} onClose={() => setModalStack(prev => prev.slice(0, -1))} title="VISITOR HISTORY">
+            <div className="flex flex-col h-[75vh]">
+                {/* Filter Bar */}
+                <div className="flex items-center gap-2 mb-4 bg-slate-50 dark:bg-white/5 p-2 rounded-2xl overflow-x-auto no-scrollbar">
+                    <button onClick={() => setHistoryFilter('today')} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase whitespace-nowrap transition-all ${historyFilter === 'today' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'text-slate-400 bg-white dark:bg-dark-900 border border-slate-100 dark:border-white/5'}`}>Today</button>
+                    <button onClick={() => setHistoryFilter('yesterday')} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase whitespace-nowrap transition-all ${historyFilter === 'yesterday' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'text-slate-400 bg-white dark:bg-dark-900 border border-slate-100 dark:border-white/5'}`}>Yesterday</button>
+                    <button onClick={() => setHistoryFilter('week')} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase whitespace-nowrap transition-all ${historyFilter === 'week' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'text-slate-400 bg-white dark:bg-dark-900 border border-slate-100 dark:border-white/5'}`}>Last 7 Days</button>
+                    
+                    <div className="relative">
+                        <input type="date" value={customDate} onChange={(e) => { setCustomDate(e.target.value); setHistoryFilter('custom'); }} className={`w-10 h-9 p-0 border-none outline-none rounded-xl bg-transparent text-transparent cursor-pointer absolute top-0 left-0 z-10 opacity-0`} />
+                        <button className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all ${historyFilter === 'custom' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'bg-white dark:bg-dark-900 text-slate-400 border border-slate-100 dark:border-white/5'}`}><Calendar size={16} /></button>
+                    </div>
+                </div>
+
+                {loading ? (
+                    <div className="flex items-center justify-center h-full"><Loader2 className="animate-spin text-emerald-500" size={32} /></div>
+                ) : visitors.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center h-full opacity-40">
+                        <ShieldCheck size={48} className="text-slate-300 mb-2" />
+                        <p className="text-[10px] font-black uppercase tracking-widest">No entries found</p>
+                    </div>
+                ) : (
+                    <div className="space-y-3 overflow-y-auto no-scrollbar flex-1 pb-4">
+                        {visitors.map((v) => (
+                            <div key={v.id} className="bg-white dark:bg-dark-900 p-4 rounded-[2rem] border border-slate-100 dark:border-white/5 shadow-sm flex items-center gap-4 premium-subview-enter">
+                                <div className="w-16 h-16 rounded-2xl bg-slate-100 dark:bg-white/5 overflow-hidden shrink-0 border border-slate-200 dark:border-white/10">
+                                    {v.photo_data ? <img src={v.photo_data} alt="Visitor" className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-slate-300"><User size={24} /></div>}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <div className="flex justify-between items-start">
+                                        <h4 className="font-black text-slate-800 dark:text-white uppercase text-sm truncate">{v.visitor_name}</h4>
+                                        <div className="text-right">
+                                            <span className="block text-[8px] font-black text-slate-400 uppercase">{new Date(v.entry_time).toLocaleDateString()}</span>
+                                            <span className="text-[10px] font-bold text-slate-500">{new Date(v.entry_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                                        </div>
+                                    </div>
+                                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wide truncate">{v.visiting_purpose} • {v.visitor_count} Person(s)</p>
+                                    <p className="text-[10px] font-bold text-emerald-500 uppercase mt-1 truncate">Meeting: {v.meet_person || 'Principal'}</p>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+        </Modal>
+
+        {/* 3. LEAVE MODAL */}
+        <LeaveRequestModal isOpen={modalStack[modalStack.length-1] === 'leave'} onClose={() => setModalStack(prev => prev.slice(0, -1))} userId={userId} schoolId={schoolId} />
 
         {/* MENU MODALS */}
         <SettingsModal isOpen={activeMenuModal === 'settings'} onClose={() => setActiveMenuModal(null)} />

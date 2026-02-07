@@ -25,7 +25,7 @@ import { GalleryModal } from './GalleryModal';
 import { ReportModal } from './ReportModal';
 import { ExamModal } from './ExamModal';
 import { useThemeLanguage } from '../contexts/ThemeLanguageContext';
-import { ChevronRight, CheckCircle2, RefreshCw, UserCheck, Bell, BarChart2, BookOpen, MapPin, Truck, CalendarRange, Play, Square, Loader2, Megaphone, GraduationCap, School as SchoolIcon, Sparkles, User, Smartphone, ChevronLeft, History, Lock, AlertCircle, Zap, ShieldCheck, MoreHorizontal, X, LayoutGrid, Image as ImageIcon, FileText, Download, FileCheck, Trophy, PieChart, Users, Check, UserX, Shield } from 'lucide-react';
+import { ChevronRight, CheckCircle2, RefreshCw, UserCheck, Bell, BarChart2, BookOpen, MapPin, Truck, CalendarRange, Play, Square, Loader2, Megaphone, GraduationCap, School as SchoolIcon, Sparkles, User, Smartphone, ChevronLeft, History, Lock, AlertCircle, Zap, ShieldCheck, MoreHorizontal, X, LayoutGrid, Image as ImageIcon, FileText, Download, FileCheck, Trophy, PieChart, Users, Check, UserX, Shield, Calendar } from 'lucide-react';
 import { SubscriptionModal } from './SubscriptionModal';
 import { Modal } from './Modal';
 import { useModalBackHandler } from '../hooks/useModalBackHandler';
@@ -40,7 +40,6 @@ interface DashboardProps {
 export const Dashboard: React.FC<DashboardProps> = ({ credentials, role, userName, onLogout }) => {
   const { t } = useThemeLanguage();
   
-  // ... (Existing states remain unchanged)
   const [currentView, setCurrentView] = useState<'home' | 'profile'>(() => {
     return (window.history.state?.view === 'profile') ? 'profile' : 'home';
   });
@@ -52,6 +51,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ credentials, role, userNam
   // --- GATE ENTRY STATE ---
   const [visitorLogs, setVisitorLogs] = useState<any[]>([]);
   const [loadingVisitors, setLoadingVisitors] = useState(false);
+  const [visitorFilter, setVisitorFilter] = useState<'today' | 'yesterday' | 'week' | 'custom'>('today');
+  const [customDate, setCustomDate] = useState(getISTDate());
 
   useModalBackHandler(
       (role === 'principal' && principalStack.length > 0) || 
@@ -109,7 +110,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ credentials, role, userNam
     else if (isExamModalOpen) setIsExamModalOpen(false);
   });
 
-  // ... (Existing useEffects for history, data fetching, GPS remain unchanged) ...
+  // ... (Existing useEffects) ...
   useEffect(() => {
     const handlePopState = (e: PopStateEvent) => {
       if (e.state && e.state.view) setCurrentView(e.state.view);
@@ -200,23 +201,43 @@ export const Dashboard: React.FC<DashboardProps> = ({ credentials, role, userNam
       }
   };
 
-  // Trigger loading when modal opens
   useEffect(() => {
       if (principalStack.includes('approvals')) handleLoadApprovals();
   }, [principalStack]);
 
-  // NEW: Visitor Logs Logic
+  // VISITOR LOGS LOGIC WITH DATE FILTER
   const handleLoadVisitorLogs = async () => {
       if (!data?.school_db_id) return;
       setLoadingVisitors(true);
-      const logs = await fetchVisitorEntries(data.school_db_id, getISTDate());
+      
+      let startDate = getISTDate();
+      let endDate: string | undefined = undefined;
+
+      const today = new Date();
+      
+      if (visitorFilter === 'yesterday') {
+          const y = new Date(today);
+          y.setDate(today.getDate() - 1);
+          startDate = y.toISOString().split('T')[0];
+          endDate = startDate; // Single day
+      } else if (visitorFilter === 'week') {
+          const w = new Date(today);
+          w.setDate(today.getDate() - 7);
+          startDate = w.toISOString().split('T')[0];
+          endDate = getISTDate();
+      } else if (visitorFilter === 'custom') {
+          startDate = customDate;
+          endDate = customDate;
+      }
+
+      const logs = await fetchVisitorEntries(data.school_db_id, startDate, endDate);
       setVisitorLogs(logs);
       setLoadingVisitors(false);
   };
 
   useEffect(() => {
       if (principalStack.includes('visitor_logs')) handleLoadVisitorLogs();
-  }, [principalStack]);
+  }, [principalStack, visitorFilter, customDate]);
 
   return (
     <div className="fixed inset-0 h-screen w-screen bg-[#F8FAFC] dark:bg-dark-950 flex flex-col overflow-hidden transition-colors">
@@ -237,19 +258,19 @@ export const Dashboard: React.FC<DashboardProps> = ({ credentials, role, userNam
                          <div className={`space-y-3 md:space-y-0 w-full transition-opacity duration-300 pb-10 ${isRefreshing ? 'opacity-40' : 'opacity-100'}`}>
                             {/* SHARED CARDS GRID */}
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4 mb-3 md:mb-6">
-                                {/* ... (Gallery, Exam, Download Cards unchanged) ... */}
+                                {/* ... Cards ... */}
                                 <div onClick={() => { if (isFeatureLocked) { if (!isSchoolActive) showLockedFeature('school'); else showLockedFeature('parent'); } else { setIsGalleryOpen(true); } }} className={`glass-card p-5 rounded-[2.5rem] flex items-center justify-between cursor-pointer group active:scale-[0.98] transition-all shadow-sm ${isFeatureLocked ? 'bg-rose-50 dark:bg-rose-950/10 border-rose-100 dark:border-rose-900/20' : ''}`}><div className="flex items-center gap-4 text-left"><div className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-inner transition-all group-hover:scale-105 ${isFeatureLocked ? 'bg-rose-500 text-white' : 'bg-brand-500/10 text-brand-600'}`}><ImageIcon size={24} /></div><div><h3 className={`font-black uppercase text-base leading-tight ${isFeatureLocked ? 'text-rose-600' : 'text-slate-800 dark:text-white'}`}>Photo Gallery</h3><p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Events & Memories</p></div></div>{isFeatureLocked ? <Lock size={20} className="text-rose-400" /> : <ChevronRight size={22} className="text-slate-200 group-hover:text-brand-500 transition-colors" />}</div>
                                 {(role === 'principal' || role === 'teacher') && (<div onClick={() => { if (isFeatureLocked) showLockedFeature('school'); else setIsExamModalOpen(true); }} className={`glass-card p-5 rounded-[2.5rem] flex items-center justify-between cursor-pointer group active:scale-[0.98] transition-all shadow-sm ${isFeatureLocked ? 'bg-rose-50 dark:bg-rose-950/10 border-rose-100 dark:border-rose-900/20' : ''}`}><div className="flex items-center gap-4 text-left"><div className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-inner transition-all group-hover:scale-105 ${isFeatureLocked ? 'bg-rose-500 text-white' : 'bg-brand-500/10 text-brand-600'}`}><FileCheck size={24} /></div><div><h3 className={`font-black uppercase text-base leading-tight ${isFeatureLocked ? 'text-rose-600' : 'text-slate-800 dark:text-white'}`}>Result Management</h3><p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Upload Marks & Reports</p></div></div>{isFeatureLocked ? <Lock size={20} className="text-rose-400" /> : <ChevronRight size={22} className="text-slate-200 group-hover:text-brand-500 transition-colors" />}</div>)}
                                 {(role === 'parent' || role === 'student') && data?.student_id && (<div onClick={() => { if (isFeatureLocked) { if (!isSchoolActive) showLockedFeature('school'); else showLockedFeature('parent'); } else { setIsReportOpen(true); } }} className={`glass-card p-5 rounded-[2.5rem] flex items-center justify-between cursor-pointer group active:scale-[0.98] transition-all shadow-sm ${isFeatureLocked ? 'bg-rose-50 dark:bg-rose-950/10 border-rose-100 dark:border-rose-900/20' : ''}`}><div className="flex items-center gap-4 text-left"><div className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-inner transition-all group-hover:scale-105 ${isFeatureLocked ? 'bg-rose-500 text-white' : 'bg-brand-500/10 text-brand-600'}`}><PieChart size={24} /></div><div><h3 className={`font-black uppercase text-base leading-tight ${isFeatureLocked ? 'text-rose-600' : 'text-slate-800 dark:text-white'}`}>Result Analytics</h3><p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Download Report Cards</p></div></div>{isFeatureLocked ? <Lock size={20} className="text-rose-400" /> : <ChevronRight size={22} className="text-slate-200 group-hover:text-brand-500 transition-colors" />}</div>)}
                                 {role !== 'admin' && role !== 'driver' && role !== 'parent' && role !== 'student' as any && (<div onClick={() => { if (isFeatureLocked) { if (!isSchoolActive) showLockedFeature('school'); else showLockedFeature('parent'); } else { setIsReportOpen(true); } }} className={`glass-card p-5 rounded-[2.5rem] flex items-center justify-between cursor-pointer group active:scale-[0.98] transition-all shadow-sm ${isFeatureLocked ? 'bg-rose-50 dark:bg-rose-950/10 border-rose-100 dark:border-rose-900/20' : ''}`}><div className="flex items-center gap-4 text-left"><div className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-inner transition-all group-hover:scale-105 ${isFeatureLocked ? 'bg-rose-500 text-white' : 'bg-brand-500/10 text-brand-600'}`}><FileText size={24} /></div><div><h3 className={`font-black uppercase text-base leading-tight ${isFeatureLocked ? 'text-rose-600' : 'text-slate-800 dark:text-white'}`}>Download History</h3><p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Report Center (PDF)</p></div></div>{isFeatureLocked ? <Lock size={20} className="text-rose-400" /> : <ChevronRight size={22} className="text-slate-200 group-hover:text-brand-500 transition-colors" />}</div>)}
                             </div>
 
-                            {/* PRINCIPAL HUB WITH NEW APPROVAL CARD AND GATEKEEPER CARD */}
+                            {/* PRINCIPAL HUB */}
                             {role === 'principal' && (
                               <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4 w-full">
                                 {[
                                     { key: "approvals", title: "Identity Approvals", subtitle: "Verify New Signups", icon: <Users size={24} /> },
-                                    { key: "visitor_logs", title: t('gate_security'), subtitle: t('view_visitors'), icon: <ShieldCheck size={24} /> }, // NEW CARD
+                                    { key: "visitor_logs", title: t('gate_security'), subtitle: t('view_visitors'), icon: <ShieldCheck size={24} /> },
                                     { key: "notice", title: t('publish_notice'), subtitle: 'Global Academic Broadcast', icon: <Megaphone size={24} /> },
                                     { key: "transport", title: t('transport_tracking'), subtitle: 'Live Vehicle Map Engine', icon: <MapPin size={24} /> },
                                     { key: "teacher_analytics", title: t('teacher_report'), subtitle: 'Staff Efficiency Monitor', icon: <BarChart2 size={24} /> },
@@ -271,7 +292,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ credentials, role, userNam
                               </div>
                             )}
 
-                            {/* ... (Teacher/Driver/Parent Hubs unchanged) ... */}
+                            {/* ... Teacher/Driver/Parent logic (unchanged) ... */}
                             {role === 'teacher' && (
                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
                                   {[{ key: 'attendance', icon: <UserCheck size={28} />, title: t('attendance'), sub: t('digital_register') }, { key: 'leave', icon: <CalendarRange size={28} />, title: t('staff_leave'), sub: t('apply_absence') }, { key: 'history', icon: <History size={28} />, title: "Previous History", sub: "Cloud Submission Log" }, { key: 'homework', icon: <BookOpen size={28} />, title: "Submit Homework", sub: `${data?.total_periods || 8} Daily Learning Periods`, border: "border-l-4 border-brand-500" }].map((it, idx) => ( <div key={idx} onClick={() => isSchoolActive ? setTeacherStack(prev => [...prev, it.key]) : showLockedFeature('school')} className={`glass-card p-5 rounded-[2.5rem] flex items-center justify-between cursor-pointer active:scale-[0.98] transition-all shadow-sm ${it.border || ''} ${!isSchoolActive ? 'bg-rose-50 dark:bg-rose-950/10 border-rose-100 dark:border-rose-900/20' : ''}`}><div className="flex items-center gap-4"><div className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-inner ${!isSchoolActive ? 'bg-rose-500 text-white' : 'bg-brand-500/10 text-brand-600'}`}>{it.icon}</div><div className="text-left"><h3 className={`font-black uppercase text-base leading-tight ${!isSchoolActive ? 'text-rose-600' : 'text-slate-800 dark:text-white'}`}>{it.title}</h3><p className="text-[10px] font-black text-slate-400 font-black uppercase tracking-widest">{it.sub}</p></div></div>{!isSchoolActive ? <Lock size={20} className="text-rose-400" /> : <ChevronRight size={22} className="text-slate-200" />}</div> ))}
@@ -317,15 +338,33 @@ export const Dashboard: React.FC<DashboardProps> = ({ credentials, role, userNam
       <StaffLeaveManagementModal isOpen={principalStack[principalStack.length-1] === 'leave_management'} onClose={() => setPrincipalStack(prev => prev.slice(0, -1))} schoolId={data?.school_db_id || ''} />
       <AttendanceModal isOpen={principalStack[principalStack.length-1] === 'attendance'} onClose={() => setPrincipalStack(prev => prev.slice(0, -1))} schoolId={data?.school_db_id || ''} teacherId={data?.user_id || ''} />
       
-      {/* NEW: VISITOR LOGS MODAL (PRINCIPAL) */}
+      {/* UPDATED: VISITOR LOGS MODAL WITH FILTER */}
       <Modal isOpen={principalStack.includes('visitor_logs')} onClose={() => setPrincipalStack(prev => prev.filter(k => k !== 'visitor_logs'))} title="VISITOR LOGS">
-          <div className="flex flex-col h-[70vh]">
+          <div className="flex flex-col h-[75vh]">
+              {/* FILTER BAR */}
+              <div className="flex items-center gap-2 mb-4 bg-slate-50 dark:bg-white/5 p-2 rounded-2xl overflow-x-auto no-scrollbar">
+                  <button onClick={() => setVisitorFilter('today')} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase whitespace-nowrap transition-all ${visitorFilter === 'today' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'text-slate-400 bg-white dark:bg-dark-900 border border-slate-100 dark:border-white/5'}`}>Today</button>
+                  <button onClick={() => setVisitorFilter('yesterday')} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase whitespace-nowrap transition-all ${visitorFilter === 'yesterday' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'text-slate-400 bg-white dark:bg-dark-900 border border-slate-100 dark:border-white/5'}`}>Yesterday</button>
+                  <button onClick={() => setVisitorFilter('week')} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase whitespace-nowrap transition-all ${visitorFilter === 'week' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'text-slate-400 bg-white dark:bg-dark-900 border border-slate-100 dark:border-white/5'}`}>This Week</button>
+                  <div className="relative">
+                      <input 
+                          type="date" 
+                          value={customDate} 
+                          onChange={(e) => { setCustomDate(e.target.value); setVisitorFilter('custom'); }} 
+                          className={`w-10 h-9 p-0 border-none outline-none rounded-xl bg-transparent text-transparent cursor-pointer absolute top-0 left-0 z-10 opacity-0`}
+                      />
+                      <button className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all ${visitorFilter === 'custom' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'bg-white dark:bg-dark-900 text-slate-400 border border-slate-100 dark:border-white/5'}`}>
+                          <Calendar size={16} />
+                      </button>
+                  </div>
+              </div>
+
               {loadingVisitors ? (
                   <div className="flex items-center justify-center h-full"><Loader2 className="animate-spin text-emerald-500" size={32} /></div>
               ) : visitorLogs.length === 0 ? (
                   <div className="flex flex-col items-center justify-center h-full opacity-40">
                       <ShieldCheck size={48} className="text-slate-300 mb-2" />
-                      <p className="text-[10px] font-black uppercase tracking-widest">No entries today</p>
+                      <p className="text-[10px] font-black uppercase tracking-widest">No entries found</p>
                   </div>
               ) : (
                   <div className="space-y-3 overflow-y-auto no-scrollbar flex-1 pb-4">
@@ -341,7 +380,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ credentials, role, userNam
                               <div className="flex-1 min-w-0">
                                   <div className="flex justify-between items-start">
                                       <h4 className="font-black text-slate-800 dark:text-white uppercase text-sm truncate">{v.visitor_name}</h4>
-                                      <span className="text-[10px] font-bold text-slate-400">{new Date(v.entry_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                                      <div className="text-right">
+                                          <span className="block text-[8px] font-black text-slate-400 uppercase">{new Date(v.entry_time).toLocaleDateString()}</span>
+                                          <span className="text-[10px] font-bold text-slate-500">{new Date(v.entry_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                                      </div>
                                   </div>
                                   <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wide truncate">{v.visiting_purpose} • {v.visitor_count} Person(s)</p>
                                   <p className="text-[10px] font-bold text-emerald-500 uppercase mt-1 truncate">Meeting: {v.meet_person || 'Principal'}</p>
