@@ -25,7 +25,7 @@ import { GalleryModal } from './GalleryModal';
 import { ReportModal } from './ReportModal';
 import { ExamModal } from './ExamModal';
 import { useThemeLanguage } from '../contexts/ThemeLanguageContext';
-import { ChevronRight, CheckCircle2, RefreshCw, UserCheck, Bell, BarChart2, BookOpen, MapPin, Truck, CalendarRange, Play, Square, Loader2, Megaphone, GraduationCap, School as SchoolIcon, Sparkles, User, Smartphone, ChevronLeft, History, Lock, AlertCircle, Zap, ShieldCheck, MoreHorizontal, X, LayoutGrid, Image as ImageIcon, FileText, Download, FileCheck, Trophy, PieChart, Users, Check, UserX, Shield, Calendar, Phone, Clock } from 'lucide-react';
+import { ChevronRight, CheckCircle2, RefreshCw, UserCheck, Bell, BarChart2, BookOpen, MapPin, Truck, CalendarRange, Play, Square, Loader2, Megaphone, GraduationCap, School as SchoolIcon, Sparkles, User, Smartphone, ChevronLeft, History, Lock, AlertCircle, Zap, ShieldCheck, MoreHorizontal, X, LayoutGrid, Image as ImageIcon, FileText, Download, FileCheck, Trophy, PieChart, Users, Check, UserX, Shield, Calendar, Phone, Clock, Award } from 'lucide-react';
 import { SubscriptionModal } from './SubscriptionModal';
 import { Modal } from './Modal';
 import { useModalBackHandler } from '../hooks/useModalBackHandler';
@@ -271,9 +271,27 @@ export const Dashboard: React.FC<DashboardProps> = ({ credentials, role, userNam
                                     { key: "teacher_analytics", title: t('teacher_report'), subtitle: 'Staff Efficiency Monitor', icon: <BarChart2 size={24} /> },
                                     { key: "parents_analytics", title: t('homework_status'), subtitle: 'Student Task Compliance', icon: <BookOpen size={24} /> },
                                     { key: "leave_management", title: t('leave_portal'), subtitle: 'Administrative Leave Hub', icon: <CalendarRange size={24} /> },
-                                    { key: "attendance", title: t('global_attendance'), subtitle: 'Central Attendance Registry', icon: <UserCheck size={24} /> }
+                                    { key: "attendance", title: t('global_attendance'), subtitle: 'Central Attendance Registry', icon: <UserCheck size={24} /> },
+                                    // Added New Cards
+                                    { key: "exam", title: "Result Center", subtitle: "Marks & Report Cards", icon: <Award size={24} /> },
+                                    { key: "gallery", title: "School Gallery", subtitle: "Event & Activity Photos", icon: <ImageIcon size={24} /> },
+                                    { key: "report", title: "Download Center", subtitle: "Export PDF/Excel Data", icon: <Download size={24} /> },
                                 ].map((item, index) => (
-                                  <div key={index} onClick={() => isSchoolActive ? setPrincipalStack(prev => [...prev, item.key]) : setShowPayModal(true)} className={`glass-card p-5 rounded-[2.5rem] flex items-center justify-between cursor-pointer group active:scale-[0.98] transition-all shadow-sm ${!isSchoolActive ? 'bg-rose-50 dark:bg-rose-950/10 border-rose-100 dark:border-rose-900/20' : ''}`}>
+                                  <div 
+                                    key={index} 
+                                    onClick={() => {
+                                        if (!isSchoolActive) {
+                                            setShowPayModal(true);
+                                            return;
+                                        }
+                                        // Handle special toggles for the 3 added cards
+                                        if (item.key === 'gallery') setIsGalleryOpen(true);
+                                        else if (item.key === 'report') setIsReportOpen(true);
+                                        else if (item.key === 'exam') setIsExamModalOpen(true);
+                                        else setPrincipalStack(prev => [...prev, item.key]);
+                                    }} 
+                                    className={`glass-card p-5 rounded-[2.5rem] flex items-center justify-between cursor-pointer group active:scale-[0.98] transition-all shadow-sm ${!isSchoolActive ? 'bg-rose-50 dark:bg-rose-950/10 border-rose-100 dark:border-rose-900/20' : ''}`}
+                                  >
                                       <div className="flex items-center gap-4 text-left">
                                           <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-inner transition-all group-hover:scale-105 ${!isSchoolActive ? 'bg-rose-500 text-white' : 'bg-brand-500/10 text-brand-600'}`}>{item.icon}</div>
                                           <div>
