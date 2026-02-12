@@ -20,13 +20,11 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({ role }) =>
   const getPlans = () => {
     if (role === 'principal' || role === 'admin') {
       return [
-        { label: 'Monthly School Premium', amount: 1000, duration: 'month' },
-        { label: 'Yearly School Premium', amount: 10000, duration: 'year' },
+        { label: 'Premium Annual Plan', amount: 120000, duration: 'year' },
       ];
     } else if (role === 'parent' || role === 'student' as any) {
       return [
-        { label: 'Monthly Student Plan', amount: 80, duration: 'month' },
-        { label: 'Yearly Student Plan', amount: 850, duration: 'year' },
+        { label: 'Student Annual Plan', amount: 200, duration: 'year' },
       ];
     }
     return [];
@@ -154,7 +152,7 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({ role }) =>
               <p className="font-black text-slate-800 dark:text-white group-hover:text-brand-500 transition-colors uppercase tracking-tight">{plan.label}</p>
             </div>
             <div className="flex items-center gap-3">
-              <span className="text-2xl font-black text-brand-500">₹{plan.amount}</span>
+              <span className="text-2xl font-black text-brand-500">₹{plan.amount.toLocaleString('en-IN')}</span>
               <div className={`p-2 rounded-lg text-white group-hover:bg-brand-600 transition-colors ${processing ? 'bg-slate-400' : 'bg-brand-500'}`}>
                 {processing ? <Loader2 size={16} className="animate-spin" /> : <Zap size={16} fill="currentColor" />}
               </div>
