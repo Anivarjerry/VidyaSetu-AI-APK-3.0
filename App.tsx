@@ -7,7 +7,7 @@ import { GatekeeperDashboard } from './components/GatekeeperDashboard';
 import { loginUser, updateUserToken } from './services/authService';
 import { LoginRequest, Role } from './types';
 import { ThemeLanguageProvider } from './contexts/ThemeLanguageContext';
-import { NavigationProvider } from './contexts/NavigationContext'; // Import Global Nav
+// Removed NavigationProvider to fix back button conflicts
 import { requestForToken, onMessageListener } from './services/firebase';
 
 const AppContent: React.FC = () => {
@@ -53,18 +53,17 @@ const AppContent: React.FC = () => {
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
 
-  // --- SPLASH SCREEN REMOVAL ---
+  // --- SPLASH SCREEN REMOVAL (Guaranteed) ---
   useEffect(() => {
-      // Logic: Wait for React to mount, then remove splash
-      const splash = document.getElementById('splash-screen');
-      if (splash) {
-          // Delay slightly to ensure smooth transition
-          setTimeout(() => {
+      const timer = setTimeout(() => {
+          const splash = document.getElementById('splash-screen');
+          if (splash) {
               splash.style.transition = 'opacity 0.5s ease-out';
               splash.style.opacity = '0';
               setTimeout(() => splash.remove(), 500);
-          }, 1500); // Keep splash for at least 1.5s
-      }
+          }
+      }, 1500);
+      return () => clearTimeout(timer);
   }, []);
 
   // --- FIREBASE NOTIFICATION INIT ---
@@ -72,9 +71,8 @@ const AppContent: React.FC = () => {
     const initNotifications = async () => {
       if ('serviceWorker' in navigator) {
           try {
-              // Ensure SW is registered in root scope
-              const reg = await navigator.serviceWorker.register('/firebase-messaging-sw.js', { scope: '/' });
-              console.log('Service Worker Registered!', reg);
+              // Standard registration without scope complications
+              await navigator.serviceWorker.register('/firebase-messaging-sw.js');
           } catch (err) {
               console.error('Service Worker Failed', err);
           }
@@ -82,7 +80,7 @@ const AppContent: React.FC = () => {
 
       const token = await requestForToken();
       if (token && authData.userId) {
-        console.log("FCM Token Generated:", token);
+        // console.log("FCM Token Generated:", token);
         await updateUserToken(authData.userId, token);
       }
     };
@@ -93,14 +91,15 @@ const AppContent: React.FC = () => {
       onMessageListener()
         .then((payload: any) => {
           if (payload) {
-             console.log("Foreground Message:", payload);
+             // console.log("Foreground Message:", payload);
              if (Notification.permission === 'granted') {
                  new Notification(payload.notification?.title || 'VidyaSetu Alert', {
                      body: payload.notification?.body,
                      icon: '/android/android-launchericon-192-192.png'
                  });
              } else {
-                 alert(`🔔 ${payload.notification?.title}: ${payload.notification?.body}`);
+                 // Fallback alert
+                 // alert(`🔔 ${payload.notification?.title}: ${payload.notification?.body}`);
              }
           }
         })
@@ -173,11 +172,9 @@ const AppContent: React.FC = () => {
 
 const App: React.FC = () => (
   <ThemeLanguageProvider>
-    <NavigationProvider>
-      <div className="fixed inset-0 bg-white dark:bg-dark-950">
-        <AppContent />
-      </div>
-    </NavigationProvider>
+    <div className="fixed inset-0 bg-white dark:bg-dark-950">
+      <AppContent />
+    </div>
   </ThemeLanguageProvider>
 );
 

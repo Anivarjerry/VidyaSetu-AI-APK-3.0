@@ -12,17 +12,9 @@ export const getISTDate = (): string => {
   return `${year}-${month}-${day}`;
 };
 
-// --- CACHING HELPER (IMPROVED: NETWORK FIRST) ---
-// If Online: Fetch Network -> Save to Cache -> Return Network Data
-// If Offline or Error: Return Cached Data
+// --- STABLE CACHING (Network First, Failover to Cache) ---
 const fetchWithCache = async <T>(key: string, fetcher: () => Promise<T>): Promise<T | null> => {
-    const cached = localStorage.getItem(key);
-    let cachedData: T | null = null;
-    
-    if (cached) {
-        try { cachedData = JSON.parse(cached); } catch (e) { console.error("Cache parse error", e); }
-    }
-
+    // 1. Try Network
     if (navigator.onLine) {
         try {
             const freshData = await fetcher();
@@ -31,89 +23,31 @@ const fetchWithCache = async <T>(key: string, fetcher: () => Promise<T>): Promis
                 return freshData;
             }
         } catch (e) {
-            console.error("Fetch failed, falling back to cache", e);
-            // Fallback to cache if network call fails
-            return cachedData;
+            console.warn("Network fetch failed, trying cache...", e);
         }
     }
 
-    // Offline mode: Return cache
-    return cachedData; 
+    // 2. Fallback to Cache
+    const cached = localStorage.getItem(key);
+    if (cached) {
+        try { return JSON.parse(cached); } catch (e) { return null; }
+    }
+    
+    return null;
 };
 
-// --- PREFETCHER ---
+// --- PREFETCHER (Simplified) ---
 export const prefetchAllDashboardData = async (schoolId: string, role: Role, userId: string, classVal?: string) => {
     if (!navigator.onLine || !schoolId) return;
-    
-    console.log("Starting Background Prefetch...");
-    const today = getISTDate();
-
-    // Fire and forget requests to populate cache
-    fetchNotices(schoolId, role); 
-    fetchGalleryImages(schoolId, today.slice(0, 7)); 
-
-    if (role === 'teacher') {
-        fetchSchoolClasses(schoolId);
-        fetchUserLeaves(userId);
-        fetchTeacherHistory(schoolId, '', today); 
-    } 
-    else if (role === 'parent' || role === 'student') {
-        if (role === 'student') fetchStudentLeavesForParent(userId); 
-    }
-    else if (role === 'driver') {
-        fetchVehicles(schoolId);
-    }
-    else if (role === 'gatekeeper') {
-        fetchVisitorEntries(schoolId, today, today);
-    }
-    else if (role === 'principal') {
-        fetchSchoolClasses(schoolId);
-        fetchPrincipalAnalytics(schoolId, today);
-    }
-};
-
-// --- OFFLINE SYNC QUEUE SYSTEM ---
-const addToSyncQueue = (key: string, data: any) => {
+    // Just simple fire-and-forget calls to populate cache
     try {
-        const queue = JSON.parse(localStorage.getItem('vidyasetu_sync_queue') || '[]');
-        queue.push({ key, data, timestamp: Date.now() });
-        localStorage.setItem('vidyasetu_sync_queue', JSON.stringify(queue));
-        return true;
-    } catch (e) { return false; }
+        fetchNotices(schoolId, role); 
+        fetchGalleryImages(schoolId, getISTDate().slice(0, 7)); 
+    } catch(e) {}
 };
 
-export const processSyncQueue = async () => {
-    if (!navigator.onLine) return;
-    const queueStr = localStorage.getItem('vidyasetu_sync_queue');
-    if (!queueStr) return;
-    
-    const queue = JSON.parse(queueStr);
-    if (queue.length === 0) return;
-
-    console.log("Processing Sync Queue:", queue.length, "items");
-    
-    const failedItems = [];
-    
-    for (const item of queue) {
-        let success = false;
-        try {
-            if (item.key === 'time_table') {
-                success = await saveTimeTableEntry(item.data, true); 
-            } else if (item.key === 'attendance') {
-                success = await submitAttendance(item.data.sid, item.data.tid, item.data.cn, item.data.recs, true);
-            }
-        } catch (e) {
-            console.error("Sync item failed", e);
-        }
-        
-        if (!success) failedItems.push(item);
-    }
-    
-    localStorage.setItem('vidyasetu_sync_queue', JSON.stringify(failedItems));
-    if (queue.length > failedItems.length) {
-        window.dispatchEvent(new Event('vidyasetu-synced'));
-    }
-};
+// --- REMOVED QUEUE LOGIC ---
+// export const processSyncQueue = async () => { ... } // DELETED
 
 // --- PUBLIC HELPERS FOR SIGNUP ---
 export const fetchSchoolsList = async () => {
@@ -125,23 +59,14 @@ export const fetchSchoolsList = async () => {
 
 export const fetchPublicParents = async (schoolId: string) => {
     try {
-        const { data } = await supabase
-            .from('users')
-            .select('id, name, mobile')
-            .eq('school_id', schoolId)
-            .eq('role', 'parent')
-            .order('name');
+        const { data } = await supabase.from('users').select('id, name, mobile').eq('school_id', schoolId).eq('role', 'parent').order('name');
         return data || [];
     } catch (e) { return []; }
 };
 
 export const fetchStudentOptionsForParent = async (parentId: string) => {
     try {
-        const { data } = await supabase
-            .from('students')
-            .select('id, name, class_name')
-            .eq('parent_user_id', parentId)
-            .order('name');
+        const { data } = await supabase.from('students').select('id, name, class_name').eq('parent_user_id', parentId).order('name');
         return data || [];
     } catch (e) { return []; }
 };
@@ -153,11 +78,7 @@ const getSchoolUUID = async (schoolCode: string): Promise<string | null> => {
         if (cached) return cached;
 
         const cleanCode = schoolCode.trim().toUpperCase();
-        const { data, error } = await supabase
-            .from('schools')
-            .select('id')
-            .ilike('school_code', cleanCode)
-            .maybeSingle();
+        const { data, error } = await supabase.from('schools').select('id').ilike('school_code', cleanCode).maybeSingle();
 
         if (error || !data) return null;
         localStorage.setItem(cacheKey, data.id);
@@ -168,12 +89,7 @@ const getSchoolUUID = async (schoolCode: string): Promise<string | null> => {
 // --- ATTENDANCE SERVICES ---
 export const fetchDailyAttendanceStatus = async (schoolId: string, date: string): Promise<string[]> => {
   return fetchWithCache(`att_status_${schoolId}_${date}`, async () => {
-      const { data, error } = await supabase
-        .from('attendance')
-        .select('students!inner(class_name)')
-        .eq('school_id', schoolId)
-        .eq('date', date);
-
+      const { data, error } = await supabase.from('attendance').select('students!inner(class_name)').eq('school_id', schoolId).eq('date', date);
       if (error || !data) return [];
       const completedClasses = data.map((item: any) => item.students?.class_name).filter(Boolean);
       return Array.from(new Set(completedClasses)) as string[];
@@ -182,13 +98,7 @@ export const fetchDailyAttendanceStatus = async (schoolId: string, date: string)
 
 export const fetchClassAttendanceToday = async (schoolId: string, className: string, date: string): Promise<Record<string, 'present' | 'absent' | 'leave'>> => {
     try {
-        const { data, error } = await supabase
-            .from('attendance')
-            .select('student_id, status, students!inner(class_name)')
-            .eq('school_id', schoolId)
-            .eq('date', date)
-            .eq('students.class_name', className);
-
+        const { data, error } = await supabase.from('attendance').select('student_id, status, students!inner(class_name)').eq('school_id', schoolId).eq('date', date).eq('students.class_name', className);
         if (error || !data) return {};
         const records: Record<string, 'present' | 'absent' | 'leave'> = {};
         data.forEach((item: any) => { records[item.student_id] = item.status; });
@@ -196,11 +106,8 @@ export const fetchClassAttendanceToday = async (schoolId: string, className: str
     } catch (e) { return {}; }
 };
 
-export const submitAttendance = async (sid: string, tid: string, cn: string, recs: AttendanceStatus[], skipQueue = false): Promise<boolean> => {
-  if (!navigator.onLine && !skipQueue) {
-      return addToSyncQueue('attendance', { sid, tid, cn, recs });
-  }
-  
+export const submitAttendance = async (sid: string, tid: string, cn: string, recs: AttendanceStatus[]): Promise<boolean> => {
+  if (!navigator.onLine) { alert("Internet connection required to save."); return false; }
   const date = getISTDate();
   if (!recs || recs.length === 0) return false;
   const payload = recs.map(r => ({ school_id: sid, marked_by_user_id: tid, student_id: r.student_id, date: date, status: r.status }));
@@ -216,7 +123,6 @@ export const fetchNotices = async (schoolCode: string, role: string): Promise<No
       if (!resolved) return [];
       schoolUUID = resolved;
   }
-  
   return fetchWithCache(`notices_${schoolUUID}_${role}`, async () => {
       let query = supabase.from('notices').select('*').eq('school_id', schoolUUID);
       if (role !== 'principal' && role !== 'admin') {
@@ -230,10 +136,9 @@ export const fetchNotices = async (schoolCode: string, role: string): Promise<No
 };
 
 export const submitNotice = async (notice: NoticeRequest): Promise<boolean> => {
-  try {
-    const { error } = await supabase.from('notices').insert(notice);
-    return !error;
-  } catch (e) { return false; }
+  if (!navigator.onLine) return false;
+  const { error } = await supabase.from('notices').insert(notice);
+  return !error;
 };
 
 export const deleteNotice = async (id: string): Promise<{success: boolean, error?: string}> => {
@@ -248,80 +153,41 @@ export const deleteNotice = async (id: string): Promise<{success: boolean, error
 // --- TIME TABLE SERVICES ---
 export const fetchTimeTable = async (schoolId: string, className: string, day: string): Promise<TimeTableEntry[]> => {
     return fetchWithCache(`tt_${schoolId}_${className}_${day}`, async () => {
-        const { data, error } = await supabase
-            .from('time_tables')
-            .select('*, users!teacher_id(name)')
-            .eq('school_id', schoolId)
-            .eq('class_name', className)
-            .eq('day_of_week', day);
-        
+        const { data, error } = await supabase.from('time_tables').select('*, users!teacher_id(name)').eq('school_id', schoolId).eq('class_name', className).eq('day_of_week', day);
         if(error) return [];
-        return (data || []).map((t: any) => ({
-            ...t,
-            teacher_name: t.users?.name || 'Unknown'
-        }));
+        return (data || []).map((t: any) => ({ ...t, teacher_name: t.users?.name || 'Unknown' }));
     }) || [];
 };
 
 export const fetchFullSchoolTimeTable = async (schoolId: string, day: string): Promise<TimeTableEntry[]> => {
     try {
-        const { data, error } = await supabase
-            .from('time_tables')
-            .select('teacher_id, period_number, class_name')
-            .eq('school_id', schoolId)
-            .eq('day_of_week', day);
-        
+        const { data, error } = await supabase.from('time_tables').select('teacher_id, period_number, class_name').eq('school_id', schoolId).eq('day_of_week', day);
         if (error) throw error;
         return data || [];
-    } catch(e) {
-        return [];
-    }
+    } catch(e) { return []; }
 };
 
-export const saveTimeTableEntry = async (entry: TimeTableEntry, skipQueue = false) => {
-    if (!navigator.onLine && !skipQueue) {
-        return addToSyncQueue('time_table', entry);
-    }
-
+export const saveTimeTableEntry = async (entry: TimeTableEntry) => {
+    if (!navigator.onLine) return false;
     try {
         const teacherId = (entry.teacher_id && entry.teacher_id !== 'null' && entry.teacher_id !== 'undefined' && entry.teacher_id.trim() !== '') ? entry.teacher_id : null;
-
-        const { error } = await supabase
-            .from('time_tables')
-            .upsert({
-                school_id: entry.school_id,
-                class_name: entry.class_name,
-                day_of_week: entry.day_of_week,
-                period_number: entry.period_number,
-                subject: entry.subject,
-                teacher_id: teacherId 
-            }, { onConflict: 'school_id,class_name,day_of_week,period_number' });
-        
-        if (error) return false;
-        return true;
+        const { error } = await supabase.from('time_tables').upsert({ school_id: entry.school_id, class_name: entry.class_name, day_of_week: entry.day_of_week, period_number: entry.period_number, subject: entry.subject, teacher_id: teacherId }, { onConflict: 'school_id,class_name,day_of_week,period_number' });
+        return !error;
     } catch(e) { return false; }
 };
 
 export const copyTimeTableDay = async (schoolId: string, className: string, sourceDay: string, targetDays: string[]) => {
+    if (!navigator.onLine) return false;
     try {
         const sourceEntries = await fetchTimeTable(schoolId, className, sourceDay);
         if (sourceEntries.length === 0) return false;
-
         const batch: any[] = [];
         for (const day of targetDays) {
             if (day === sourceDay) continue;
             sourceEntries.forEach(entry => {
-                batch.push({
-                    school_id: schoolId,
-                    class_name: className,
-                    day_of_week: day,
-                    period_number: entry.period_number,
-                    subject: entry.subject,
-                    teacher_id: entry.teacher_id || null
-                });
+                batch.push({ school_id: schoolId, class_name: className, day_of_week: day, period_number: entry.period_number, subject: entry.subject, teacher_id: entry.teacher_id || null });
             });
         }
-
         if (batch.length === 0) return true;
         const { error } = await supabase.from('time_tables').upsert(batch, { onConflict: 'school_id,class_name,day_of_week,period_number' });
         return !error;
@@ -330,12 +196,7 @@ export const copyTimeTableDay = async (schoolId: string, className: string, sour
 
 export const fetchTeachersForTimeTable = async (schoolId: string) => {
     return fetchWithCache(`teachers_${schoolId}`, async () => {
-        const { data } = await supabase
-            .from('users')
-            .select('id, name, assigned_subject')
-            .eq('school_id', schoolId)
-            .eq('role', 'teacher')
-            .order('name');
+        const { data } = await supabase.from('users').select('id, name, assigned_subject').eq('school_id', schoolId).eq('role', 'teacher').order('name');
         return data || [];
     }) || [];
 };
@@ -348,15 +209,12 @@ export const fetchPrincipalAnalytics = async (sc: string, d: string): Promise<An
       if (!resolved) return null;
       schoolUUID = resolved;
   }
-  
   return fetchWithCache(`analytics_${schoolUUID}_${d}`, async () => {
       const { data: schoolConfig } = await supabase.from('schools').select('total_periods').eq('id', schoolUUID).single();
       const periodsCount = schoolConfig?.total_periods || 8;
       const { data: ts } = await supabase.from('users').select('id, name, mobile').eq('school_id', schoolUUID).eq('role', 'teacher');
       const { data: pds } = await supabase.from('daily_periods').select('teacher_user_id').eq('school_id', schoolUUID).eq('date', d);
-      const teacherList: TeacherProgress[] = (ts || []).map(t => ({ 
-          id: t.id, name: t.name, mobile: t.mobile, periods_submitted: (pds || []).filter(s => s.teacher_user_id === t.id).length, total_periods: periodsCount 
-      }));
+      const teacherList: TeacherProgress[] = (ts || []).map(t => ({ id: t.id, name: t.name, mobile: t.mobile, periods_submitted: (pds || []).filter(s => s.teacher_user_id === t.id).length, total_periods: periodsCount }));
       return { total_teachers: ts?.length || 0, active_teachers: teacherList.filter(t => t.periods_submitted > 0).length, inactive_teachers: teacherList.filter(t => t.periods_submitted === 0).length, total_periods_expected: (ts?.length || 0) * periodsCount, total_periods_submitted: pds?.length || 0, teacher_list: teacherList };
   });
 };
@@ -390,7 +248,6 @@ export const fetchTeacherHistory = async (sc: string, mob: string, d: string): P
       if (!resolved) return [];
       schoolUUID = resolved;
   }
-  
   return fetchWithCache(`teacher_hist_${mob || 'uid'}_${d}`, async () => {
       let userId = mob;
       if (mob.length >= 10 && !mob.includes('-')) {
@@ -398,7 +255,6 @@ export const fetchTeacherHistory = async (sc: string, mob: string, d: string): P
           if (!user) return [];
           userId = user.id;
       }
-      
       const { data } = await supabase.from('daily_periods').select('*').eq('teacher_user_id', userId).eq('date', d).order('period_number');
       return (data || []).map((p: any) => ({ id: p.id, period_number: p.period_number, status: 'submitted', class_name: p.class_name, subject: p.subject, lesson: p.lesson, homework: p.homework, homework_type: p.homework_type }));
   }) || [];
@@ -424,7 +280,7 @@ export const fetchAttendanceHistory = async (id: string): Promise<AttendanceHist
       return (data || []).map((h: any) => ({ id: h.id, date: h.date, status: h.status, marked_by_name: h.users?.name }));
   }) || [];
 };
-export const applyForLeave = async (l: Partial<StaffLeave>): Promise<boolean> => { const { error } = await supabase.from('staff_leaves').insert(l); return !error; };
+export const applyForLeave = async (l: Partial<StaffLeave>): Promise<boolean> => { if(!navigator.onLine) return false; const { error } = await supabase.from('staff_leaves').insert(l); return !error; };
 export const fetchUserLeaves = async (id: string): Promise<StaffLeave[]> => { 
     return fetchWithCache(`user_leaves_${id}`, async () => {
         const { data } = await supabase.from('staff_leaves').select('*').eq('user_id', id).order('created_at', { ascending: false }); return data || []; 
@@ -437,7 +293,7 @@ export const fetchSchoolLeaves = async (id: string): Promise<StaffLeave[]> => {
   }) || [];
 };
 export const updateLeaveStatus = async (id: string, s: string, c: string): Promise<boolean> => { const { error } = await supabase.from('staff_leaves').update({ status: s, principal_comment: c }).eq('id', id); return !error; };
-export const applyStudentLeave = async (l: Partial<StudentLeave>): Promise<boolean> => { const { error } = await supabase.from('student_leaves').insert(l); return !error; };
+export const applyStudentLeave = async (l: Partial<StudentLeave>): Promise<boolean> => { if(!navigator.onLine) return false; const { error } = await supabase.from('student_leaves').insert(l); return !error; };
 export const fetchStudentLeavesForParent = async (id: string): Promise<StudentLeave[]> => { const { data } = await supabase.from('student_leaves').select('*').eq('parent_id', id).order('created_at', { ascending: false }); return data || []; };
 export const fetchSchoolStudentLeaves = async (id: string): Promise<StudentLeave[]> => {
   return fetchWithCache(`school_student_leaves_${id}`, async () => {
@@ -485,6 +341,7 @@ export const fetchSchoolSummary = async (id: string): Promise<SchoolSummary | nu
 };
 
 export const updateSchoolPeriods = async (schoolId: string, count: number): Promise<boolean> => {
+    if(!navigator.onLine) return false;
     const { error } = await supabase.from('schools').update({ total_periods: count }).eq('id', schoolId);
     return !error;
 };
@@ -499,6 +356,7 @@ export const fetchSchoolUserList = async (id: string, cat: string): Promise<Scho
 };
 
 export const submitPeriodData = async (sc: string, mob: string, p: PeriodData, un: string, action: string): Promise<boolean> => {
+  if(!navigator.onLine) { alert("Internet connection required to save."); return false; }
   let schoolUUID = sc;
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(sc)) {
       const resolved = await getSchoolUUID(sc);
@@ -506,7 +364,6 @@ export const submitPeriodData = async (sc: string, mob: string, p: PeriodData, u
       schoolUUID = resolved;
   }
   
-  // Find User ID from Mobile if needed
   let userId = '';
   const { data: user } = await supabase.from('users').select('id').eq('mobile', mob).eq('school_id', schoolUUID).maybeSingle();
   if (user) userId = user.id;
@@ -534,6 +391,7 @@ export const fetchParentHomework = async (sc: string, cn: string, s: string, sid
 };
 
 export const updateParentHomeworkStatus = async (sc: string, cn: string, s: string, sid: string, mob: string, p: string, sub: string, date: string): Promise<boolean> => {
+  if(!navigator.onLine) return false;
   const pn = parseInt(p.replace(/\D/g, '')) || 1;
   const { error } = await supabase.from('homework_submissions').upsert({ student_id: sid, date: date, period_number: pn, status: 'completed' }, { onConflict: 'student_id,date,period_number' });
   return !error;
@@ -630,6 +488,7 @@ export const fetchGalleryImages = async (schoolId: string, month: string): Promi
 };
 
 export const uploadGalleryPhoto = async (payload: { school_id: string; image_data: string; caption: string; tag: string; month_year: string; uploaded_by: string; }) => {
+    if(!navigator.onLine) return { success: false, message: "No Internet Connection" };
     try {
         const { error } = await supabase.from('gallery_images').insert([payload]);
         if (error) return { success: false, message: error.message };
@@ -647,6 +506,7 @@ export const fetchGalleryUsage = async (userId: string) => {
 };
 
 export const incrementGalleryView = async (userId: string): Promise<boolean> => {
+    if(!navigator.onLine) return true; // Allow offline view if cached
     try {
         const usage = await fetchGalleryUsage(userId);
         if (usage.view_count >= usage.limit) return false;
@@ -657,6 +517,7 @@ export const incrementGalleryView = async (userId: string): Promise<boolean> => 
 
 // --- EXAMINATION SERVICES ---
 export const createExamRecord = async (payload: ExamRecord): Promise<{success: boolean, id?: string, error?: string}> => {
+    if(!navigator.onLine) return { success: false, error: "No Internet" };
     try {
         const { data, error } = await supabase.from('exam_records').insert({
             school_id: payload.school_id,
@@ -667,38 +528,23 @@ export const createExamRecord = async (payload: ExamRecord): Promise<{success: b
             total_marks: payload.total_marks
         }).select().single();
 
-        if (error) {
-            console.error("Exam Creation Error:", error);
-            if(error.code === '42P01') return { success: false, error: "Tables missing. Run the new SQL script."};
-            return { success: false, error: error.message };
-        }
+        if (error) return { success: false, error: error.message };
         return { success: true, id: data.id };
-    } catch (e: any) {
-        return { success: false, error: e.message };
-    }
+    } catch (e: any) { return { success: false, error: e.message }; }
 };
 
 export const submitExamResults = async (marks: ExamMark[]): Promise<{success: boolean, error?: string}> => {
+    if(!navigator.onLine) return { success: false, error: "No Internet" };
     try {
         const { error } = await supabase.from('exam_marks').insert(marks);
-        if (error) {
-            console.error("Marks Insertion Error:", error);
-            return { success: false, error: error.message };
-        }
+        if (error) return { success: false, error: error.message };
         return { success: true };
-    } catch (e: any) {
-        return { success: false, error: e.message };
-    }
+    } catch (e: any) { return { success: false, error: e.message }; }
 };
 
 export const fetchExamRecords = async (schoolId: string): Promise<ExamRecord[]> => {
     return fetchWithCache(`exam_records_${schoolId}`, async () => {
-        const { data, error } = await supabase
-            .from('exam_records')
-            .select('*')
-            .eq('school_id', schoolId)
-            .order('exam_date', { ascending: false });
-        
+        const { data, error } = await supabase.from('exam_records').select('*').eq('school_id', schoolId).order('exam_date', { ascending: false });
         if (error) return [];
         return data || [];
     }) || [];
@@ -706,11 +552,7 @@ export const fetchExamRecords = async (schoolId: string): Promise<ExamRecord[]> 
 
 export const fetchExamResultsByRecord = async (recordId: string): Promise<ExamMark[]> => {
     return fetchWithCache(`exam_results_${recordId}`, async () => {
-        const { data, error } = await supabase
-            .from('exam_marks')
-            .select('*')
-            .eq('record_id', recordId);
-        
+        const { data, error } = await supabase.from('exam_marks').select('*').eq('record_id', recordId);
         if (error) return [];
         return data || [];
     }) || [];
@@ -718,12 +560,7 @@ export const fetchExamResultsByRecord = async (recordId: string): Promise<ExamMa
 
 export const fetchStudentExamResults = async (studentId: string): Promise<any[]> => {
     return fetchWithCache(`student_results_${studentId}`, async () => {
-        const { data, error } = await supabase
-            .from('exam_marks')
-            .select('obtained_marks, grade, is_absent, exam_records(exam_title, subject, total_marks, exam_date)')
-            .eq('student_id', studentId)
-            .order('created_at', { ascending: false });
-
+        const { data, error } = await supabase.from('exam_marks').select('obtained_marks, grade, is_absent, exam_records(exam_title, subject, total_marks, exam_date)').eq('student_id', studentId).order('created_at', { ascending: false });
         if (error) return [];
         return data.map((d: any) => ({
             exam_type: d.exam_records?.exam_title,
@@ -739,6 +576,7 @@ export const fetchStudentExamResults = async (studentId: string): Promise<any[]>
 
 // --- VISITOR MANAGEMENT SERVICES ---
 export const addVisitorEntry = async (entry: VisitorEntry) => {
+    if(!navigator.onLine) return false;
     const { error } = await supabase.from('visitor_entries').insert([entry]);
     return !error;
 };
@@ -747,15 +585,7 @@ export const fetchVisitorEntries = async (schoolId: string, startDate: string, e
     return fetchWithCache(`visitors_${schoolId}_${startDate}`, async () => {
         const start = `${startDate}T00:00:00`;
         const end = `${endDate || startDate}T23:59:59`;
-
-        const { data, error } = await supabase
-            .from('visitor_entries')
-            .select('*')
-            .eq('school_id', schoolId)
-            .gte('entry_time', start)
-            .lte('entry_time', end)
-            .order('entry_time', { ascending: false });
-
+        const { data, error } = await supabase.from('visitor_entries').select('*').eq('school_id', schoolId).gte('entry_time', start).lte('entry_time', end).order('entry_time', { ascending: false });
         return data || [];
     }) || [];
 };
@@ -764,84 +594,29 @@ export const fetchVisitorEntries = async (schoolId: string, startDate: string, e
 export const searchPeople = async (schoolId: string, query: string, role: 'student' | 'staff'): Promise<SearchPerson[]> => {
     if (!query || query.length < 2) return [];
     const term = `%${query}%`; 
-
     try {
         if (role === 'student') {
-            const { data } = await supabase
-                .from('students')
-                .select('id, name, class_name, father_name, mother_name')
-                .eq('school_id', schoolId)
-                .or(`name.ilike.${term},father_name.ilike.${term},class_name.ilike.${term}`)
-                .limit(20);
-            
-            return (data || []).map((s: any) => ({
-                id: s.id,
-                name: s.name,
-                role: 'student',
-                sub_text: s.class_name,
-                father_name: s.father_name,
-                mother_name: s.mother_name
-            }));
+            const { data } = await supabase.from('students').select('id, name, class_name, father_name, mother_name').eq('school_id', schoolId).or(`name.ilike.${term},father_name.ilike.${term},class_name.ilike.${term}`).limit(20);
+            return (data || []).map((s: any) => ({ id: s.id, name: s.name, role: 'student', sub_text: s.class_name, father_name: s.father_name, mother_name: s.mother_name }));
         } else {
-            const { data } = await supabase
-                .from('users')
-                .select('id, name, role, mobile')
-                .eq('school_id', schoolId)
-                .in('role', ['teacher', 'driver', 'gatekeeper'])
-                .or(`name.ilike.${term},mobile.ilike.${term}`)
-                .limit(20);
-            
-            return (data || []).map((u: any) => ({
-                id: u.id,
-                name: u.name,
-                role: u.role,
-                sub_text: u.mobile
-            }));
+            const { data } = await supabase.from('users').select('id, name, role, mobile').eq('school_id', schoolId).in('role', ['teacher', 'driver', 'gatekeeper']).or(`name.ilike.${term},mobile.ilike.${term}`).limit(20);
+            return (data || []).map((u: any) => ({ id: u.id, name: u.name, role: u.role, sub_text: u.mobile }));
         }
-    } catch (e) {
-        return [];
-    }
+    } catch (e) { return []; }
 };
 
 export const fetchRecentPeople = async (schoolId: string, role: 'student' | 'staff', filterClass?: string): Promise<SearchPerson[]> => {
     try {
         if (role === 'student') {
-            let query = supabase
-                .from('students')
-                .select('id, name, class_name, father_name, mother_name')
-                .eq('school_id', schoolId);
-            
+            let query = supabase.from('students').select('id, name, class_name, father_name, mother_name').eq('school_id', schoolId);
             if (filterClass) query = query.eq('class_name', filterClass);
-            
             const { data } = await query.order('created_at', { ascending: false }).limit(20);
-            
-            return (data || []).map((s: any) => ({
-                id: s.id,
-                name: s.name,
-                role: 'student',
-                sub_text: s.class_name,
-                father_name: s.father_name,
-                mother_name: s.mother_name
-            }));
+            return (data || []).map((s: any) => ({ id: s.id, name: s.name, role: 'student', sub_text: s.class_name, father_name: s.father_name, mother_name: s.mother_name }));
         } else {
-            const { data } = await supabase
-                .from('users')
-                .select('id, name, role, mobile')
-                .eq('school_id', schoolId)
-                .in('role', ['teacher', 'driver', 'gatekeeper'])
-                .order('created_at', { ascending: false })
-                .limit(20);
-            
-            return (data || []).map((u: any) => ({
-                id: u.id,
-                name: u.name,
-                role: u.role,
-                sub_text: u.mobile
-            }));
+            const { data } = await supabase.from('users').select('id, name, role, mobile').eq('school_id', schoolId).in('role', ['teacher', 'driver', 'gatekeeper']).order('created_at', { ascending: false }).limit(20);
+            return (data || []).map((u: any) => ({ id: u.id, name: u.name, role: u.role, sub_text: u.mobile }));
         }
-    } catch (e) {
-        return [];
-    }
+    } catch (e) { return []; }
 };
 
 export const fetchStudentFullHistory = async (studentId: string, dateFrom?: string, dateTo?: string): Promise<FullHistory | null> => {
@@ -894,10 +669,7 @@ export const fetchStudentFullHistory = async (studentId: string, dateFrom?: stri
             leave_log: (leaves.data || []).map((l:any) => ({ type: l.leave_type, dates: `${l.start_date} -> ${l.end_date}`, status: l.status, reason: l.reason })),
             activity_log: (subs.data || []).map((s:any) => ({ title: `Homework - Period ${s.period_number}`, detail: s.status, date: s.date }))
         };
-    } catch(e) { 
-        console.error("Full History Error", e);
-        return null; 
-    }
+    } catch(e) { return null; }
 };
 
 export const fetchStaffFullHistory = async (userId: string, dateFrom?: string, dateTo?: string): Promise<FullHistory | null> => {

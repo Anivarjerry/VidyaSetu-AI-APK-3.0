@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { DashboardData, LoginRequest, Role } from '../types';
-import { fetchDashboardData, fetchSchoolSummary, processSyncQueue, prefetchAllDashboardData } from '../services/dashboardService';
+import { fetchDashboardData, fetchSchoolSummary, prefetchAllDashboardData } from '../services/dashboardService';
 import { Header } from './Header';
 import { BottomNav } from './BottomNav';
 import { SkeletonSchoolCard } from './Skeletons';
@@ -13,12 +13,12 @@ import { useThemeLanguage } from '../contexts/ThemeLanguageContext';
 import { RefreshCw, Lock, School as SchoolIcon, User, Loader2, Sparkles } from 'lucide-react';
 import { SubscriptionModal } from './SubscriptionModal';
 import { Modal } from './Modal';
-import { useNavigation } from '../contexts/NavigationContext'; // NEW GLOBAL CONTEXT
 import { PrincipalDashboard } from './PrincipalDashboard';
 import { TeacherDashboard } from './TeacherDashboard';
 import { ParentDashboard } from './ParentDashboard';
 import { DriverDashboard } from './DriverDashboard';
 import { AIChatModal } from './AIChatModal'; 
+import { useModalBackHandler } from '../hooks/useModalBackHandler';
 
 interface DashboardProps {
   credentials: LoginRequest;
@@ -30,8 +30,15 @@ interface DashboardProps {
 export const Dashboard: React.FC<DashboardProps> = ({ credentials, role, userName, onLogout }) => {
   const { t } = useThemeLanguage();
   
-  // Use Global Navigation Context
-  const { currentTab, switchTab, modalStack, openModal, closeModal, closeAllModals } = useNavigation();
+  // Local Navigation State (Restored Stable Pattern)
+  const [currentView, setCurrentView] = useState<'home' | 'profile' | 'action' | 'manage'>('home');
+  const [activeModal, setActiveModal] = useState<string | null>(null);
+
+  // Use Back Handler for Top Level Modals
+  useModalBackHandler(!!activeModal || currentView !== 'home', () => {
+      if (activeModal) setActiveModal(null);
+      else if (currentView !== 'home') setCurrentView('home');
+  });
 
   const [data, setData] = useState<DashboardData | null>(null);
   const [isSchoolActive, setIsSchoolActive] = useState(true);
@@ -52,14 +59,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ credentials, role, userNam
   const [schoolSummary, setSchoolSummary] = useState<any>(null);
   const [loadingSchoolSummary, setLoadingSchoolSummary] = useState(false);
 
-  // Background Sync Logic
-  useEffect(() => {
-    const handleOnline = () => processSyncQueue();
-    window.addEventListener('online', handleOnline);
-    processSyncQueue(); // Check on mount
-    return () => window.removeEventListener('online', handleOnline);
-  }, []);
-
   const fetchGenericData = useCallback(async (targetStudent?: string) => {
      try {
         const dashboardData = await fetchDashboardData(credentials.school_id, credentials.mobile, role, credentials.password, targetStudent);
@@ -71,7 +70,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ credentials, role, userNam
             
             localStorage.setItem('vidyasetu_dashboard_data', JSON.stringify(dashboardData));
             
-            // Trigger Smart Prefetch for Offline Use
             if (dashboardData.school_db_id && dashboardData.user_id) {
                 prefetchAllDashboardData(dashboardData.school_db_id, role, dashboardData.user_id, dashboardData.class_name);
             }
@@ -89,7 +87,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ credentials, role, userNam
     if (!isSchoolActive && role !== 'principal') return; 
     setIsRefreshing(true);
     await fetchGenericData(selectedStudentId || undefined);
-    processSyncQueue(); 
     setTimeout(() => setIsRefreshing(false), 700);
   };
 
@@ -107,7 +104,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ credentials, role, userNam
 
   const handleSchoolCardClick = async () => {
     if (!data?.school_db_id) return;
-    openModal('school_details');
+    setActiveModal('school_details');
     setLoadingSchoolSummary(true);
     const summary = await fetchSchoolSummary(data.school_db_id);
     if (summary) setSchoolSummary(summary);
@@ -121,19 +118,18 @@ export const Dashboard: React.FC<DashboardProps> = ({ credentials, role, userNam
         onOpenSettings={() => setActiveMenuModal('settings')} 
         onOpenAbout={() => setActiveMenuModal('about')} 
         onOpenHelp={() => setActiveMenuModal('help')} 
-        onOpenNotices={() => openModal('notices')} 
+        onOpenNotices={() => setActiveModal('notices')} 
         onLogout={onLogout} 
-        currentView={currentTab === 'profile' ? 'profile' : 'home'} 
-        onChangeView={(v) => switchTab(v as any)} 
+        currentView={currentView === 'profile' ? 'profile' : 'home'} 
+        onChangeView={(v) => setCurrentView(v as any)} 
       />
 
       {/* Main Container */}
       <main className="flex-1 w-full flex flex-col overflow-hidden relative" style={{ marginTop: 'calc(5.5rem + env(safe-area-inset-top, 0px))', marginBottom: window.innerWidth < 768 ? 'calc(5.5rem + env(safe-area-inset-bottom, 0px))' : '0' }}>
         
-        {/* VIEW 1: HOME / ACTION / MANAGE DASHBOARD */}
-        {(currentTab === 'home' || currentTab === 'action' || currentTab === 'manage') ? (
+        {(currentView === 'home' || currentView === 'action' || currentView === 'manage') ? (
             <>
-                {currentTab === 'home' && (
+                {currentView === 'home' && (
                     <div className="w-full px-4 pt-3 pb-0.5 z-[40] flex-shrink-0 animate-in fade-in zoom-in-95 duration-300">
                         <div className="max-w-4xl md:max-w-7xl mx-auto w-full">
                             {initialLoading && !data ? <SkeletonSchoolCard /> : <SchoolInfoCard schoolName={data?.school_name || ''} schoolCode={data?.school_code || ''} onClick={handleSchoolCardClick} />}
@@ -161,7 +157,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ credentials, role, userNam
                     <div className="max-w-4xl md:max-w-7xl mx-auto w-full h-full">
                          <div className={`w-full h-full transition-opacity duration-300 pb-10 ${isRefreshing ? 'opacity-40' : 'opacity-100'}`}>
                             
-                            {data && role === 'principal' && <PrincipalDashboard data={data} credentials={credentials} isSchoolActive={isSchoolActive} onShowPayModal={() => setShowPayModal(true)} onRefresh={handleManualRefresh} viewMode={currentTab} />}
+                            {data && role === 'principal' && <PrincipalDashboard data={data} credentials={credentials} isSchoolActive={isSchoolActive} onShowPayModal={() => setShowPayModal(true)} onRefresh={handleManualRefresh} viewMode={currentView} />}
                             {data && role === 'teacher' && <TeacherDashboard data={data} credentials={credentials} isSchoolActive={isSchoolActive} onShowLocked={() => showLockedFeature('school')} onRefresh={handleManualRefresh} />}
                             {data && (role === 'parent' || role === 'student') && <ParentDashboard data={data} credentials={credentials} role={role} isSchoolActive={isSchoolActive} isUserActive={isUserActive} onShowLocked={showLockedFeature} onRefresh={handleManualRefresh} isRefreshing={isRefreshing} />}
                             {data && role === 'driver' && <DriverDashboard data={data} isSchoolActive={isSchoolActive} onShowLocked={() => showLockedFeature('school')} />}
@@ -179,18 +175,18 @@ export const Dashboard: React.FC<DashboardProps> = ({ credentials, role, userNam
         )}
       </main>
 
-      <BottomNav currentView={currentTab} onChangeView={switchTab} showAction={role === 'principal'} />
+      <BottomNav currentView={currentView} onChangeView={setCurrentView} showAction={role === 'principal'} />
       
-      {currentTab !== 'profile' && isSchoolActive && (
+      {currentView !== 'profile' && isSchoolActive && (
           <button 
-            onClick={() => openModal('ai_chat')}
+            onClick={() => setActiveModal('ai_chat')}
             className="fixed bottom-[calc(6rem+env(safe-area-inset-bottom,0px))] right-6 z-40 w-14 h-14 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full shadow-2xl shadow-indigo-500/40 flex items-center justify-center text-white active:scale-90 transition-all hover:scale-105 border-2 border-white/20 animate-in zoom-in duration-300"
           >
              <Sparkles size={24} className="animate-pulse" />
           </button>
       )}
 
-      {/* GLOBAL MODALS - CONTROLLED BY CONTEXT OR LOCAL STATE FOR ALERTS */}
+      {/* GLOBAL MODALS */}
       <Modal isOpen={!!showLockPopup} onClose={() => setShowLockPopup(null)} title="ACCESS RESTRICTED">
           <div className="text-center py-4 space-y-6">
               <div className="w-20 h-20 bg-rose-500/10 text-rose-500 rounded-[2rem] flex items-center justify-center mx-auto shadow-inner"><Lock size={40} /></div>
@@ -208,12 +204,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ credentials, role, userNam
       <AboutModal isOpen={activeMenuModal === 'about'} onClose={() => setActiveMenuModal(null)} />
       <HelpModal isOpen={activeMenuModal === 'help'} onClose={() => setActiveMenuModal(null)} />
       
-      {/* Dynamic Modals via Global Navigation Stack */}
-      <NoticeListModal isOpen={modalStack.includes('notices')} onClose={closeModal} schoolId={credentials.school_id} role={role} />
-      <AIChatModal isOpen={modalStack.includes('ai_chat')} onClose={closeModal} userName={data?.user_name || 'User'} role={role} className={data?.class_name} dashboardData={data} />
+      {/* Dynamic Modals */}
+      <NoticeListModal isOpen={activeModal === 'notices'} onClose={() => setActiveModal(null)} schoolId={credentials.school_id} role={role} />
+      <AIChatModal isOpen={activeModal === 'ai_chat'} onClose={() => setActiveModal(null)} userName={data?.user_name || 'User'} role={role} className={data?.class_name} dashboardData={data} />
       
       {/* School Details Modal */}
-      <Modal isOpen={modalStack.includes('school_details')} onClose={closeModal} title="INSTITUTION PROFILE">
+      <Modal isOpen={activeModal === 'school_details'} onClose={() => setActiveModal(null)} title="INSTITUTION PROFILE">
           <div className="flex flex-col h-[50vh]">
               <div className="space-y-6 overflow-y-auto no-scrollbar pb-4 flex-1 relative premium-subview-enter">
                   {loadingSchoolSummary ? <div className="text-center py-10"><Loader2 className="animate-spin mx-auto text-brand-500" /></div> : (

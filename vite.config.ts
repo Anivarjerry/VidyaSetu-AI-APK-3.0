@@ -14,48 +14,26 @@ export default defineConfig(({ mode }) => {
       plugins: [
         react(),
         VitePWA({
-          registerType: 'autoUpdate',
-          // Workbox config ensures the service worker is generated correctly
+          // REMOVED 'registerType: autoUpdate' to stop reload loops
+          // registerType: 'prompt', 
+          devOptions: {
+            enabled: false // Disable PWA in dev to prevent caching issues while coding
+          },
           workbox: {
             globPatterns: ['**/*.{js,css,html,ico,png,svg,json}'],
             cleanupOutdatedCaches: true,
             clientsClaim: true,
             skipWaiting: true,
-            navigateFallback: '/index.html', // Fix for offline navigation fallback
+            navigateFallback: '/index.html',
             runtimeCaching: [
               {
                 urlPattern: /^https:\/\/.*\.supabase\.co\/.*/i,
-                handler: 'NetworkOnly',
+                handler: 'NetworkFirst', // Changed to NetworkFirst for better data consistency
                 options: {
-                  cacheName: 'supabase-api-cache'
-                  // Removed networkTimeoutSeconds as it is not supported with NetworkOnly strategy
-                }
-              },
-              {
-                urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
-                handler: 'CacheFirst',
-                options: {
-                  cacheName: 'google-fonts-cache',
+                  cacheName: 'supabase-api-cache',
                   expiration: {
-                    maxEntries: 10,
-                    maxAgeSeconds: 60 * 60 * 24 * 365
-                  },
-                  cacheableResponse: {
-                    statuses: [0, 200]
-                  }
-                }
-              },
-              {
-                urlPattern: /^https:\/\/fonts\.gstatic\.com\/.*/i,
-                handler: 'CacheFirst',
-                options: {
-                  cacheName: 'gstatic-fonts-cache',
-                  expiration: {
-                    maxEntries: 10,
-                    maxAgeSeconds: 60 * 60 * 24 * 365
-                  },
-                  cacheableResponse: {
-                    statuses: [0, 200]
+                    maxEntries: 50,
+                    maxAgeSeconds: 60 * 60 // 1 hour only
                   }
                 }
               }
@@ -72,115 +50,19 @@ export default defineConfig(({ mode }) => {
             theme_color: '#ffffff',
             background_color: '#ffffff',
             display: 'standalone',
-            display_override: ['window-controls-overlay', 'standalone', 'minimal-ui'],
             orientation: 'portrait',
-            categories: ['education', 'productivity', 'utilities'],
-            lang: 'en',
-            dir: 'ltr',
-            prefer_related_applications: false,
             icons: [
-              {
-                src: 'android/android-launchericon-48-48.png',
-                sizes: '48x48',
-                type: 'image/png'
-              },
-              {
-                src: 'android/android-launchericon-72-72.png',
-                sizes: '72x72',
-                type: 'image/png'
-              },
-              {
-                src: 'android/android-launchericon-96-96.png',
-                sizes: '96x96',
-                type: 'image/png'
-              },
-              {
-                src: 'android/android-launchericon-144-144.png',
-                sizes: '144x144',
-                type: 'image/png'
-              },
               {
                 src: 'android/android-launchericon-192-192.png',
                 sizes: '192x192',
                 type: 'image/png',
-                purpose: 'any'
+                purpose: 'any maskable'
               },
               {
                 src: 'android/android-launchericon-512-512.png',
                 sizes: '512x512',
                 type: 'image/png',
-                purpose: 'any'
-              },
-              {
-                src: 'android/android-launchericon-512-512.png',
-                sizes: '512x512',
-                type: 'image/png',
-                purpose: 'maskable'
-              }
-            ],
-            screenshots: [
-              {
-                src: 'screenshot1.png',
-                sizes: '1080x1920',
-                type: 'image/png',
-                form_factor: 'narrow',
-                label: 'Dashboard Home'
-              },
-              {
-                src: 'screenshot2.png',
-                sizes: '1080x1920',
-                type: 'image/png',
-                form_factor: 'narrow',
-                label: 'User Profile'
-              },
-              {
-                src: 'screenshot3.png',
-                sizes: '1080x1920',
-                type: 'image/png',
-                form_factor: 'narrow',
-                label: 'Features List'
-              },
-              {
-                src: 'screenshot4.png',
-                sizes: '1080x1920',
-                type: 'image/png',
-                form_factor: 'narrow',
-                label: 'Attendance Tracking'
-              },
-              {
-                src: 'screenshot5.png',
-                sizes: '1080x1920',
-                type: 'image/png',
-                form_factor: 'narrow',
-                label: 'School Admin'
-              },
-              {
-                src: 'screenshot6.png',
-                sizes: '1080x1920',
-                type: 'image/png',
-                form_factor: 'narrow',
-                label: 'Transport Map'
-              },
-              {
-                src: 'screenshot7.png',
-                sizes: '1080x1920',
-                type: 'image/png',
-                form_factor: 'narrow',
-                label: 'Homework Portal'
-              },
-              {
-                src: 'screenshot8.png',
-                sizes: '1080x1920',
-                type: 'image/png',
-                form_factor: 'narrow',
-                label: 'Gallery'
-              },
-              {
-                src: 'screenshot9.png',
-                sizes: '1080x1920',
-                type: 'image/png',
-                form_factor: 'narrow',
-                label: 'Reports'
+                purpose: 'any maskable'
               }
             ]
           }
