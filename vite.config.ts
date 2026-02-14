@@ -41,15 +41,17 @@ export default defineConfig(({ mode }) => {
           },
           includeAssets: ['android/android-launchericon-192-192.png', 'ios/180.png'], 
           manifest: {
-            id: '/',
+            // FIXED: Unique ID to prevent ghost windows
+            id: 'vidyasetu-ai-production-v1', 
             start_url: '/',
             scope: '/',
+            display: 'standalone',
+            display_override: ['standalone', 'window-controls-overlay'],
             name: 'Vidyasetu AI',
             short_name: 'Vidyasetu',
             description: 'Premium School Management System with Real-time Tracking.',
             theme_color: '#ffffff',
             background_color: '#ffffff',
-            display: 'standalone',
             orientation: 'portrait',
             icons: [
               {
