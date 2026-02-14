@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { DashboardData, LoginRequest, SearchPerson, FullHistory } from '../types';
-import { Megaphone, MapPin, BarChart2, BookOpen, CalendarRange, UserCheck, Award, Image as ImageIcon, Download, Lock, ChevronRight, Users, ShieldCheck, Search, Filter, FileText, Loader2, User, Check, UserX, Phone, CheckCircle2, RefreshCw, Calendar, ListFilter, LayoutGrid } from 'lucide-react';
+import { Megaphone, MapPin, BarChart2, BookOpen, CalendarRange, UserCheck, Award, Image as ImageIcon, Download, Lock, ChevronRight, Users, ShieldCheck, Search, Filter, FileText, Loader2, User, Check, UserX, Phone, CheckCircle2, RefreshCw, Calendar, ListFilter } from 'lucide-react';
 import { useModalBackHandler } from '../hooks/useModalBackHandler';
 import { Modal } from './Modal';
 import { NoticeModal } from './NoticeModal';
@@ -25,7 +25,7 @@ interface PrincipalDashboardProps {
   isSchoolActive: boolean;
   onShowPayModal: () => void;
   onRefresh: () => void;
-  viewMode: 'home' | 'action' | 'manage' | 'profile'; // Updated viewMode types
+  viewMode: 'home' | 'action' | 'manage' | 'profile'; 
 }
 
 export const PrincipalDashboard: React.FC<PrincipalDashboardProps> = ({ 
@@ -79,7 +79,6 @@ export const PrincipalDashboard: React.FC<PrincipalDashboardProps> = ({
   // --- LOAD INITIAL DATA FOR ACTION TAB ---
   useEffect(() => {
       if (viewMode === 'action' && data.school_db_id) {
-          // IMPORTANT: Load default data immediately
           loadRecentPeople();
           loadClasses();
       }

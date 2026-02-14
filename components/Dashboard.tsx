@@ -30,9 +30,10 @@ interface DashboardProps {
 export const Dashboard: React.FC<DashboardProps> = ({ credentials, role, userName, onLogout }) => {
   const { t } = useThemeLanguage();
   
-  // Expanded view type to include 'action'
-  const [currentView, setCurrentView] = useState<'home' | 'profile' | 'action'>(() => {
-    return (window.history.state?.view === 'profile') ? 'profile' : 'home';
+  // Expanded view type to include 'action' and 'manage'
+  const [currentView, setCurrentView] = useState<'home' | 'profile' | 'action' | 'manage'>(() => {
+    const view = window.history.state?.view;
+    return (view === 'profile' || view === 'action' || view === 'manage') ? view : 'home';
   });
 
   const [data, setData] = useState<DashboardData | null>(null);
@@ -77,13 +78,19 @@ export const Dashboard: React.FC<DashboardProps> = ({ credentials, role, userNam
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
-  const handleViewChange = (view: 'home' | 'profile' | 'action') => {
+  const handleViewChange = (view: 'home' | 'profile' | 'action' | 'manage') => {
     if (view === currentView) return;
     
     // History Management
     if (view === 'home') {
-      if (window.history.state?.view !== 'home') window.history.back();
-      else setCurrentView('home');
+      // If going home, we try to go back if possible to keep history clean, else replace
+      if (window.history.state?.view !== 'home') {
+          // Simple navigation for now to avoid complexity
+          try { window.history.pushState({ view: 'home' }, '', window.location.href); } catch (e) {}
+          setCurrentView('home');
+      } else {
+          setCurrentView('home');
+      }
     } else {
       try { window.history.pushState({ view: view }, '', window.location.href); } catch (e) {}
       setCurrentView(view);
@@ -138,13 +145,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ credentials, role, userNam
 
   return (
     <div className="fixed inset-0 h-screen w-screen bg-[#F8FAFC] dark:bg-dark-950 flex flex-col overflow-hidden transition-colors">
-      <Header onRefresh={handleManualRefresh} onOpenSettings={() => setActiveMenuModal('settings')} onOpenAbout={() => setActiveMenuModal('about')} onOpenHelp={() => setActiveMenuModal('help')} onOpenNotices={() => setIsNoticeListOpen(true)} onLogout={onLogout} currentView={currentView === 'action' ? 'home' : currentView as any} onChangeView={(v) => handleViewChange(v)} />
+      <Header onRefresh={handleManualRefresh} onOpenSettings={() => setActiveMenuModal('settings')} onOpenAbout={() => setActiveMenuModal('about')} onOpenHelp={() => setActiveMenuModal('help')} onOpenNotices={() => setIsNoticeListOpen(true)} onLogout={onLogout} currentView={currentView === 'profile' ? 'profile' : 'home'} onChangeView={(v) => handleViewChange(v)} />
 
       {/* Main Container */}
       <main className="flex-1 w-full flex flex-col overflow-hidden relative" style={{ marginTop: 'calc(5.5rem + env(safe-area-inset-top, 0px))', marginBottom: window.innerWidth < 768 ? 'calc(5.5rem + env(safe-area-inset-bottom, 0px))' : '0' }}>
         
-        {/* VIEW 1: HOME DASHBOARD */}
-        {(currentView === 'home' || currentView === 'action') ? (
+        {/* VIEW 1: HOME / ACTION / MANAGE DASHBOARD */}
+        {(currentView === 'home' || currentView === 'action' || currentView === 'manage') ? (
             <>
                 {currentView === 'home' && (
                     <div className="w-full px-4 pt-3 pb-0.5 z-[40] flex-shrink-0 animate-in fade-in zoom-in-95 duration-300">
@@ -175,7 +182,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ credentials, role, userNam
                          <div className={`w-full h-full transition-opacity duration-300 pb-10 ${isRefreshing ? 'opacity-40' : 'opacity-100'}`}>
                             
                             {/* DYNAMIC DASHBOARD COMPONENT BASED ON ROLE */}
-                            {data && role === 'principal' && <PrincipalDashboard data={data} credentials={credentials} isSchoolActive={isSchoolActive} onShowPayModal={() => setShowPayModal(true)} onRefresh={handleManualRefresh} viewMode={currentView === 'action' ? 'action' : 'home'} />}
+                            {data && role === 'principal' && <PrincipalDashboard data={data} credentials={credentials} isSchoolActive={isSchoolActive} onShowPayModal={() => setShowPayModal(true)} onRefresh={handleManualRefresh} viewMode={currentView} />}
                             {data && role === 'teacher' && <TeacherDashboard data={data} credentials={credentials} isSchoolActive={isSchoolActive} onShowLocked={() => showLockedFeature('school')} onRefresh={handleManualRefresh} />}
                             {data && (role === 'parent' || role === 'student') && <ParentDashboard data={data} credentials={credentials} role={role} isSchoolActive={isSchoolActive} isUserActive={isUserActive} onShowLocked={showLockedFeature} onRefresh={handleManualRefresh} isRefreshing={isRefreshing} />}
                             {data && role === 'driver' && <DriverDashboard data={data} isSchoolActive={isSchoolActive} onShowLocked={() => showLockedFeature('school')} />}
