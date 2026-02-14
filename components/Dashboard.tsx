@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { DashboardData, LoginRequest, Role } from '../types';
-import { fetchDashboardData, fetchSchoolSummary } from '../services/dashboardService';
+import { fetchDashboardData, fetchSchoolSummary, processSyncQueue } from '../services/dashboardService';
 import { Header } from './Header';
 import { BottomNav } from './BottomNav';
 import { SkeletonSchoolCard } from './Skeletons';
@@ -66,7 +66,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ credentials, role, userNam
       else setIsSchoolDetailOpen(false);
   });
 
-  // Custom Back Handler for Tabs (Android Native Feel)
+  // Custom Back Handler for Tabs (Android Native Feel - Replace State)
   useEffect(() => {
     const handlePopState = (e: PopStateEvent) => {
         // If we are NOT on home, go to home
@@ -81,18 +81,29 @@ export const Dashboard: React.FC<DashboardProps> = ({ credentials, role, userNam
         }
     };
 
-    // Push a state when we enter non-home views to allow "back" to catch it
-    if (currentView !== 'home') {
-        window.history.pushState({ view: currentView }, '', window.location.href);
+    // Replace the current state initially to ensure we have a state object
+    if (!window.history.state) {
+        window.history.replaceState({ view: 'home' }, '', window.location.href);
     }
 
     window.addEventListener('popstate', handlePopState);
-    return () => window.removeEventListener('popstate', handlePopState);
+    
+    // Background Sync Logic
+    const handleOnline = () => processSyncQueue();
+    window.addEventListener('online', handleOnline);
+    processSyncQueue(); // Check on mount
+
+    return () => {
+        window.removeEventListener('popstate', handlePopState);
+        window.removeEventListener('online', handleOnline);
+    };
   }, [currentView]);
 
   const handleViewChange = (view: 'home' | 'profile' | 'action' | 'manage') => {
     if (view === currentView) return;
     setCurrentView(view);
+    // Use replaceState to avoid building a history stack for tabs
+    window.history.replaceState({ view: view }, '', window.location.href);
   };
 
   const fetchGenericData = useCallback(async (targetStudent?: string) => {
@@ -117,6 +128,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ credentials, role, userNam
     if (!isSchoolActive && role !== 'principal') return; 
     setIsRefreshing(true);
     await fetchGenericData(selectedStudentId || undefined);
+    processSyncQueue(); // Trigger sync
     setTimeout(() => setIsRefreshing(false), 700);
   };
 

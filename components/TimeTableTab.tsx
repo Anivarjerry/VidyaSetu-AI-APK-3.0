@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { fetchSchoolClasses, fetchClassSubjects, fetchTeachersForTimeTable, fetchTimeTable, saveTimeTableEntry, copyTimeTableDay } from '../services/dashboardService';
 import { downloadTimeTablePDF } from '../services/reportService';
-import { TimeTableEntry } from '../types';
+import { TimeTableEntry, DashboardData } from '../types';
 import { Loader2, Plus, FileText, Calendar, GraduationCap, Save, Copy, X, Check, RefreshCw } from 'lucide-react';
 
 interface TimeTableTabProps {
