@@ -3,28 +3,26 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { LoginCard } from './components/LoginCard';
 import { Dashboard } from './components/Dashboard';
 import { AdminDashboard } from './components/AdminDashboard';
-import { GatekeeperDashboard } from './components/GatekeeperDashboard'; // Import Gatekeeper Dashboard
+import { GatekeeperDashboard } from './components/GatekeeperDashboard'; 
 import { loginUser, updateUserToken } from './services/authService';
 import { LoginRequest, Role } from './types';
 import { ThemeLanguageProvider } from './contexts/ThemeLanguageContext';
 import { requestForToken, onMessageListener } from './services/firebase';
 
 const AppContent: React.FC = () => {
-  // Sync Initialization: Immediate check from localStorage to prevent blink
-  // Using useMemo to define state initial value as purely sync operation
   const [authData, setAuthData] = useState<{
     view: 'login' | 'dashboard' | 'admin';
     credentials: LoginRequest | null;
     userRole: Role | null;
     userName: string;
-    userId?: string; // Add userId to state to pass to Gatekeeper
-    schoolDbId?: string; // Add schoolDbId
+    userId?: string; 
+    schoolDbId?: string;
   }>(() => {
     try {
       const savedCreds = localStorage.getItem('vidyasetu_creds');
       const savedRole = localStorage.getItem('vidyasetu_role');
       const savedName = localStorage.getItem('vidyasetu_name');
-      const savedData = localStorage.getItem('vidyasetu_dashboard_data'); // Try to get cached dashboard data for IDs
+      const savedData = localStorage.getItem('vidyasetu_dashboard_data'); 
 
       let userId = '';
       let schoolDbId = '';
@@ -57,22 +55,41 @@ const AppContent: React.FC = () => {
   // --- FIREBASE NOTIFICATION INIT ---
   useEffect(() => {
     const initNotifications = async () => {
+      if ('serviceWorker' in navigator) {
+          try {
+              const reg = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+              console.log('Service Worker Registered!', reg);
+          } catch (err) {
+              console.error('Service Worker Failed', err);
+          }
+      }
+
+      console.log("Requesting Notification Permission...");
       const token = await requestForToken();
       if (token && authData.userId) {
-        // Sync token to Supabase for this user
-        console.log("FCM Token:", token);
+        console.log("FCM Token Generated:", token);
         await updateUserToken(authData.userId, token);
+      } else {
+        console.warn("FCM Token failed to generate. Check console for 'permission' or 'network' errors.");
       }
     };
 
     if (authData.view !== 'login') {
       initNotifications();
-      // Listen for foreground messages
+      
       onMessageListener()
         .then((payload: any) => {
           if (payload) {
-             // Simple alert for now, can be replaced with a toast
-             alert(`New Notification: ${payload.notification?.title}\n${payload.notification?.body}`);
+             console.log("Foreground Message:", payload);
+             // Use Native Notification if permitted, else Alert
+             if (Notification.permission === 'granted') {
+                 new Notification(payload.notification?.title || 'VidyaSetu Alert', {
+                     body: payload.notification?.body,
+                     icon: '/android/android-launchericon-192-192.png'
+                 });
+             } else {
+                 alert(`🔔 ${payload.notification?.title}: ${payload.notification?.body}`);
+             }
           }
         })
         .catch(err => console.log('failed: ', err));
@@ -93,9 +110,7 @@ const AppContent: React.FC = () => {
           localStorage.setItem('vidyasetu_role', role);
           localStorage.setItem('vidyasetu_name', name);
           
-          // For Gatekeeper specifically, we need these immediately
           if (role === 'gatekeeper') {
-             // We can store minimal data to allow immediate re-render
              localStorage.setItem('vidyasetu_dashboard_data', JSON.stringify({
                  user_id: response.user_id,
                  school_db_id: response.school_db_id
@@ -128,17 +143,14 @@ const AppContent: React.FC = () => {
     } catch (e) {}
   };
 
-  // Switch Case for immediate rendering based on initial synchronous state
   switch(authData.view) {
     case 'admin':
       return <AdminDashboard onLogout={handleLogout} userName={authData.userName} />;
     case 'dashboard':
       if (authData.credentials && authData.userRole) {
-        // --- GATEKEEPER ROUTING ---
         if (authData.userRole === 'gatekeeper') {
             return <GatekeeperDashboard onLogout={handleLogout} schoolId={authData.schoolDbId || ''} userId={authData.userId || ''} />;
         }
-
         return <Dashboard credentials={authData.credentials} role={authData.userRole} userName={authData.userName} onLogout={handleLogout} />;
       }
       return <LoginCard onSubmit={handleLogin} isLoading={isLoggingIn} error={loginError} />;

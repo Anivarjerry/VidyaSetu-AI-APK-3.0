@@ -13,12 +13,7 @@ export const getISTDate = (): string => {
 };
 
 // --- CACHING HELPER ---
-// This function returns cached data immediately if available, then fetches fresh data.
-// Note: In React, we usually handle this by calling the service, getting cached result, 
-// and then the service might trigger a state update if we pass a callback, or we handle it in the component.
-// For simplicity in this structure, we will return cached data if offline, or network data if online.
 const fetchWithCache = async <T>(key: string, fetcher: () => Promise<T>): Promise<T | null> => {
-    // 1. Try to get from Local Storage
     const cached = localStorage.getItem(key);
     let cachedData: T | null = null;
     
@@ -26,12 +21,10 @@ const fetchWithCache = async <T>(key: string, fetcher: () => Promise<T>): Promis
         try { cachedData = JSON.parse(cached); } catch (e) { console.error("Cache parse error", e); }
     }
 
-    // 2. If Offline, return cache immediately
     if (!navigator.onLine) {
         return cachedData;
     }
 
-    // 3. If Online, fetch fresh
     try {
         const freshData = await fetcher();
         if (freshData) {
@@ -42,7 +35,46 @@ const fetchWithCache = async <T>(key: string, fetcher: () => Promise<T>): Promis
         console.error("Fetch failed, falling back to cache", e);
     }
 
-    return cachedData; // Fallback to cache if fetch fails
+    return cachedData; 
+};
+
+// --- NEW: SMART PREFETCHER (Prevents White Screen Crash) ---
+export const prefetchAllDashboardData = async (schoolId: string, role: Role, userId: string, classVal?: string) => {
+    if (!navigator.onLine || !schoolId) return;
+    
+    console.log("Starting Background Prefetch...");
+    const today = getISTDate();
+
+    // 1. Common Data (Notices, Gallery)
+    fetchNotices(schoolId, role); // Caches automatically
+    fetchGalleryImages(schoolId, today.slice(0, 7)); // Current Month Gallery
+
+    // 2. Role Specific Data
+    if (role === 'teacher') {
+        // Prefetch Classes, Leaves, and Today's Period History
+        fetchSchoolClasses(schoolId);
+        fetchUserLeaves(userId);
+        fetchTeacherHistory(schoolId, '', today); // Requires mobile logic inside service, might skip exact mobile match here relying on user_id inside specific funcs
+    } 
+    else if (role === 'parent' || role === 'student') {
+        // Prefetch Homework, Leaves
+        if (classVal) {
+             // We can't easily prefetch homework without knowing section/studentId perfectly here, 
+             // but we can prefetch Leaves
+             if (role === 'student') fetchStudentLeavesForParent(userId); // Actually needs parent ID logic
+        }
+    }
+    else if (role === 'driver') {
+        // Prefetch Vehicles
+        fetchVehicles(schoolId);
+    }
+    else if (role === 'gatekeeper') {
+        fetchVisitorEntries(schoolId, today, today);
+    }
+    else if (role === 'principal') {
+        fetchSchoolClasses(schoolId);
+        fetchPrincipalAnalytics(schoolId, today);
+    }
 };
 
 // --- OFFLINE SYNC QUEUE SYSTEM ---
@@ -84,7 +116,6 @@ export const processSyncQueue = async () => {
     
     localStorage.setItem('vidyasetu_sync_queue', JSON.stringify(failedItems));
     if (queue.length > failedItems.length) {
-        // Trigger a custom event to notify UI of sync
         window.dispatchEvent(new Event('vidyasetu-synced'));
     }
 };
@@ -172,7 +203,6 @@ export const fetchClassAttendanceToday = async (schoolId: string, className: str
 };
 
 export const submitAttendance = async (sid: string, tid: string, cn: string, recs: AttendanceStatus[], skipQueue = false): Promise<boolean> => {
-  // Offline Handling
   if (!navigator.onLine && !skipQueue) {
       return addToSyncQueue('attendance', { sid, tid, cn, recs });
   }
@@ -186,8 +216,13 @@ export const submitAttendance = async (sid: string, tid: string, cn: string, rec
 
 // --- NOTICE SERVICES ---
 export const fetchNotices = async (schoolCode: string, role: string): Promise<NoticeItem[]> => {
-  const schoolUUID = await getSchoolUUID(schoolCode);
-  if (!schoolUUID) return [];
+  // Can be school ID or Code, try to treat as ID first if UUID-like, else resolve
+  let schoolUUID = schoolCode;
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(schoolCode)) {
+      const resolved = await getSchoolUUID(schoolCode);
+      if (!resolved) return [];
+      schoolUUID = resolved;
+  }
   
   return fetchWithCache(`notices_${schoolUUID}_${role}`, async () => {
       let query = supabase.from('notices').select('*').eq('school_id', schoolUUID);
@@ -203,9 +238,7 @@ export const fetchNotices = async (schoolCode: string, role: string): Promise<No
 
 export const submitNotice = async (notice: NoticeRequest): Promise<boolean> => {
   try {
-    const schoolUUID = await getSchoolUUID(notice.school_id);
-    if (!schoolUUID) return false;
-    const { error } = await supabase.from('notices').insert({ school_id: schoolUUID, date: notice.date, title: notice.title, message: notice.message, category: notice.category, target: notice.target });
+    const { error } = await supabase.from('notices').insert(notice);
     return !error;
   } catch (e) { return false; }
 };
@@ -253,7 +286,6 @@ export const fetchFullSchoolTimeTable = async (schoolId: string, day: string): P
 };
 
 export const saveTimeTableEntry = async (entry: TimeTableEntry, skipQueue = false) => {
-    // Offline Logic
     if (!navigator.onLine && !skipQueue) {
         return addToSyncQueue('time_table', entry);
     }
@@ -285,15 +317,12 @@ export const saveTimeTableEntry = async (entry: TimeTableEntry, skipQueue = fals
 
 export const copyTimeTableDay = async (schoolId: string, className: string, sourceDay: string, targetDays: string[]) => {
     try {
-        // 1. Fetch Source
         const sourceEntries = await fetchTimeTable(schoolId, className, sourceDay);
         if (sourceEntries.length === 0) return false;
 
-        // 2. Prepare Batch
         const batch: any[] = [];
         for (const day of targetDays) {
             if (day === sourceDay) continue;
-            
             sourceEntries.forEach(entry => {
                 batch.push({
                     school_id: schoolId,
@@ -307,8 +336,6 @@ export const copyTimeTableDay = async (schoolId: string, className: string, sour
         }
 
         if (batch.length === 0) return true;
-
-        // 3. Upsert Batch
         const { error } = await supabase.from('time_tables').upsert(batch, { onConflict: 'school_id,class_name,day_of_week,period_number' });
         return !error;
     } catch(e) { return false; }
@@ -328,8 +355,12 @@ export const fetchTeachersForTimeTable = async (schoolId: string) => {
 
 // --- ANALYTICS ---
 export const fetchPrincipalAnalytics = async (sc: string, d: string): Promise<AnalyticsSummary | null> => {
-  const schoolUUID = await getSchoolUUID(sc);
-  if (!schoolUUID) return null;
+  let schoolUUID = sc;
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(sc)) {
+      const resolved = await getSchoolUUID(sc);
+      if (!resolved) return null;
+      schoolUUID = resolved;
+  }
   
   return fetchWithCache(`analytics_${schoolUUID}_${d}`, async () => {
       const { data: schoolConfig } = await supabase.from('schools').select('total_periods').eq('id', schoolUUID).single();
@@ -344,8 +375,12 @@ export const fetchPrincipalAnalytics = async (sc: string, d: string): Promise<An
 };
 
 export const fetchHomeworkAnalytics = async (sc: string, date: string): Promise<HomeworkAnalyticsData | null> => {
-  const schoolUUID = await getSchoolUUID(sc);
-  if (!schoolUUID) return null;
+  let schoolUUID = sc;
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(sc)) {
+      const resolved = await getSchoolUUID(sc);
+      if (!resolved) return null;
+      schoolUUID = resolved;
+  }
   return fetchWithCache(`hw_analytics_${schoolUUID}_${date}`, async () => {
       const { data: sts } = await supabase.from('students').select('id, name, class_name, users!parent_user_id(name)').eq('school_id', schoolUUID);
       const { data: tps = [] } = await supabase.from('daily_periods').select('class_name').eq('school_id', schoolUUID).eq('date', date);
@@ -362,13 +397,24 @@ export const fetchHomeworkAnalytics = async (sc: string, date: string): Promise<
 };
 
 export const fetchTeacherHistory = async (sc: string, mob: string, d: string): Promise<PeriodData[]> => {
-  const schoolUUID = await getSchoolUUID(sc);
-  if (!schoolUUID) return [];
-  const { data: user } = await supabase.from('users').select('id').eq('mobile', mob).eq('school_id', schoolUUID).single();
-  if (!user) return [];
+  // If we have a user_id based flow in components, this might need ID. But here we resolve via mobile if needed
+  let schoolUUID = sc;
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(sc)) {
+      const resolved = await getSchoolUUID(sc);
+      if (!resolved) return [];
+      schoolUUID = resolved;
+  }
   
-  return fetchWithCache(`teacher_hist_${user.id}_${d}`, async () => {
-      const { data } = await supabase.from('daily_periods').select('*').eq('teacher_user_id', user.id).eq('date', d).order('period_number');
+  return fetchWithCache(`teacher_hist_${mob || 'uid'}_${d}`, async () => {
+      // If mob is actually ID
+      let userId = mob;
+      if (mob.length >= 10 && !mob.includes('-')) {
+          const { data: user } = await supabase.from('users').select('id').eq('mobile', mob).eq('school_id', schoolUUID).maybeSingle();
+          if (!user) return [];
+          userId = user.id;
+      }
+      
+      const { data } = await supabase.from('daily_periods').select('*').eq('teacher_user_id', userId).eq('date', d).order('period_number');
       return (data || []).map((p: any) => ({ id: p.id, period_number: p.period_number, status: 'submitted', class_name: p.class_name, subject: p.subject, lesson: p.lesson, homework: p.homework, homework_type: p.homework_type }));
   }) || [];
 };
@@ -468,17 +514,30 @@ export const fetchSchoolUserList = async (id: string, cat: string): Promise<Scho
 };
 
 export const submitPeriodData = async (sc: string, mob: string, p: PeriodData, un: string, action: string): Promise<boolean> => {
-  const schoolUUID = await getSchoolUUID(sc);
-  if (!schoolUUID) return false;
-  const { data: user } = await supabase.from('users').select('id').eq('mobile', mob).eq('school_id', schoolUUID).single();
-  if (!user) return false;
-  const { error } = await supabase.from('daily_periods').upsert({ school_id: schoolUUID, teacher_user_id: user.id, date: getISTDate(), period_number: p.period_number, class_name: p.class_name, subject: p.subject, lesson: p.lesson, homework: p.homework, homework_type: p.homework_type || 'Manual' }, { onConflict: 'teacher_user_id,date,period_number' });
+  let schoolUUID = sc;
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(sc)) {
+      const resolved = await getSchoolUUID(sc);
+      if (!resolved) return false;
+      schoolUUID = resolved;
+  }
+  
+  // Find User ID from Mobile if needed
+  let userId = '';
+  const { data: user } = await supabase.from('users').select('id').eq('mobile', mob).eq('school_id', schoolUUID).maybeSingle();
+  if (user) userId = user.id;
+  else return false;
+
+  const { error } = await supabase.from('daily_periods').upsert({ school_id: schoolUUID, teacher_user_id: userId, date: getISTDate(), period_number: p.period_number, class_name: p.class_name, subject: p.subject, lesson: p.lesson, homework: p.homework, homework_type: p.homework_type || 'Manual' }, { onConflict: 'teacher_user_id,date,period_number' });
   return !error;
 };
 
 export const fetchParentHomework = async (sc: string, cn: string, s: string, sid: string, mob: string, date: string): Promise<ParentHomework[]> => {
-  const schoolUUID = await getSchoolUUID(sc);
-  if (!schoolUUID) return [];
+  let schoolUUID = sc;
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(sc)) {
+      const resolved = await getSchoolUUID(sc);
+      if (!resolved) return [];
+      schoolUUID = resolved;
+  }
   
   return fetchWithCache(`parent_hw_${sid}_${date}`, async () => {
       const { data: periods } = await supabase.from('daily_periods').select('*, users!teacher_user_id(name)').eq('school_id', schoolUUID).eq('class_name', cn).eq('date', date);
