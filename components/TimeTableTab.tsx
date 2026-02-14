@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { fetchSchoolClasses, fetchClassSubjects, fetchTeachersForTimeTable, fetchTimeTable, saveTimeTableEntry, copyTimeTableDay } from '../services/dashboardService';
+import { fetchSchoolClasses, fetchClassSubjects, fetchTeachersForTimeTable, fetchTimeTable, saveTimeTableEntry, copyTimeTableDay, fetchFullSchoolTimeTable } from '../services/dashboardService';
 import { downloadTimeTablePDF } from '../services/reportService';
 import { TimeTableEntry, DashboardData } from '../types';
 import { Loader2, Plus, FileText, Calendar, GraduationCap, Save, Copy, X, Check, RefreshCw } from 'lucide-react';
@@ -24,6 +24,9 @@ export const TimeTableTab: React.FC<TimeTableTabProps> = ({ schoolId, schoolName
     const [teachers, setTeachers] = useState<any[]>([]);
     const [entries, setEntries] = useState<TimeTableEntry[]>([]);
     
+    // Global Allocations for Conflict Detection
+    const [allAllocations, setAllAllocations] = useState<TimeTableEntry[]>([]);
+    
     // Modal State
     const [isEditOpen, setIsEditOpen] = useState(false);
     const [editingPeriod, setEditingPeriod] = useState<number | null>(null);
@@ -38,10 +41,13 @@ export const TimeTableTab: React.FC<TimeTableTabProps> = ({ schoolId, schoolName
     }, [schoolId]);
 
     useEffect(() => {
+        if (schoolId && selectedDay) {
+            loadAllAllocations(); // Fetch full school data for conflicts
+        }
         if (selectedClass && selectedDay) {
             loadEntries();
         }
-    }, [selectedClass, selectedDay]);
+    }, [selectedClass, selectedDay, schoolId]);
 
     useEffect(() => {
         if (selectedClass) {
@@ -59,6 +65,11 @@ export const TimeTableTab: React.FC<TimeTableTabProps> = ({ schoolId, schoolName
         setClasses(clsData);
         setTeachers(teachData);
         setLoading(false);
+    };
+
+    const loadAllAllocations = async () => {
+        const data = await fetchFullSchoolTimeTable(schoolId, selectedDay);
+        setAllAllocations(data);
     };
 
     const loadSubjects = async (classId: string) => {
@@ -98,7 +109,7 @@ export const TimeTableTab: React.FC<TimeTableTabProps> = ({ schoolId, schoolName
 
         const success = await saveTimeTableEntry(payload);
         if (success) {
-            await loadEntries();
+            await Promise.all([loadEntries(), loadAllAllocations()]);
             setIsEditOpen(false);
         } else {
             alert("Failed to save entry. Check DB permissions.");
@@ -120,13 +131,22 @@ export const TimeTableTab: React.FC<TimeTableTabProps> = ({ schoolId, schoolName
         downloadTimeTablePDF(entries, schoolName, principalName, selectedClass, selectedDay);
     };
 
-    const getTeacherName = (id: string) => teachers.find(t => t.id === id)?.name || 'Unknown';
+    const getTeacherBusyInfo = (teacherId: string) => {
+        if (editingPeriod === null) return null;
+        // Find if this teacher is assigned to THIS period but in a DIFFERENT class
+        const conflict = allAllocations.find(a => 
+            a.teacher_id === teacherId && 
+            a.period_number === editingPeriod &&
+            a.class_name !== selectedClass
+        );
+        return conflict ? `(Busy in ${conflict.class_name})` : null;
+    };
 
     // Ensure we show at least 8 periods if totalPeriods is 0 or low
     const displayPeriods = (totalPeriods && totalPeriods > 0) ? totalPeriods : 8;
 
     return (
-        <div className="flex flex-col h-full bg-slate-50 dark:bg-dark-950 pb-20">
+        <div className="flex flex-col h-full bg-slate-50 dark:bg-dark-950 pb-40">
             {/* Header Controls */}
             <div className="sticky top-0 z-10 bg-white/80 dark:bg-dark-900/80 backdrop-blur-xl p-4 space-y-4 shadow-sm">
                 <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2">
@@ -134,7 +154,7 @@ export const TimeTableTab: React.FC<TimeTableTabProps> = ({ schoolId, schoolName
                         <button 
                             key={day} 
                             onClick={() => setSelectedDay(day)}
-                            className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase whitespace-nowrap transition-all ${selectedDay === day ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/20' : 'bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 text-slate-400'}`}
+                            className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase whitespace-nowrap transition-all ${selectedDay === day ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 text-slate-400'}`}
                         >
                             {day}
                         </button>
@@ -167,7 +187,7 @@ export const TimeTableTab: React.FC<TimeTableTabProps> = ({ schoolId, schoolName
                     <button 
                         onClick={handleDownload} 
                         disabled={!selectedClass}
-                        className="w-12 h-12 flex items-center justify-center bg-indigo-50 dark:bg-indigo-500/10 text-indigo-500 rounded-2xl border border-indigo-100 dark:border-indigo-500/20 disabled:opacity-50"
+                        className="w-12 h-12 flex items-center justify-center bg-emerald-50 dark:bg-emerald-500/10 text-emerald-500 rounded-2xl border border-emerald-100 dark:border-emerald-500/20 disabled:opacity-50"
                     >
                         <FileText size={20} />
                     </button>
@@ -182,7 +202,7 @@ export const TimeTableTab: React.FC<TimeTableTabProps> = ({ schoolId, schoolName
                         <p className="text-[10px] font-black uppercase tracking-widest">Select a class to manage</p>
                     </div>
                 ) : loading ? (
-                    <div className="text-center py-20"><Loader2 className="animate-spin mx-auto text-indigo-500" /></div>
+                    <div className="text-center py-20"><Loader2 className="animate-spin mx-auto text-emerald-500" /></div>
                 ) : (
                     Array.from({ length: displayPeriods }).map((_, i) => {
                         const pNum = i + 1;
@@ -192,10 +212,10 @@ export const TimeTableTab: React.FC<TimeTableTabProps> = ({ schoolId, schoolName
                             <div 
                                 key={pNum} 
                                 onClick={() => handleEditClick(pNum)}
-                                className={`p-4 rounded-[1.8rem] border transition-all active:scale-[0.98] cursor-pointer flex items-center justify-between shadow-sm ${entry ? 'bg-white dark:bg-dark-900 border-indigo-100 dark:border-white/10' : 'bg-slate-50 dark:bg-white/5 border-slate-100 dark:border-white/5'}`}
+                                className={`p-4 rounded-[1.8rem] border transition-all active:scale-[0.98] cursor-pointer flex items-center justify-between shadow-sm ${entry ? 'bg-white dark:bg-dark-900 border-emerald-100 dark:border-white/10' : 'bg-slate-50 dark:bg-white/5 border-slate-100 dark:border-white/5'}`}
                             >
                                 <div className="flex items-center gap-4">
-                                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xs font-black shadow-inner ${entry ? 'bg-indigo-500 text-white' : 'bg-slate-200 dark:bg-white/10 text-slate-400'}`}>
+                                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xs font-black shadow-inner ${entry ? 'bg-emerald-500 text-white' : 'bg-slate-200 dark:bg-white/10 text-slate-400'}`}>
                                         {pNum}
                                     </div>
                                     <div>
@@ -207,7 +227,7 @@ export const TimeTableTab: React.FC<TimeTableTabProps> = ({ schoolId, schoolName
                                         </p>
                                     </div>
                                 </div>
-                                <div className={`p-2 rounded-full ${entry ? 'text-indigo-500 bg-indigo-50 dark:bg-indigo-500/10' : 'text-slate-300'}`}>
+                                <div className={`p-2 rounded-full ${entry ? 'text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10' : 'text-slate-300'}`}>
                                     {entry ? <FileText size={16} /> : <Plus size={16} />}
                                 </div>
                             </div>
@@ -252,18 +272,24 @@ export const TimeTableTab: React.FC<TimeTableTabProps> = ({ schoolId, schoolName
                                     className="w-full p-4 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl text-xs font-bold uppercase outline-none"
                                 >
                                     <option value="">Select Teacher</option>
-                                    {teachers.map(t => (
-                                        <option key={t.id} value={t.id}>
-                                            {t.name} {t.assigned_subject ? `(${t.assigned_subject})` : ''}
-                                        </option>
-                                    ))}
+                                    {teachers.map(t => {
+                                        const busyInfo = getTeacherBusyInfo(t.id);
+                                        const isCurrent = editForm.teacher_id === t.id; // Allow if already assigned here
+                                        const isDisabled = !!busyInfo && !isCurrent;
+                                        
+                                        return (
+                                            <option key={t.id} value={t.id} disabled={isDisabled} className={isDisabled ? 'text-slate-400' : ''}>
+                                                {t.name} {t.assigned_subject ? `(${t.assigned_subject})` : ''} {isDisabled ? busyInfo : ''}
+                                            </option>
+                                        );
+                                    })}
                                 </select>
                             </div>
 
                             <button 
                                 onClick={handleSaveEntry} 
                                 disabled={saving} 
-                                className="w-full py-4 bg-indigo-500 text-white rounded-2xl font-black uppercase text-xs shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2 mt-4"
+                                className="w-full py-4 bg-emerald-500 text-white rounded-2xl font-black uppercase text-xs shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2 mt-4"
                             >
                                 {saving ? <Loader2 className="animate-spin" /> : <><Save size={16} /> Save Allocation</>}
                             </button>

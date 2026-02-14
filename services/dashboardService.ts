@@ -200,6 +200,22 @@ export const fetchTimeTable = async (schoolId: string, className: string, day: s
     }
 };
 
+// NEW: Fetch ALL entries for a specific day to detect teacher conflicts
+export const fetchFullSchoolTimeTable = async (schoolId: string, day: string): Promise<TimeTableEntry[]> => {
+    try {
+        const { data, error } = await supabase
+            .from('time_tables')
+            .select('teacher_id, period_number, class_name')
+            .eq('school_id', schoolId)
+            .eq('day_of_week', day);
+        
+        if (error) throw error;
+        return data || [];
+    } catch(e) {
+        return [];
+    }
+};
+
 export const saveTimeTableEntry = async (entry: TimeTableEntry, skipQueue = false) => {
     // Offline Logic
     if (!navigator.onLine && !skipQueue) {
