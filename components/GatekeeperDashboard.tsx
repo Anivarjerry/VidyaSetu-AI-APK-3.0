@@ -181,7 +181,9 @@ export const GatekeeperDashboard: React.FC<GatekeeperDashboardProps> = ({ onLogo
       };
       const success = await addVisitorEntry(payload);
       if (success) {
-          alert("Entry Logged Successfully");
+          const msg = navigator.onLine ? "Entry Logged Successfully" : "Entry Saved Offline. Will sync when online.";
+          alert(msg);
+          
           setFormData({ visitor_name: '', mobile: '', village: '', visitor_count: 1, visiting_purpose: 'Principal/Enquiry', meet_person: 'Principal' });
           setPhotoData('');
           setModalStack([]);
@@ -235,7 +237,7 @@ export const GatekeeperDashboard: React.FC<GatekeeperDashboardProps> = ({ onLogo
                     <div className="space-y-3 overflow-y-auto no-scrollbar flex-1 pb-4">
                         {visitors.map((v) => (
                             <div key={v.id} onClick={() => setSelectedVisitor(v)} className="bg-white dark:bg-dark-900 p-4 rounded-[2rem] border border-slate-100 dark:border-white/5 shadow-sm flex items-center gap-4 premium-subview-enter cursor-pointer active:scale-[0.98] transition-all hover:border-emerald-500/30">
-                                <div className="w-16 h-16 rounded-2xl bg-slate-100 dark:bg-white/5 overflow-hidden shrink-0 border border-slate-200 dark:border-white/10">{v.photo_data ? <img src={v.photo_data} alt="Visitor" className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-slate-300"><User size={24} /></div>}</div>
+                                <div className="w-16 h-16 rounded-2xl bg-slate-100 dark:bg-white/5 overflow-hidden shrink-0 border border-slate-200 dark:border-white/10">{v.photo_data ? <img src={v.photo_data} alt="Visitor" className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-slate-300"><Users size={24} /></div>}</div>
                                 <div className="flex-1 min-w-0"><div className="flex justify-between items-start"><h4 className="font-black text-slate-800 dark:text-white uppercase text-sm truncate">{v.visitor_name}</h4><div className="text-right"><span className="block text-[8px] font-black text-slate-400 uppercase">{new Date(v.entry_time).toLocaleDateString()}</span><span className="text-[10px] font-bold text-slate-500">{new Date(v.entry_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span></div></div><p className="text-[10px] font-bold text-slate-500 uppercase tracking-wide truncate">{v.visiting_purpose} • {v.visitor_count} Person(s)</p><p className="text-[10px] font-bold text-emerald-500 uppercase mt-1 truncate">Meeting: {v.meet_person || 'Principal'}</p></div>
                             </div>
                         ))}

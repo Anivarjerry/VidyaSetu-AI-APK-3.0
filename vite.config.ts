@@ -41,18 +41,19 @@ export default defineConfig(({ mode }) => {
           },
           includeAssets: ['android/android-launchericon-192-192.png', 'ios/180.png'], 
           manifest: {
-            // FIXED: Unique ID to prevent ghost windows
+            // FIXED: Standardized ID and Scope to prevent ghost windows
             id: 'vidyasetu-ai-production-v1', 
-            start_url: '/',
-            scope: '/',
-            display: 'standalone',
-            display_override: ['standalone', 'window-controls-overlay'],
             name: 'Vidyasetu AI',
             short_name: 'Vidyasetu',
             description: 'Premium School Management System with Real-time Tracking.',
-            theme_color: '#ffffff',
+            start_url: '/',
+            scope: '/',
+            display: 'standalone',
+            // Removed 'display_override' array to force standard standalone behavior across all Android versions
             background_color: '#ffffff',
+            theme_color: '#ffffff',
             orientation: 'portrait',
+            categories: ['education', 'productivity'],
             icons: [
               {
                 src: 'android/android-launchericon-192-192.png',

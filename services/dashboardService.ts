@@ -1,6 +1,7 @@
 
 import { DashboardData, PeriodData, Role, ParentHomework, NoticeItem, NoticeRequest, AnalyticsSummary, TeacherProgress, HomeworkAnalyticsData, StudentHomeworkStatus, Student, AttendanceStatus, Vehicle, StaffLeave, AttendanceHistoryItem, StudentLeave, SchoolSummary, SchoolUser, SiblingInfo, GalleryItem, ExamRecord, ExamMark, VisitorEntry, SearchPerson, FullHistory, TimeTableEntry } from '../types';
 import { supabase } from './supabaseClient';
+import { offlineStore } from './offlineStore';
 
 export const getISTDate = (): string => {
   const now = new Date();
@@ -12,14 +13,15 @@ export const getISTDate = (): string => {
   return `${year}-${month}-${day}`;
 };
 
-// --- STABLE CACHING (Network First, Failover to Cache) ---
+// --- STABLE CACHING (Network First, Failover to IndexedDB) ---
 const fetchWithCache = async <T>(key: string, fetcher: () => Promise<T>): Promise<T | null> => {
     // 1. Try Network
     if (navigator.onLine) {
         try {
             const freshData = await fetcher();
             if (freshData) {
-                localStorage.setItem(key, JSON.stringify(freshData));
+                // Async set, don't await strictly to not block return
+                offlineStore.set(key, freshData); 
                 return freshData;
             }
         } catch (e) {
@@ -27,10 +29,12 @@ const fetchWithCache = async <T>(key: string, fetcher: () => Promise<T>): Promis
         }
     }
 
-    // 2. Fallback to Cache
-    const cached = localStorage.getItem(key);
-    if (cached) {
-        try { return JSON.parse(cached); } catch (e) { return null; }
+    // 2. Fallback to Cache (IndexedDB)
+    try {
+        const cached = await offlineStore.get<T>(key);
+        if (cached) return cached;
+    } catch (e) {
+        console.warn("Cache retrieval failed", e);
     }
     
     return null;
@@ -45,9 +49,6 @@ export const prefetchAllDashboardData = async (schoolId: string, role: Role, use
         fetchGalleryImages(schoolId, getISTDate().slice(0, 7)); 
     } catch(e) {}
 };
-
-// --- REMOVED QUEUE LOGIC ---
-// export const processSyncQueue = async () => { ... } // DELETED
 
 // --- PUBLIC HELPERS FOR SIGNUP ---
 export const fetchSchoolsList = async () => {
@@ -73,6 +74,7 @@ export const fetchStudentOptionsForParent = async (parentId: string) => {
 
 const getSchoolUUID = async (schoolCode: string): Promise<string | null> => {
     try {
+        // We use localStorage for UUID mapping as it's small and static
         const cacheKey = `vidyasetu_uuid_${schoolCode}`;
         const cached = localStorage.getItem(cacheKey);
         if (cached) return cached;
@@ -106,11 +108,15 @@ export const fetchClassAttendanceToday = async (schoolId: string, className: str
     } catch (e) { return {}; }
 };
 
-export const submitAttendance = async (sid: string, tid: string, cn: string, recs: AttendanceStatus[]): Promise<boolean> => {
-  if (!navigator.onLine) { alert("Internet connection required to save."); return false; }
+export const submitAttendance = async (schoolId: string, userId: string, className: string, records: AttendanceStatus[]): Promise<boolean> => {
+  if (!navigator.onLine) {
+      await offlineStore.addToQueue('SUBMIT_ATTENDANCE', { schoolId, userId, className, records });
+      return true; // Return true to update UI optimistically
+  }
+  
   const date = getISTDate();
-  if (!recs || recs.length === 0) return false;
-  const payload = recs.map(r => ({ school_id: sid, marked_by_user_id: tid, student_id: r.student_id, date: date, status: r.status }));
+  if (!records || records.length === 0) return false;
+  const payload = records.map(r => ({ school_id: schoolId, marked_by_user_id: userId, student_id: r.student_id, date: date, status: r.status }));
   const { error } = await supabase.from('attendance').upsert(payload, { onConflict: 'student_id,date' });
   return !error;
 };
@@ -136,7 +142,7 @@ export const fetchNotices = async (schoolCode: string, role: string): Promise<No
 };
 
 export const submitNotice = async (notice: NoticeRequest): Promise<boolean> => {
-  if (!navigator.onLine) return false;
+  if (!navigator.onLine) return false; // Notice broadcast usually requires online
   const { error } = await supabase.from('notices').insert(notice);
   return !error;
 };
@@ -280,7 +286,16 @@ export const fetchAttendanceHistory = async (id: string): Promise<AttendanceHist
       return (data || []).map((h: any) => ({ id: h.id, date: h.date, status: h.status, marked_by_name: h.users?.name }));
   }) || [];
 };
-export const applyForLeave = async (l: Partial<StaffLeave>): Promise<boolean> => { if(!navigator.onLine) return false; const { error } = await supabase.from('staff_leaves').insert(l); return !error; };
+
+export const applyForLeave = async (l: Partial<StaffLeave>): Promise<boolean> => { 
+    if(!navigator.onLine) {
+        await offlineStore.addToQueue('APPLY_LEAVE', l);
+        return true;
+    }
+    const { error } = await supabase.from('staff_leaves').insert(l); 
+    return !error; 
+};
+
 export const fetchUserLeaves = async (id: string): Promise<StaffLeave[]> => { 
     return fetchWithCache(`user_leaves_${id}`, async () => {
         const { data } = await supabase.from('staff_leaves').select('*').eq('user_id', id).order('created_at', { ascending: false }); return data || []; 
@@ -293,7 +308,16 @@ export const fetchSchoolLeaves = async (id: string): Promise<StaffLeave[]> => {
   }) || [];
 };
 export const updateLeaveStatus = async (id: string, s: string, c: string): Promise<boolean> => { const { error } = await supabase.from('staff_leaves').update({ status: s, principal_comment: c }).eq('id', id); return !error; };
-export const applyStudentLeave = async (l: Partial<StudentLeave>): Promise<boolean> => { if(!navigator.onLine) return false; const { error } = await supabase.from('student_leaves').insert(l); return !error; };
+
+export const applyStudentLeave = async (l: Partial<StudentLeave>): Promise<boolean> => { 
+    if(!navigator.onLine) {
+        await offlineStore.addToQueue('APPLY_STUDENT_LEAVE', l);
+        return true;
+    }
+    const { error } = await supabase.from('student_leaves').insert(l); 
+    return !error; 
+};
+
 export const fetchStudentLeavesForParent = async (id: string): Promise<StudentLeave[]> => { const { data } = await supabase.from('student_leaves').select('*').eq('parent_id', id).order('created_at', { ascending: false }); return data || []; };
 export const fetchSchoolStudentLeaves = async (id: string): Promise<StudentLeave[]> => {
   return fetchWithCache(`school_student_leaves_${id}`, async () => {
@@ -356,12 +380,16 @@ export const fetchSchoolUserList = async (id: string, cat: string): Promise<Scho
 };
 
 export const submitPeriodData = async (sc: string, mob: string, p: PeriodData, un: string, action: string): Promise<boolean> => {
-  if(!navigator.onLine) { alert("Internet connection required to save."); return false; }
   let schoolUUID = sc;
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(sc)) {
       const resolved = await getSchoolUUID(sc);
       if (!resolved) return false;
       schoolUUID = resolved;
+  }
+  
+  if(!navigator.onLine) {
+      await offlineStore.addToQueue('SUBMIT_PERIOD', { schoolId: schoolUUID, mobile: mob, data: p, userName: un, action });
+      return true;
   }
   
   let userId = '';
@@ -391,7 +419,10 @@ export const fetchParentHomework = async (sc: string, cn: string, s: string, sid
 };
 
 export const updateParentHomeworkStatus = async (sc: string, cn: string, s: string, sid: string, mob: string, p: string, sub: string, date: string): Promise<boolean> => {
-  if(!navigator.onLine) return false;
+  if(!navigator.onLine) {
+      await offlineStore.addToQueue('SUBMIT_HOMEWORK_STATUS', { schoolId: sc, className: cn, section: s, studentId: sid, mobile: mob, period: p, subject: sub, date });
+      return true;
+  }
   const pn = parseInt(p.replace(/\D/g, '')) || 1;
   const { error } = await supabase.from('homework_submissions').upsert({ student_id: sid, date: date, period_number: pn, status: 'completed' }, { onConflict: 'student_id,date,period_number' });
   return !error;
@@ -576,7 +607,10 @@ export const fetchStudentExamResults = async (studentId: string): Promise<any[]>
 
 // --- VISITOR MANAGEMENT SERVICES ---
 export const addVisitorEntry = async (entry: VisitorEntry) => {
-    if(!navigator.onLine) return false;
+    if(!navigator.onLine) {
+        await offlineStore.addToQueue('VISITOR_ENTRY', entry);
+        return true;
+    }
     const { error } = await supabase.from('visitor_entries').insert([entry]);
     return !error;
 };

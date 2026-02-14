@@ -41,6 +41,11 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
   const handlePeriodSubmit = async (pData: PeriodData) => {
     const success = await submitPeriodData(credentials.school_id, credentials.mobile, pData, data.user_name, 'submit');
     if (success) { 
+        const msg = navigator.onLine 
+            ? "Submission Synced with Cloud!" 
+            : "Saved Offline. Will sync when online.";
+        alert(msg);
+        
         // Close Edit Period Modal, but Keep Homework Grid Open
         setActiveModal('homework'); 
         onRefresh(); 

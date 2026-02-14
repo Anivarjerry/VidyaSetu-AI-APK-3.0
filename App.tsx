@@ -7,8 +7,8 @@ import { GatekeeperDashboard } from './components/GatekeeperDashboard';
 import { loginUser, updateUserToken } from './services/authService';
 import { LoginRequest, Role } from './types';
 import { ThemeLanguageProvider } from './contexts/ThemeLanguageContext';
-// Removed NavigationProvider to fix back button conflicts
 import { requestForToken, onMessageListener } from './services/firebase';
+import { SyncManager } from './services/syncManager';
 
 const AppContent: React.FC = () => {
   const [authData, setAuthData] = useState<{
@@ -64,6 +64,11 @@ const AppContent: React.FC = () => {
           }
       }, 1500);
       return () => clearTimeout(timer);
+  }, []);
+
+  // --- INITIALIZE OFFLINE SYNC ---
+  useEffect(() => {
+      SyncManager.init();
   }, []);
 
   // --- FIREBASE NOTIFICATION INIT ---

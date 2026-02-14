@@ -1,6 +1,9 @@
 
 import { LoginRequest, LoginResponse, Role } from '../types';
 import { supabase } from './supabaseClient';
+import { offlineStore } from './offlineStore';
+
+const AUTH_CACHE_PREFIX = 'auth_session_';
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -25,13 +28,32 @@ export const checkUserStatus = async (mobile: string) => {
 };
 
 export const loginUser = async (credentials: LoginRequest): Promise<LoginResponse> => {
+  const { mobile, password } = credentials;
+
+  // --- 0. OFFLINE HANDLER ---
+  if (!navigator.onLine) {
+      console.log("Offline mode detected. Attempting local login...");
+      try {
+          const cachedSession = await offlineStore.get<any>(AUTH_CACHE_PREFIX + mobile);
+          
+          if (cachedSession && cachedSession.password === password) {
+              return {
+                  status: 'success',
+                  message: 'Login Successful (Offline Mode)',
+                  role: cachedSession.role,
+                  user_role: cachedSession.role,
+                  user_name: cachedSession.name,
+                  user_id: cachedSession.id,
+                  school_db_id: cachedSession.school_db_id
+              };
+          }
+          return { status: 'error', message: 'You are offline and no local session found for these credentials.' };
+      } catch (e) {
+          return { status: 'error', message: 'Offline login failed due to storage error.' };
+      }
+  }
+
   try {
-    if (!navigator.onLine) {
-      return { status: 'error', message: 'You are offline. Please check your internet connection.' };
-    }
-
-    const { mobile, password } = credentials;
-
     // --- 1. CHECK FOR ADMIN ---
     // Logic: If mobile matches admin, treat 'password' input as 'secret_code'
     let adminResult;
@@ -49,6 +71,17 @@ export const loginUser = async (credentials: LoginRequest): Promise<LoginRespons
       // Check Secret Code
       if (adminResult.data.secret_code === password) {
           console.log("Admin Login Successful");
+          
+          // Cache Session for Offline
+          await offlineStore.set(AUTH_CACHE_PREFIX + mobile, {
+              mobile,
+              password,
+              role: 'admin',
+              name: adminResult.data.name,
+              id: adminResult.data.id,
+              school_db_id: null
+          });
+
           return {
             status: 'success',
             role: 'admin',
@@ -105,6 +138,16 @@ export const loginUser = async (credentials: LoginRequest): Promise<LoginRespons
     if (!schoolData) return { status: 'error', message: 'Account not linked to any valid school.' };
 
     credentials.school_id = schoolData.school_code;
+
+    // Cache Session for Offline
+    await offlineStore.set(AUTH_CACHE_PREFIX + mobile, {
+        mobile,
+        password,
+        role: userData.role,
+        name: userData.name,
+        id: userData.id,
+        school_db_id: schoolData.id
+    });
 
     return {
       status: 'success',

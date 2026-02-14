@@ -1,6 +1,6 @@
 
-import React, { useState } from 'react';
-import { GraduationCap, MoreVertical, Settings, Info, HelpCircle, Bell, LogOut, LayoutDashboard, User } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { GraduationCap, MoreVertical, Settings, Info, HelpCircle, Bell, LogOut, LayoutDashboard, User, Cloud, CloudOff, RefreshCw } from 'lucide-react';
 import { useThemeLanguage } from '../contexts/ThemeLanguageContext';
 import { useModalBackHandler } from '../hooks/useModalBackHandler';
 
@@ -18,8 +18,34 @@ interface HeaderProps {
 export const Header: React.FC<HeaderProps> = ({ onOpenSettings, onOpenAbout, onOpenHelp, onOpenNotices, onLogout, currentView, onChangeView }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const { t } = useThemeLanguage();
+  
+  // Sync Status State
+  const [syncStatus, setSyncStatus] = useState<'online' | 'offline' | 'syncing'>('online');
 
   useModalBackHandler(isMenuOpen, () => setIsMenuOpen(false));
+
+  useEffect(() => {
+      // Initial Check
+      setSyncStatus(navigator.onLine ? 'online' : 'offline');
+
+      // Listeners
+      const handleOnline = () => setSyncStatus('online');
+      const handleOffline = () => setSyncStatus('offline');
+      const handleSyncChange = (e: any) => {
+          if (e.detail?.isSyncing) setSyncStatus('syncing');
+          else setSyncStatus(navigator.onLine ? 'online' : 'offline');
+      };
+
+      window.addEventListener('online', handleOnline);
+      window.addEventListener('offline', handleOffline);
+      window.addEventListener('vidyasetu-sync-change', handleSyncChange);
+
+      return () => {
+          window.removeEventListener('online', handleOnline);
+          window.removeEventListener('offline', handleOffline);
+          window.removeEventListener('vidyasetu-sync-change', handleSyncChange);
+      };
+  }, []);
 
   const handleMenuItemClick = (action: () => void) => {
     setIsMenuOpen(false);
@@ -59,6 +85,13 @@ export const Header: React.FC<HeaderProps> = ({ onOpenSettings, onOpenAbout, onO
 
         {/* Actions */}
         <div className="flex items-center gap-1.5">
+          {/* SYNC INDICATOR */}
+          <div className="mr-1 flex items-center justify-center w-8 h-8 rounded-full bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/5 shadow-sm">
+             {syncStatus === 'offline' && <CloudOff className="text-rose-500" size={16} />}
+             {syncStatus === 'syncing' && <RefreshCw className="text-amber-500 animate-spin" size={16} />}
+             {syncStatus === 'online' && <Cloud className="text-emerald-500" size={16} />}
+          </div>
+
           {onOpenNotices && (
               <button onClick={onOpenNotices} className="p-2.5 text-slate-400 hover:text-brand-500 dark:text-slate-500 dark:hover:text-brand-400 transition-all active:scale-90">
                   <Bell size={22} strokeWidth={2} />

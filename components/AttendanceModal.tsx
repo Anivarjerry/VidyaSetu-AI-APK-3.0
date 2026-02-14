@@ -116,7 +116,11 @@ export const AttendanceModal: React.FC<AttendanceModalProps> = ({ isOpen, onClos
           setCompletedClasses(prev => [...prev, selectedClass]);
       }
       
-      alert("Success: Attendance Synced with Cloud!");
+      const msg = navigator.onLine 
+        ? "Success: Attendance Synced with Cloud!" 
+        : "Success: Attendance Saved Offline. Will sync when online.";
+      alert(msg);
+      
       setTab('class');
       setSelectedClass('');
     } else {
