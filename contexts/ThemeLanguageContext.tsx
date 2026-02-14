@@ -20,10 +20,10 @@ const translations: Record<string, Record<Language, string>> = {
   'parent': { en: 'Parent', hi: 'अभिभावक' },
   'admin': { en: 'Admin', hi: 'एडमिन' },
   'driver': { en: 'Driver', hi: 'ड्राइवर' },
-  'gatekeeper': { en: 'Gatekeeper', hi: 'द्वारपाल (गार्ड)' }, // NEW
-  'visitor_logs': { en: 'Visitor Logs', hi: 'आगंतुक रजिस्टर' }, // NEW
-  'gate_security': { en: 'Gate Security', hi: 'गेट सुरक्षा' }, // NEW
-  'view_visitors': { en: 'View Visitors', hi: 'आगंतुक देखें' }, // NEW
+  'gatekeeper': { en: 'Gatekeeper', hi: 'द्वारपाल (गार्ड)' },
+  'visitor_logs': { en: 'Visitor Logs', hi: 'आगंतुक रजिस्टर' },
+  'gate_security': { en: 'Gate Security', hi: 'गेट सुरक्षा' },
+  'view_visitors': { en: 'View Visitors', hi: 'आगंतुक देखें' },
   'school_id_placeholder': { en: 'School ID', hi: 'स्कूल आईडी' },
   'mobile_placeholder': { en: 'Mobile Number', hi: 'मोबाइल नंबर' },
   'password_placeholder': { en: 'Password', hi: 'पासवर्ड' },
@@ -171,10 +171,14 @@ export const ThemeLanguageProvider: React.FC<{ children: React.ReactNode }> = ({
 
   useEffect(() => {
     localStorage.setItem('vidyasetu_theme', theme);
+    const metaThemeColor = document.querySelector('meta[name="theme-color"]');
+    
     if (theme === 'dark') {
       document.documentElement.classList.add('dark');
+      if (metaThemeColor) metaThemeColor.setAttribute('content', '#020617'); // Dark Status Bar
     } else {
       document.documentElement.classList.remove('dark');
+      if (metaThemeColor) metaThemeColor.setAttribute('content', '#ffffff'); // Light Status Bar
     }
   }, [theme]);
 

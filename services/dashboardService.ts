@@ -12,6 +12,39 @@ export const getISTDate = (): string => {
   return `${year}-${month}-${day}`;
 };
 
+// --- CACHING HELPER ---
+// This function returns cached data immediately if available, then fetches fresh data.
+// Note: In React, we usually handle this by calling the service, getting cached result, 
+// and then the service might trigger a state update if we pass a callback, or we handle it in the component.
+// For simplicity in this structure, we will return cached data if offline, or network data if online.
+const fetchWithCache = async <T>(key: string, fetcher: () => Promise<T>): Promise<T | null> => {
+    // 1. Try to get from Local Storage
+    const cached = localStorage.getItem(key);
+    let cachedData: T | null = null;
+    
+    if (cached) {
+        try { cachedData = JSON.parse(cached); } catch (e) { console.error("Cache parse error", e); }
+    }
+
+    // 2. If Offline, return cache immediately
+    if (!navigator.onLine) {
+        return cachedData;
+    }
+
+    // 3. If Online, fetch fresh
+    try {
+        const freshData = await fetcher();
+        if (freshData) {
+            localStorage.setItem(key, JSON.stringify(freshData));
+            return freshData;
+        }
+    } catch (e) {
+        console.error("Fetch failed, falling back to cache", e);
+    }
+
+    return cachedData; // Fallback to cache if fetch fails
+};
+
 // --- OFFLINE SYNC QUEUE SYSTEM ---
 const addToSyncQueue = (key: string, data: any) => {
     try {
@@ -89,6 +122,11 @@ export const fetchStudentOptionsForParent = async (parentId: string) => {
 
 const getSchoolUUID = async (schoolCode: string): Promise<string | null> => {
     try {
+        // Simple cache for UUID lookup
+        const cacheKey = `vidyasetu_uuid_${schoolCode}`;
+        const cached = localStorage.getItem(cacheKey);
+        if (cached) return cached;
+
         const cleanCode = schoolCode.trim().toUpperCase();
         const { data, error } = await supabase
             .from('schools')
@@ -97,23 +135,24 @@ const getSchoolUUID = async (schoolCode: string): Promise<string | null> => {
             .maybeSingle();
 
         if (error || !data) return null;
+        localStorage.setItem(cacheKey, data.id);
         return data.id;
     } catch (e) { return null; }
 };
 
 // --- ATTENDANCE SERVICES ---
 export const fetchDailyAttendanceStatus = async (schoolId: string, date: string): Promise<string[]> => {
-  try {
-    const { data, error } = await supabase
-      .from('attendance')
-      .select('students!inner(class_name)')
-      .eq('school_id', schoolId)
-      .eq('date', date);
+  return fetchWithCache(`att_status_${schoolId}_${date}`, async () => {
+      const { data, error } = await supabase
+        .from('attendance')
+        .select('students!inner(class_name)')
+        .eq('school_id', schoolId)
+        .eq('date', date);
 
-    if (error || !data) return [];
-    const completedClasses = data.map((item: any) => item.students?.class_name).filter(Boolean);
-    return Array.from(new Set(completedClasses)) as string[];
-  } catch (e) { return []; }
+      if (error || !data) return [];
+      const completedClasses = data.map((item: any) => item.students?.class_name).filter(Boolean);
+      return Array.from(new Set(completedClasses)) as string[];
+  }) || [];
 };
 
 export const fetchClassAttendanceToday = async (schoolId: string, className: string, date: string): Promise<Record<string, 'present' | 'absent' | 'leave'>> => {
@@ -147,18 +186,19 @@ export const submitAttendance = async (sid: string, tid: string, cn: string, rec
 
 // --- NOTICE SERVICES ---
 export const fetchNotices = async (schoolCode: string, role: string): Promise<NoticeItem[]> => {
-  try {
-    const schoolUUID = await getSchoolUUID(schoolCode);
-    if (!schoolUUID) return [];
-    let query = supabase.from('notices').select('*').eq('school_id', schoolUUID);
-    if (role !== 'principal' && role !== 'admin') {
-        const targetRole = role === 'student' ? 'parent' : role;
-        query = query.or(`target.eq.all,target.eq.${targetRole}`);
-    }
-    const { data, error } = await query.order('created_at', { ascending: false });
-    if (error) return [];
-    return data || [];
-  } catch (e) { return []; }
+  const schoolUUID = await getSchoolUUID(schoolCode);
+  if (!schoolUUID) return [];
+  
+  return fetchWithCache(`notices_${schoolUUID}_${role}`, async () => {
+      let query = supabase.from('notices').select('*').eq('school_id', schoolUUID);
+      if (role !== 'principal' && role !== 'admin') {
+          const targetRole = role === 'student' ? 'parent' : role;
+          query = query.or(`target.eq.all,target.eq.${targetRole}`);
+      }
+      const { data, error } = await query.order('created_at', { ascending: false });
+      if (error) return [];
+      return data || [];
+  }) || [];
 };
 
 export const submitNotice = async (notice: NoticeRequest): Promise<boolean> => {
@@ -181,7 +221,7 @@ export const deleteNotice = async (id: string): Promise<{success: boolean, error
 
 // --- TIME TABLE SERVICES (ROBUST) ---
 export const fetchTimeTable = async (schoolId: string, className: string, day: string): Promise<TimeTableEntry[]> => {
-    try {
+    return fetchWithCache(`tt_${schoolId}_${className}_${day}`, async () => {
         const { data, error } = await supabase
             .from('time_tables')
             .select('*, users!teacher_id(name)')
@@ -189,18 +229,14 @@ export const fetchTimeTable = async (schoolId: string, className: string, day: s
             .eq('class_name', className)
             .eq('day_of_week', day);
         
-        if(error) throw error;
-        
+        if(error) return [];
         return (data || []).map((t: any) => ({
             ...t,
             teacher_name: t.users?.name || 'Unknown'
         }));
-    } catch(e) {
-        return [];
-    }
+    }) || [];
 };
 
-// NEW: Fetch ALL entries for a specific day to detect teacher conflicts
 export const fetchFullSchoolTimeTable = async (schoolId: string, day: string): Promise<TimeTableEntry[]> => {
     try {
         const { data, error } = await supabase
@@ -223,8 +259,6 @@ export const saveTimeTableEntry = async (entry: TimeTableEntry, skipQueue = fals
     }
 
     try {
-        // IMPORTANT FIX: Robustly converting empty/invalid teacher_id strings to NULL
-        // Postgres UUID fields throw 'Invalid syntax' for empty strings ""
         const teacherId = (entry.teacher_id && entry.teacher_id !== 'null' && entry.teacher_id !== 'undefined' && entry.teacher_id.trim() !== '') ? entry.teacher_id : null;
 
         const { error } = await supabase
@@ -240,7 +274,6 @@ export const saveTimeTableEntry = async (entry: TimeTableEntry, skipQueue = fals
         
         if (error) {
             console.error("Supabase Save Error Details:", error);
-            // This allows user to see specific error if they inspect console
             return false;
         }
         return true;
@@ -250,7 +283,6 @@ export const saveTimeTableEntry = async (entry: TimeTableEntry, skipQueue = fals
     }
 };
 
-// NEW: Copy Time Table Logic
 export const copyTimeTableDay = async (schoolId: string, className: string, sourceDay: string, targetDays: string[]) => {
     try {
         // 1. Fetch Source
@@ -283,7 +315,7 @@ export const copyTimeTableDay = async (schoolId: string, className: string, sour
 };
 
 export const fetchTeachersForTimeTable = async (schoolId: string) => {
-    try {
+    return fetchWithCache(`teachers_${schoolId}`, async () => {
         const { data } = await supabase
             .from('users')
             .select('id, name, assigned_subject')
@@ -291,37 +323,42 @@ export const fetchTeachersForTimeTable = async (schoolId: string) => {
             .eq('role', 'teacher')
             .order('name');
         return data || [];
-    } catch(e) { return []; }
+    }) || [];
 };
 
 // --- ANALYTICS ---
 export const fetchPrincipalAnalytics = async (sc: string, d: string): Promise<AnalyticsSummary | null> => {
   const schoolUUID = await getSchoolUUID(sc);
   if (!schoolUUID) return null;
-  const { data: schoolConfig } = await supabase.from('schools').select('total_periods').eq('id', schoolUUID).single();
-  const periodsCount = schoolConfig?.total_periods || 8;
-  const { data: ts } = await supabase.from('users').select('id, name, mobile').eq('school_id', schoolUUID).eq('role', 'teacher');
-  const { data: pds } = await supabase.from('daily_periods').select('teacher_user_id').eq('school_id', schoolUUID).eq('date', d);
-  const teacherList: TeacherProgress[] = (ts || []).map(t => ({ 
-      id: t.id, name: t.name, mobile: t.mobile, periods_submitted: (pds || []).filter(s => s.teacher_user_id === t.id).length, total_periods: periodsCount 
-  }));
-  return { total_teachers: ts?.length || 0, active_teachers: teacherList.filter(t => t.periods_submitted > 0).length, inactive_teachers: teacherList.filter(t => t.periods_submitted === 0).length, total_periods_expected: (ts?.length || 0) * periodsCount, total_periods_submitted: pds?.length || 0, teacher_list: teacherList };
+  
+  return fetchWithCache(`analytics_${schoolUUID}_${d}`, async () => {
+      const { data: schoolConfig } = await supabase.from('schools').select('total_periods').eq('id', schoolUUID).single();
+      const periodsCount = schoolConfig?.total_periods || 8;
+      const { data: ts } = await supabase.from('users').select('id, name, mobile').eq('school_id', schoolUUID).eq('role', 'teacher');
+      const { data: pds } = await supabase.from('daily_periods').select('teacher_user_id').eq('school_id', schoolUUID).eq('date', d);
+      const teacherList: TeacherProgress[] = (ts || []).map(t => ({ 
+          id: t.id, name: t.name, mobile: t.mobile, periods_submitted: (pds || []).filter(s => s.teacher_user_id === t.id).length, total_periods: periodsCount 
+      }));
+      return { total_teachers: ts?.length || 0, active_teachers: teacherList.filter(t => t.periods_submitted > 0).length, inactive_teachers: teacherList.filter(t => t.periods_submitted === 0).length, total_periods_expected: (ts?.length || 0) * periodsCount, total_periods_submitted: pds?.length || 0, teacher_list: teacherList };
+  });
 };
 
 export const fetchHomeworkAnalytics = async (sc: string, date: string): Promise<HomeworkAnalyticsData | null> => {
   const schoolUUID = await getSchoolUUID(sc);
   if (!schoolUUID) return null;
-  const { data: sts } = await supabase.from('students').select('id, name, class_name, users!parent_user_id(name)').eq('school_id', schoolUUID);
-  const { data: tps = [] } = await supabase.from('daily_periods').select('class_name').eq('school_id', schoolUUID).eq('date', date);
-  const { data: sbs = [] } = await supabase.from('homework_submissions').select('student_id').eq('date', date);
-  const list: StudentHomeworkStatus[] = (sts || []).map((s: any) => {
-    const total = (tps || []).filter((t: any) => t.class_name === s.class_name).length;
-    const done = (sbs || []).filter((b: any) => b.student_id === s.id).length;
-    let status: any = 'pending';
-    if (total === 0) status = 'no_homework'; else if (done >= total) status = 'completed'; else if (done > 0) status = 'partial';
-    return { student_id: s.id, student_name: s.name, class_name: s.class_name, parent_name: s.users?.name || 'Unknown', total_homeworks: total, completed_homeworks: done, status };
+  return fetchWithCache(`hw_analytics_${schoolUUID}_${date}`, async () => {
+      const { data: sts } = await supabase.from('students').select('id, name, class_name, users!parent_user_id(name)').eq('school_id', schoolUUID);
+      const { data: tps = [] } = await supabase.from('daily_periods').select('class_name').eq('school_id', schoolUUID).eq('date', date);
+      const { data: sbs = [] } = await supabase.from('homework_submissions').select('student_id').eq('date', date);
+      const list: StudentHomeworkStatus[] = (sts || []).map((s: any) => {
+        const total = (tps || []).filter((t: any) => t.class_name === s.class_name).length;
+        const done = (sbs || []).filter((b: any) => b.student_id === s.id).length;
+        let status: any = 'pending';
+        if (total === 0) status = 'no_homework'; else if (done >= total) status = 'completed'; else if (done > 0) status = 'partial';
+        return { student_id: s.id, student_name: s.name, class_name: s.class_name, parent_name: s.users?.name || 'Unknown', total_homeworks: total, completed_homeworks: done, status };
+      });
+      return { total_students: sts?.length || 0, fully_completed: list.filter(l => l.status === 'completed').length, partial_completed: list.filter(l => l.status === 'partial').length, pending: list.filter(l => l.status === 'pending').length, student_list: list };
   });
-  return { total_students: sts?.length || 0, fully_completed: list.filter(l => l.status === 'completed').length, partial_completed: list.filter(l => l.status === 'partial').length, pending: list.filter(l => l.status === 'pending').length, student_list: list };
 };
 
 export const fetchTeacherHistory = async (sc: string, mob: string, d: string): Promise<PeriodData[]> => {
@@ -329,39 +366,67 @@ export const fetchTeacherHistory = async (sc: string, mob: string, d: string): P
   if (!schoolUUID) return [];
   const { data: user } = await supabase.from('users').select('id').eq('mobile', mob).eq('school_id', schoolUUID).single();
   if (!user) return [];
-  const { data } = await supabase.from('daily_periods').select('*').eq('teacher_user_id', user.id).eq('date', d).order('period_number');
-  return (data || []).map((p: any) => ({ id: p.id, period_number: p.period_number, status: 'submitted', class_name: p.class_name, subject: p.subject, lesson: p.lesson, homework: p.homework, homework_type: p.homework_type }));
+  
+  return fetchWithCache(`teacher_hist_${user.id}_${d}`, async () => {
+      const { data } = await supabase.from('daily_periods').select('*').eq('teacher_user_id', user.id).eq('date', d).order('period_number');
+      return (data || []).map((p: any) => ({ id: p.id, period_number: p.period_number, status: 'submitted', class_name: p.class_name, subject: p.subject, lesson: p.lesson, homework: p.homework, homework_type: p.homework_type }));
+  }) || [];
 };
 
 // --- MISC ---
 export const fetchVehicles = async (id: string): Promise<Vehicle[]> => {
-  const { data } = await supabase.from('vehicles').select('*, users!driver_id(name)').eq('school_id', id);
-  return (data || []).map((v: any) => ({ ...v, driver_name: v.users?.name }));
+  return fetchWithCache(`vehicles_${id}`, async () => {
+      const { data } = await supabase.from('vehicles').select('*, users!driver_id(name)').eq('school_id', id);
+      return (data || []).map((v: any) => ({ ...v, driver_name: v.users?.name }));
+  }) || [];
 };
 export const upsertVehicle = async (v: Partial<Vehicle>): Promise<boolean> => { const { error } = await supabase.from('vehicles').upsert({ school_id: v.school_id, vehicle_number: v.vehicle_number, vehicle_type: v.vehicle_type, driver_id: v.driver_id, is_active: v.is_active || true }); return !error; };
-export const fetchStudentsForClass = async (id: string, cn: string): Promise<Student[]> => { const { data } = await supabase.from('students').select('*').eq('school_id', id).eq('class_name', cn).order('name'); return data || []; };
+export const fetchStudentsForClass = async (id: string, cn: string): Promise<Student[]> => { 
+    return fetchWithCache(`students_${id}_${cn}`, async () => {
+        const { data } = await supabase.from('students').select('*').eq('school_id', id).eq('class_name', cn).order('name'); 
+        return data || []; 
+    }) || [];
+};
 export const fetchAttendanceHistory = async (id: string): Promise<AttendanceHistoryItem[]> => {
-  const { data } = await supabase.from('attendance').select('*, users!marked_by_user_id(name)').eq('student_id', id).order('date', { ascending: false }).limit(60);
-  return (data || []).map((h: any) => ({ id: h.id, date: h.date, status: h.status, marked_by_name: h.users?.name }));
+  return fetchWithCache(`att_hist_${id}`, async () => {
+      const { data } = await supabase.from('attendance').select('*, users!marked_by_user_id(name)').eq('student_id', id).order('date', { ascending: false }).limit(60);
+      return (data || []).map((h: any) => ({ id: h.id, date: h.date, status: h.status, marked_by_name: h.users?.name }));
+  }) || [];
 };
 export const applyForLeave = async (l: Partial<StaffLeave>): Promise<boolean> => { const { error } = await supabase.from('staff_leaves').insert(l); return !error; };
-export const fetchUserLeaves = async (id: string): Promise<StaffLeave[]> => { const { data } = await supabase.from('staff_leaves').select('*').eq('user_id', id).order('created_at', { ascending: false }); return data || []; };
+export const fetchUserLeaves = async (id: string): Promise<StaffLeave[]> => { 
+    return fetchWithCache(`user_leaves_${id}`, async () => {
+        const { data } = await supabase.from('staff_leaves').select('*').eq('user_id', id).order('created_at', { ascending: false }); return data || []; 
+    }) || [];
+};
 export const fetchSchoolLeaves = async (id: string): Promise<StaffLeave[]> => {
-  const { data } = await supabase.from('staff_leaves').select('*, users(name)').eq('school_id', id).order('created_at', { ascending: false });
-  return (data || []).map((l: any) => ({ ...l, user_name: l.users?.name }));
+  return fetchWithCache(`school_leaves_${id}`, async () => {
+      const { data } = await supabase.from('staff_leaves').select('*, users(name)').eq('school_id', id).order('created_at', { ascending: false });
+      return (data || []).map((l: any) => ({ ...l, user_name: l.users?.name }));
+  }) || [];
 };
 export const updateLeaveStatus = async (id: string, s: string, c: string): Promise<boolean> => { const { error } = await supabase.from('staff_leaves').update({ status: s, principal_comment: c }).eq('id', id); return !error; };
 export const applyStudentLeave = async (l: Partial<StudentLeave>): Promise<boolean> => { const { error } = await supabase.from('student_leaves').insert(l); return !error; };
 export const fetchStudentLeavesForParent = async (id: string): Promise<StudentLeave[]> => { const { data } = await supabase.from('student_leaves').select('*').eq('parent_id', id).order('created_at', { ascending: false }); return data || []; };
 export const fetchSchoolStudentLeaves = async (id: string): Promise<StudentLeave[]> => {
-  const { data } = await supabase.from('student_leaves').select('*, students(name)').eq('school_id', id).order('created_at', { ascending: false });
-  return (data || []).map((l: any) => ({ ...l, student_name: l.students?.name }));
+  return fetchWithCache(`school_student_leaves_${id}`, async () => {
+      const { data } = await supabase.from('student_leaves').select('*, students(name)').eq('school_id', id).order('created_at', { ascending: false });
+      return (data || []).map((l: any) => ({ ...l, student_name: l.students?.name }));
+  }) || [];
 };
 export const updateStudentLeaveStatus = async (id: string, s: string, c: string): Promise<boolean> => { const { error } = await supabase.from('student_leaves').update({ status: s, principal_comment: c }).eq('id', id); return !error; };
 
 // --- CURRICULUM SERVICES ---
-export const fetchSchoolClasses = async (id: string) => { const { data } = await supabase.from('school_classes').select('*').eq('school_id', id).order('class_name'); return data || []; };
-export const fetchClassSubjects = async (id: string) => { const { data } = await supabase.from('class_subjects').select('*').eq('class_id', id).order('subject_name'); return data || []; };
+export const fetchSchoolClasses = async (id: string) => { 
+    return fetchWithCache(`classes_${id}`, async () => {
+        const { data } = await supabase.from('school_classes').select('*').eq('school_id', id).order('class_name'); return data || []; 
+    }) || [];
+};
+export const fetchClassSubjects = async (id: string) => { 
+    return fetchWithCache(`subjects_${id}`, async () => {
+        const { data } = await supabase.from('class_subjects').select('*').eq('class_id', id).order('subject_name'); return data || []; 
+    }) || [];
+};
 export const fetchSubjectLessons = async (id: string) => { const { data } = await supabase.from('subject_lessons').select('*').eq('subject_id', id).order('lesson_name'); return data || []; };
 export const addSchoolClass = async (id: string, name: string) => { return await supabase.from('school_classes').insert([{ school_id: id, class_name: name }]); };
 export const addClassSubject = async (id: string, name: string) => { return await supabase.from('class_subjects').insert([{ class_id: id, subject_name: name }]); };
@@ -377,13 +442,15 @@ export const updateVehicleLocation = async (id: string, lat: number, lng: number
 };
 
 export const fetchSchoolSummary = async (id: string): Promise<SchoolSummary | null> => {
-  const { data: s } = await supabase.from('schools').select('name, school_code, total_periods').eq('id', id).single();
-  if (!s) return null;
-  const { data: p } = await supabase.from('users').select('name').eq('school_id', id).eq('role', 'principal').maybeSingle();
-  const { count: t } = await supabase.from('users').select('*', { count: 'exact', head: true }).eq('school_id', id).eq('role', 'teacher');
-  const { count: d } = await supabase.from('users').select('*', { count: 'exact', head: true }).eq('school_id', id).eq('role', 'driver');
-  const { count: st } = await supabase.from('students').select('*', { count: 'exact', head: true }).eq('school_id', id);
-  return { school_name: s.name, school_code: s.school_code, principal_name: p?.name || 'Principal', total_teachers: t || 0, total_drivers: d || 0, total_students: st || 0, total_periods: s.total_periods || 8 };
+  return fetchWithCache(`school_summary_${id}`, async () => {
+      const { data: s } = await supabase.from('schools').select('name, school_code, total_periods').eq('id', id).single();
+      if (!s) return null;
+      const { data: p } = await supabase.from('users').select('name').eq('school_id', id).eq('role', 'principal').maybeSingle();
+      const { count: t } = await supabase.from('users').select('*', { count: 'exact', head: true }).eq('school_id', id).eq('role', 'teacher');
+      const { count: d } = await supabase.from('users').select('*', { count: 'exact', head: true }).eq('school_id', id).eq('role', 'driver');
+      const { count: st } = await supabase.from('students').select('*', { count: 'exact', head: true }).eq('school_id', id);
+      return { school_name: s.name, school_code: s.school_code, principal_name: p?.name || 'Principal', total_teachers: t || 0, total_drivers: d || 0, total_students: st || 0, total_periods: s.total_periods || 8 };
+  });
 };
 
 export const updateSchoolPeriods = async (schoolId: string, count: number): Promise<boolean> => {
@@ -412,11 +479,14 @@ export const submitPeriodData = async (sc: string, mob: string, p: PeriodData, u
 export const fetchParentHomework = async (sc: string, cn: string, s: string, sid: string, mob: string, date: string): Promise<ParentHomework[]> => {
   const schoolUUID = await getSchoolUUID(sc);
   if (!schoolUUID) return [];
-  const { data: periods } = await supabase.from('daily_periods').select('*, users!teacher_user_id(name)').eq('school_id', schoolUUID).eq('class_name', cn).eq('date', date);
-  const { data: subs = [] } = await supabase.from('homework_submissions').select('period_number, status').eq('student_id', sid).eq('date', date);
-  return (periods || []).map((p: any) => ({
-    id: p.id, period: `Period ${p.period_number}`, subject: p.subject, teacher_name: p.users?.name || 'Teacher', homework: p.homework, homework_type: p.homework_type, status: subs?.find((s: any) => s.period_number === p.period_number)?.status || 'pending'
-  }));
+  
+  return fetchWithCache(`parent_hw_${sid}_${date}`, async () => {
+      const { data: periods } = await supabase.from('daily_periods').select('*, users!teacher_user_id(name)').eq('school_id', schoolUUID).eq('class_name', cn).eq('date', date);
+      const { data: subs = [] } = await supabase.from('homework_submissions').select('period_number, status').eq('student_id', sid).eq('date', date);
+      return (periods || []).map((p: any) => ({
+        id: p.id, period: `Period ${p.period_number}`, subject: p.subject, teacher_name: p.users?.name || 'Teacher', homework: p.homework, homework_type: p.homework_type, status: subs?.find((s: any) => s.period_number === p.period_number)?.status || 'pending'
+      }));
+  }) || [];
 };
 
 export const updateParentHomeworkStatus = async (sc: string, cn: string, s: string, sid: string, mob: string, p: string, sub: string, date: string): Promise<boolean> => {
@@ -459,58 +529,60 @@ export const fetchAIContextData = async (role: Role, schoolIdCode: string, userI
 
 // --- DASHBOARD DATA FETCH ---
 export const fetchDashboardData = async ( sc: string, mob: string, role: Role, pw?: string, sid?: string ): Promise<DashboardData | null> => {
-  try {
-    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(sc.trim());
-    let schoolQuery = supabase.from('schools').select('id, name, school_code, is_active, subscription_end_date, total_periods');
-    if (isUUID) schoolQuery = schoolQuery.eq('id', sc.trim());
-    else schoolQuery = schoolQuery.ilike('school_code', sc.trim());
+  return fetchWithCache(`dashboard_${sc}_${mob}`, async () => {
+      try {
+        const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(sc.trim());
+        let schoolQuery = supabase.from('schools').select('id, name, school_code, is_active, subscription_end_date, total_periods');
+        if (isUUID) schoolQuery = schoolQuery.eq('id', sc.trim());
+        else schoolQuery = schoolQuery.ilike('school_code', sc.trim());
 
-    const { data: school } = await schoolQuery.maybeSingle();
-    if (!school) return null;
-    let uQ = supabase.from('users').select('id, name, role, mobile, subscription_end_date, assigned_subject').eq('school_id', school.id).eq('mobile', mob);
-    if (pw) uQ = uQ.eq('password', pw);
-    const { data: user } = await uQ.maybeSingle();
-    if (!user) return null;
+        const { data: school } = await schoolQuery.maybeSingle();
+        if (!school) return null;
+        let uQ = supabase.from('users').select('id, name, role, mobile, subscription_end_date, assigned_subject').eq('school_id', school.id).eq('mobile', mob);
+        if (pw) uQ = uQ.eq('password', pw);
+        const { data: user } = await uQ.maybeSingle();
+        if (!user) return null;
 
-    const today = new Date(getISTDate() + "T00:00:00Z").getTime();
-    const schoolActive = school.is_active && school.subscription_end_date && new Date(school.subscription_end_date + "T00:00:00Z").getTime() >= today;
-    const userActive = user.subscription_end_date && new Date(user.subscription_end_date + "T00:00:00Z").getTime() >= today;
-    const isClient = role === 'parent' || role === 'student' as any;
-    const displayDate = isClient ? user.subscription_end_date : school.subscription_end_date;
+        const today = new Date(getISTDate() + "T00:00:00Z").getTime();
+        const schoolActive = school.is_active && school.subscription_end_date && new Date(school.subscription_end_date + "T00:00:00Z").getTime() >= today;
+        const userActive = user.subscription_end_date && new Date(user.subscription_end_date + "T00:00:00Z").getTime() >= today;
+        const isClient = role === 'parent' || role === 'student' as any;
+        const displayDate = isClient ? user.subscription_end_date : school.subscription_end_date;
 
-    const base: DashboardData = { user_id: user.id, school_db_id: school.id, user_name: user.name, user_role: user.role as Role, mobile_number: user.mobile, school_name: school.name, school_code: school.school_code, subscription_status: isClient ? (schoolActive && userActive ? 'active' : 'inactive') : (schoolActive ? 'active' : 'inactive'), school_subscription_status: schoolActive ? 'active' : 'inactive', subscription_end_date: displayDate, total_periods: school.total_periods || 8, assigned_subject: user.assigned_subject };
+        const base: DashboardData = { user_id: user.id, school_db_id: school.id, user_name: user.name, user_role: user.role as Role, mobile_number: user.mobile, school_name: school.name, school_code: school.school_code, subscription_status: isClient ? (schoolActive && userActive ? 'active' : 'inactive') : (schoolActive ? 'active' : 'inactive'), school_subscription_status: schoolActive ? 'active' : 'inactive', subscription_end_date: displayDate, total_periods: school.total_periods || 8, assigned_subject: user.assigned_subject };
 
-    if (role === 'gatekeeper') return base; 
+        if (role === 'gatekeeper') return base; 
 
-    if (role === 'teacher') {
-      const { data: ps } = await supabase.from('daily_periods').select('*').eq('school_id', school.id).eq('teacher_user_id', user.id).eq('date', getISTDate());
-      return { ...base, periods: (ps || []).map((p: any) => ({ id: p.id, period_number: p.period_number, status: 'submitted', class_name: p.class_name, subject: p.subject, lesson: p.lesson, homework: p.homework, homework_type: p.homework_type })) };
-    }
-    if (role === 'parent') {
-      const { data: kids } = await supabase.from('students').select('id, name, class_name, section, dob').eq('parent_user_id', user.id);
-      const target = sid ? kids?.find(k => k.id === sid) : kids?.[0];
-      const { data: att } = await supabase.from('attendance').select('status').eq('student_id', target?.id).eq('date', getISTDate()).maybeSingle();
-      return { ...base, student_id: target?.id, student_name: target?.name, class_name: target?.class_name, section: target?.section || '', today_attendance: (att?.status as any) || 'pending', siblings: kids || [] };
-    }
-    if (role === 'student' as any) {
-      let { data: st } = await supabase.from('students').select('id, name, class_name, section, father_name, parent_user_id').eq('student_user_id', user.id).maybeSingle();
-      if (!st) st = (await supabase.from('students').select('id, name, class_name, section, father_name, parent_user_id').eq('school_id', school.id).eq('name', user.name).maybeSingle()).data || null;
-      if (st) {
-        const { data: att = null } = await supabase.from('attendance').select('status').eq('student_id', st.id).eq('date', getISTDate()).maybeSingle();
-        return { ...base, student_id: st.id, student_name: st.name, class_name: st.class_name, section: st.section || '', father_name: st.father_name, linked_parent_id: st.parent_user_id, today_attendance: (att?.status as any) || 'pending' };
-      }
-    }
-    return base;
-  } catch (error) { return null; }
+        if (role === 'teacher') {
+          const { data: ps } = await supabase.from('daily_periods').select('*').eq('school_id', school.id).eq('teacher_user_id', user.id).eq('date', getISTDate());
+          return { ...base, periods: (ps || []).map((p: any) => ({ id: p.id, period_number: p.period_number, status: 'submitted', class_name: p.class_name, subject: p.subject, lesson: p.lesson, homework: p.homework, homework_type: p.homework_type })) };
+        }
+        if (role === 'parent') {
+          const { data: kids } = await supabase.from('students').select('id, name, class_name, section, dob').eq('parent_user_id', user.id);
+          const target = sid ? kids?.find(k => k.id === sid) : kids?.[0];
+          const { data: att } = await supabase.from('attendance').select('status').eq('student_id', target?.id).eq('date', getISTDate()).maybeSingle();
+          return { ...base, student_id: target?.id, student_name: target?.name, class_name: target?.class_name, section: target?.section || '', today_attendance: (att?.status as any) || 'pending', siblings: kids || [] };
+        }
+        if (role === 'student' as any) {
+          let { data: st } = await supabase.from('students').select('id, name, class_name, section, father_name, parent_user_id').eq('student_user_id', user.id).maybeSingle();
+          if (!st) st = (await supabase.from('students').select('id, name, class_name, section, father_name, parent_user_id').eq('school_id', school.id).eq('name', user.name).maybeSingle()).data || null;
+          if (st) {
+            const { data: att = null } = await supabase.from('attendance').select('status').eq('student_id', st.id).eq('date', getISTDate()).maybeSingle();
+            return { ...base, student_id: st.id, student_name: st.name, class_name: st.class_name, section: st.section || '', father_name: st.father_name, linked_parent_id: st.parent_user_id, today_attendance: (att?.status as any) || 'pending' };
+          }
+        }
+        return base;
+      } catch (error) { return null; }
+  });
 };
 
 // --- GALLERY SERVICES ---
 export const fetchGalleryImages = async (schoolId: string, month: string): Promise<GalleryItem[]> => {
-    try {
+    return fetchWithCache(`gallery_${schoolId}_${month}`, async () => {
         const { data, error } = await supabase.from('gallery_images').select('*').eq('school_id', schoolId).eq('month_year', month).order('created_at', { ascending: false });
         if (error) return [];
         return data || [];
-    } catch (e) { return []; }
+    }) || [];
 };
 
 export const uploadGalleryPhoto = async (payload: { school_id: string; image_data: string; caption: string; tag: string; month_year: string; uploaded_by: string; }) => {
@@ -576,7 +648,7 @@ export const submitExamResults = async (marks: ExamMark[]): Promise<{success: bo
 };
 
 export const fetchExamRecords = async (schoolId: string): Promise<ExamRecord[]> => {
-    try {
+    return fetchWithCache(`exam_records_${schoolId}`, async () => {
         const { data, error } = await supabase
             .from('exam_records')
             .select('*')
@@ -585,11 +657,11 @@ export const fetchExamRecords = async (schoolId: string): Promise<ExamRecord[]> 
         
         if (error) return [];
         return data || [];
-    } catch (e) { return []; }
+    }) || [];
 };
 
 export const fetchExamResultsByRecord = async (recordId: string): Promise<ExamMark[]> => {
-    try {
+    return fetchWithCache(`exam_results_${recordId}`, async () => {
         const { data, error } = await supabase
             .from('exam_marks')
             .select('*')
@@ -597,11 +669,11 @@ export const fetchExamResultsByRecord = async (recordId: string): Promise<ExamMa
         
         if (error) return [];
         return data || [];
-    } catch (e) { return []; }
+    }) || [];
 };
 
 export const fetchStudentExamResults = async (studentId: string): Promise<any[]> => {
-    try {
+    return fetchWithCache(`student_results_${studentId}`, async () => {
         const { data, error } = await supabase
             .from('exam_marks')
             .select('obtained_marks, grade, is_absent, exam_records(exam_title, subject, total_marks, exam_date)')
@@ -618,7 +690,7 @@ export const fetchStudentExamResults = async (studentId: string): Promise<any[]>
             grade: d.grade,
             is_absent: d.is_absent
         }));
-    } catch (e) { return []; }
+    }) || [];
 };
 
 // --- VISITOR MANAGEMENT SERVICES ---
@@ -628,23 +700,23 @@ export const addVisitorEntry = async (entry: VisitorEntry) => {
 };
 
 export const fetchVisitorEntries = async (schoolId: string, startDate: string, endDate?: string) => {
-    const start = `${startDate}T00:00:00`;
-    const end = `${endDate || startDate}T23:59:59`;
+    return fetchWithCache(`visitors_${schoolId}_${startDate}`, async () => {
+        const start = `${startDate}T00:00:00`;
+        const end = `${endDate || startDate}T23:59:59`;
 
-    const { data, error } = await supabase
-        .from('visitor_entries')
-        .select('*')
-        .eq('school_id', schoolId)
-        .gte('entry_time', start)
-        .lte('entry_time', end)
-        .order('entry_time', { ascending: false });
+        const { data, error } = await supabase
+            .from('visitor_entries')
+            .select('*')
+            .eq('school_id', schoolId)
+            .gte('entry_time', start)
+            .lte('entry_time', end)
+            .order('entry_time', { ascending: false });
 
-    return data || [];
+        return data || [];
+    }) || [];
 };
 
-// --- NEW SEARCH & FULL HISTORY SERVICES ---
-
-// Unified Search Function (Updated to handle partial class names)
+// --- SEARCH & FULL HISTORY SERVICES ---
 export const searchPeople = async (schoolId: string, query: string, role: 'student' | 'staff'): Promise<SearchPerson[]> => {
     if (!query || query.length < 2) return [];
     const term = `%${query}%`; 
@@ -655,7 +727,7 @@ export const searchPeople = async (schoolId: string, query: string, role: 'stude
                 .from('students')
                 .select('id, name, class_name, father_name, mother_name')
                 .eq('school_id', schoolId)
-                .or(`name.ilike.${term},father_name.ilike.${term},class_name.ilike.${term}`) // Enhanced class search
+                .or(`name.ilike.${term},father_name.ilike.${term},class_name.ilike.${term}`)
                 .limit(20);
             
             return (data || []).map((s: any) => ({

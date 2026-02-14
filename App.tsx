@@ -1,12 +1,13 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { LoginCard } from './components/LoginCard';
 import { Dashboard } from './components/Dashboard';
 import { AdminDashboard } from './components/AdminDashboard';
 import { GatekeeperDashboard } from './components/GatekeeperDashboard'; // Import Gatekeeper Dashboard
-import { loginUser } from './services/authService';
+import { loginUser, updateUserToken } from './services/authService';
 import { LoginRequest, Role } from './types';
 import { ThemeLanguageProvider } from './contexts/ThemeLanguageContext';
+import { requestForToken, onMessageListener } from './services/firebase';
 
 const AppContent: React.FC = () => {
   // Sync Initialization: Immediate check from localStorage to prevent blink
@@ -52,6 +53,31 @@ const AppContent: React.FC = () => {
 
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
+
+  // --- FIREBASE NOTIFICATION INIT ---
+  useEffect(() => {
+    const initNotifications = async () => {
+      const token = await requestForToken();
+      if (token && authData.userId) {
+        // Sync token to Supabase for this user
+        console.log("FCM Token:", token);
+        await updateUserToken(authData.userId, token);
+      }
+    };
+
+    if (authData.view !== 'login') {
+      initNotifications();
+      // Listen for foreground messages
+      onMessageListener()
+        .then((payload: any) => {
+          if (payload) {
+             // Simple alert for now, can be replaced with a toast
+             alert(`New Notification: ${payload.notification?.title}\n${payload.notification?.body}`);
+          }
+        })
+        .catch(err => console.log('failed: ', err));
+    }
+  }, [authData.userId, authData.view]);
 
   const handleLogin = async (creds: LoginRequest) => {
     setIsLoggingIn(true);
@@ -110,12 +136,6 @@ const AppContent: React.FC = () => {
       if (authData.credentials && authData.userRole) {
         // --- GATEKEEPER ROUTING ---
         if (authData.userRole === 'gatekeeper') {
-            // Ensure we have IDs, if not (e.g. fresh reload without full cache), standard Dashboard might handle it or we might need to rely on Dashboard fetching first.
-            // But loginUser returns them. 
-            // Fallback: If IDs missing here, Dashboard component usually fetches them. 
-            // But GatekeeperDashboard is standalone.
-            // We pass what we have; GatekeeperDashboard might need to fetch schoolId if missing, 
-            // but login response provided it.
             return <GatekeeperDashboard onLogout={handleLogout} schoolId={authData.schoolDbId || ''} userId={authData.userId || ''} />;
         }
 

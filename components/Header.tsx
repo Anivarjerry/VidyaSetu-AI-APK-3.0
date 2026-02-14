@@ -28,18 +28,20 @@ export const Header: React.FC<HeaderProps> = ({ onOpenSettings, onOpenAbout, onO
 
   return (
     <>
-      {/* Increased height from 4.5rem to 5.5rem and ensured content is at the bottom */}
-      <header className="fixed top-0 left-0 right-0 glass-header z-50 px-6 flex items-end justify-between border-b border-slate-100/20 dark:border-white/5 safe-padding-top h-[calc(5.5rem+env(safe-area-inset-top,0px))] pb-4 transition-all duration-300">
+      {/* Centered Header with Proper Flexbox */}
+      <header className="fixed top-0 left-0 right-0 glass-header z-50 px-6 flex items-center justify-between border-b border-slate-100/20 dark:border-white/5 safe-padding-top h-[calc(4.5rem+env(safe-area-inset-top,0px))] pt-[env(safe-area-inset-top,0px)] transition-all duration-300">
+        
+        {/* Brand */}
         <div className="flex items-center gap-3">
           <div className="text-brand-500 neon-glow-subtle">
-            <GraduationCap size={30} strokeWidth={2.5} />
+            <GraduationCap size={28} strokeWidth={2.5} />
           </div>
-          <span className="font-black text-slate-800 dark:text-white text-lg tracking-tight uppercase">VidyaSetu</span>
+          <span className="font-black text-slate-800 dark:text-white text-lg tracking-tight uppercase leading-none mt-0.5">VidyaSetu</span>
         </div>
 
         {/* DESKTOP NAVIGATION (Visible only on md+) */}
         {onChangeView && (
-            <div className="hidden md:flex items-center gap-2 absolute left-1/2 -translate-x-1/2 bottom-4 bg-slate-100 dark:bg-white/5 p-1 rounded-2xl border border-slate-200 dark:border-white/10">
+            <div className="hidden md:flex items-center gap-2 absolute left-1/2 -translate-x-1/2 top-[calc(50%+env(safe-area-inset-top,0px)/2)] -translate-y-1/2 bg-slate-100 dark:bg-white/5 p-1 rounded-2xl border border-slate-200 dark:border-white/10">
                 <button 
                     onClick={() => onChangeView('home')}
                     className={`flex items-center gap-2 px-6 py-2 rounded-xl text-xs font-black uppercase transition-all ${currentView === 'home' ? 'bg-white dark:bg-dark-900 text-brand-600 shadow-sm' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}
@@ -55,7 +57,8 @@ export const Header: React.FC<HeaderProps> = ({ onOpenSettings, onOpenAbout, onO
             </div>
         )}
 
-        <div className="flex items-center gap-2">
+        {/* Actions */}
+        <div className="flex items-center gap-1.5">
           {onOpenNotices && (
               <button onClick={onOpenNotices} className="p-2.5 text-slate-400 hover:text-brand-500 dark:text-slate-500 dark:hover:text-brand-400 transition-all active:scale-90">
                   <Bell size={22} strokeWidth={2} />
@@ -70,8 +73,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenSettings, onOpenAbout, onO
       {isMenuOpen && (
         <>
             <div className="fixed inset-0 bg-slate-900/5 backdrop-blur-[1px] z-[60]" onClick={() => setIsMenuOpen(false)} />
-            {/* Adjusted menu position to match new header height */}
-            <div className="fixed top-[calc(6rem+env(safe-area-inset-top,0px))] right-6 w-52 glass-card rounded-[1.8rem] border border-slate-100 dark:border-white/20 overflow-hidden z-[70] shadow-xl animate-in fade-in zoom-in-95 duration-200">
+            <div className="fixed top-[calc(5rem+env(safe-area-inset-top,0px))] right-6 w-52 glass-card rounded-[1.8rem] border border-slate-100 dark:border-white/20 overflow-hidden z-[70] shadow-xl animate-in fade-in zoom-in-95 duration-200">
                <div className="py-1">
                  {[
                    { icon: <Settings size={16} />, label: "Settings", action: onOpenSettings },
