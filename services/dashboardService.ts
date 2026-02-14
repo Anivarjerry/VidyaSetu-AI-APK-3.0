@@ -1,5 +1,5 @@
 
-import { DashboardData, PeriodData, Role, ParentHomework, NoticeItem, NoticeRequest, AnalyticsSummary, TeacherProgress, HomeworkAnalyticsData, StudentHomeworkStatus, Student, AttendanceStatus, Vehicle, StaffLeave, AttendanceHistoryItem, StudentLeave, SchoolSummary, SchoolUser, SiblingInfo, GalleryItem, ExamRecord, ExamMark, VisitorEntry, SearchPerson, FullHistory } from '../types';
+import { DashboardData, PeriodData, Role, ParentHomework, NoticeItem, NoticeRequest, AnalyticsSummary, TeacherProgress, HomeworkAnalyticsData, StudentHomeworkStatus, Student, AttendanceStatus, Vehicle, StaffLeave, AttendanceHistoryItem, StudentLeave, SchoolSummary, SchoolUser, SiblingInfo, GalleryItem, ExamRecord, ExamMark, VisitorEntry, SearchPerson, FullHistory, TimeTableEntry } from '../types';
 import { supabase } from './supabaseClient';
 
 export const getISTDate = (): string => {
@@ -221,6 +221,56 @@ export const addSubjectLesson = async (id: string, name: string) => { return awa
 export const fetchLessonHomework = async (id: string) => { const { data } = await supabase.from('lesson_homework').select('*').eq('lesson_id', id).order('created_at'); return data || []; };
 export const addLessonHomework = async (id: string, t: string) => { return await supabase.from('lesson_homework').insert([{ lesson_id: id, homework_template: t }]); };
 export const deleteLessonHomework = async (id: string) => { return await supabase.from('lesson_homework').delete().eq('id', id); };
+
+// --- TIME TABLE SERVICES (NEW) ---
+export const fetchTimeTable = async (schoolId: string, className: string, day: string): Promise<TimeTableEntry[]> => {
+    try {
+        const { data, error } = await supabase
+            .from('time_tables')
+            .select('*, users!teacher_id(name)')
+            .eq('school_id', schoolId)
+            .eq('class_name', className)
+            .eq('day_of_week', day);
+        
+        if(error) throw error;
+        
+        return (data || []).map((t: any) => ({
+            ...t,
+            teacher_name: t.users?.name || 'Unknown'
+        }));
+    } catch(e) {
+        return [];
+    }
+};
+
+export const saveTimeTableEntry = async (entry: TimeTableEntry) => {
+    try {
+        const { error } = await supabase
+            .from('time_tables')
+            .upsert({
+                school_id: entry.school_id,
+                class_name: entry.class_name,
+                day_of_week: entry.day_of_week,
+                period_number: entry.period_number,
+                subject: entry.subject,
+                teacher_id: entry.teacher_id
+            }, { onConflict: 'school_id,class_name,day_of_week,period_number' });
+        
+        return !error;
+    } catch(e) { return false; }
+};
+
+export const fetchTeachersForTimeTable = async (schoolId: string) => {
+    try {
+        const { data } = await supabase
+            .from('users')
+            .select('id, name, assigned_subject')
+            .eq('school_id', schoolId)
+            .eq('role', 'teacher')
+            .order('name');
+        return data || [];
+    } catch(e) { return []; }
+};
 
 // --- CORE DASHBOARD SERVICES ---
 export const updateVehicleLocation = async (id: string, lat: number, lng: number): Promise<boolean> => {
@@ -665,16 +715,10 @@ export const fetchStaffFullHistory = async (userId: string, dateFrom?: string, d
         const approvedLeaves = leaves.filter(l => l.status === 'approved');
         
         // --- FIXED ATTENDANCE CALCULATION ---
-        // Assume 26 working days a month. Rate = (26 - Approved Leaves) / 26 * 100
-        // Or strictly strictly based on leaves taken vs total time since join?
-        // Let's keep it simple: 100% minus leaves impact.
-        
         let attendanceRate = 100;
         if (approvedLeaves.length > 0) {
-            // Rough estimate: Each leave day reduces from a standard 30-day block just for the visual stat
-            // Or better: Count "Present" as days they uploaded periods? No, simply use Leaves.
             const totalWorkingDaysApprox = 30; // Last 30 days window
-            const daysOnLeave = approvedLeaves.length; // Simply count requests for now (imperfect but better than 100%)
+            const daysOnLeave = approvedLeaves.length;
             attendanceRate = Math.max(0, Math.round(((totalWorkingDaysApprox - daysOnLeave) / totalWorkingDaysApprox) * 100));
         }
 
@@ -692,7 +736,7 @@ export const fetchStaffFullHistory = async (userId: string, dateFrom?: string, d
                 leaves_taken: approvedLeaves.length,
                 tasks_completed: activityLog.length
             },
-            attendance_log: [], // Teachers don't mark their own daily attendance in this app version
+            attendance_log: [], 
             exam_log: [],
             leave_log: leaves.map(l => ({ type: l.leave_type, dates: `${l.start_date} -> ${l.end_date}`, status: l.status, reason: l.reason })),
             activity_log: activityLog

@@ -3,7 +3,7 @@ import { supabase } from './supabaseClient';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
-import { Role, FullHistory } from '../types';
+import { Role, FullHistory, TimeTableEntry } from '../types';
 
 // Helper to get Past Date
 const getPastDate = (days: number) => {
@@ -165,7 +165,37 @@ const generatePDF = (config: ReportConfig) => {
     doc.save(`${title.replace(/\s+/g, '_')}_${Date.now()}.pdf`);
 };
 
-// --- API ACTIONS ---
+// --- TIME TABLE PDF ---
+export const downloadTimeTablePDF = (
+    entries: TimeTableEntry[], 
+    schoolName: string, 
+    principalName: string, 
+    className: string, 
+    day: string
+) => {
+    const sorted = [...entries].sort((a,b) => a.period_number - b.period_number);
+    const rows = sorted.map(e => [
+        `Period ${e.period_number}`, 
+        e.subject || '-', 
+        e.teacher_name || 'Not Assigned'
+    ]);
+
+    generatePDF({
+        schoolName,
+        principalName,
+        title: `TIME TABLE: ${className}`,
+        subTitle: `Day: ${day}`,
+        summary: [
+            { label: 'Periods', value: sorted.length },
+            { label: 'Assigned', value: sorted.filter(e => e.teacher_id).length, color: '#10b981' }
+        ],
+        headers: ["Period", "Subject", "Teacher"],
+        data: rows
+    });
+    return true;
+};
+
+// --- API ACTIONS (Existing...) ---
 
 export const downloadPrincipalAttendance = async (schoolId: string, schoolName: string, principalName: string, className?: string, startDate?: string, endDate?: string) => {
     try {

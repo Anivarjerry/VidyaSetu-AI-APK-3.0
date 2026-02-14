@@ -1,6 +1,7 @@
+
 import React, { useState, useEffect } from 'react';
 import { DashboardData, LoginRequest, SearchPerson, FullHistory } from '../types';
-import { Megaphone, MapPin, BarChart2, BookOpen, CalendarRange, UserCheck, Award, Image as ImageIcon, Download, Lock, ChevronRight, Users, ShieldCheck, Search, Filter, FileText, Loader2, User, Check, UserX, Phone, CheckCircle2, RefreshCw, Calendar, ListFilter } from 'lucide-react';
+import { Megaphone, MapPin, BarChart2, BookOpen, CalendarRange, UserCheck, Award, Image as ImageIcon, Download, Lock, ChevronRight, Users, ShieldCheck, Search, Filter, FileText, Loader2, User, Check, UserX, Phone, CheckCircle2, RefreshCw, Calendar, ListFilter, LayoutGrid } from 'lucide-react';
 import { useModalBackHandler } from '../hooks/useModalBackHandler';
 import { Modal } from './Modal';
 import { NoticeModal } from './NoticeModal';
@@ -16,6 +17,7 @@ import { fetchPendingApprovals, updateUserApprovalStatus } from '../services/aut
 import { fetchVisitorEntries, searchPeople, fetchRecentPeople, fetchStudentFullHistory, fetchStaffFullHistory, fetchSchoolClasses } from '../services/dashboardService';
 import { generate360Report } from '../services/reportService';
 import { useThemeLanguage } from '../contexts/ThemeLanguageContext';
+import { TimeTableTab } from './TimeTableTab';
 
 interface PrincipalDashboardProps {
   data: DashboardData;
@@ -23,7 +25,7 @@ interface PrincipalDashboardProps {
   isSchoolActive: boolean;
   onShowPayModal: () => void;
   onRefresh: () => void;
-  viewMode: 'home' | 'action'; 
+  viewMode: 'home' | 'action' | 'manage' | 'profile'; // Updated viewMode types
 }
 
 export const PrincipalDashboard: React.FC<PrincipalDashboardProps> = ({ 
@@ -77,6 +79,7 @@ export const PrincipalDashboard: React.FC<PrincipalDashboardProps> = ({
   // --- LOAD INITIAL DATA FOR ACTION TAB ---
   useEffect(() => {
       if (viewMode === 'action' && data.school_db_id) {
+          // IMPORTANT: Load default data immediately
           loadRecentPeople();
           loadClasses();
       }
@@ -201,8 +204,9 @@ export const PrincipalDashboard: React.FC<PrincipalDashboardProps> = ({
 
   return (
     <div className="pb-10 h-full flex flex-col">
-      {/* VIEW SWITCHER */}
-      {viewMode === 'home' ? (
+      
+      {/* 1. HOME VIEW */}
+      {viewMode === 'home' && (
           <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4 w-full animate-in fade-in zoom-in-95 duration-300">
             {cards.map((item, index) => (
               <div 
@@ -230,8 +234,10 @@ export const PrincipalDashboard: React.FC<PrincipalDashboardProps> = ({
               </div>
             ))}
           </div>
-      ) : (
-          /* ACTION TAB - ADVANCED SEARCH & REPORTS */
+      )}
+
+      {/* 2. ACTION VIEW (SEARCH & REPORTS) */}
+      {viewMode === 'action' && (
           <div className="flex flex-col h-full animate-in slide-in-from-bottom-4 duration-500">
               <div className="sticky top-0 z-20 bg-[#F8FAFC]/90 dark:bg-dark-950/90 backdrop-blur-xl pb-4">
                   {/* ROLE SWITCHER */}
@@ -282,7 +288,7 @@ export const PrincipalDashboard: React.FC<PrincipalDashboardProps> = ({
                                   <select 
                                       value={filterClass} 
                                       onChange={(e) => setFilterClass(e.target.value)} 
-                                      className="flex-1 p-3 bg-slate-50 dark:bg-white/5 border-none rounded-xl text-xs font-bold uppercase outline-none"
+                                      className="flex-1 p-3 bg-slate-50 dark:bg-white/5 border-none rounded-xl text-xs font-bold uppercase outline-none text-slate-800 dark:text-white"
                                   >
                                       <option value="">All Classes</option>
                                       {schoolClasses.map(c => <option key={c.id} value={c.class_name}>{c.class_name}</option>)}
@@ -308,7 +314,7 @@ export const PrincipalDashboard: React.FC<PrincipalDashboardProps> = ({
                           ))
                       )
                   ) : (
-                      /* CASE 2: DEFAULT RECENT LIST */
+                      /* CASE 2: DEFAULT RECENT LIST (Shows when not searching) */
                       loadingRecent ? (
                           <div className="text-center py-20"><Loader2 className="animate-spin mx-auto text-brand-500" /></div>
                       ) : recentList.length === 0 ? (
@@ -326,6 +332,18 @@ export const PrincipalDashboard: React.FC<PrincipalDashboardProps> = ({
                       )
                   )}
               </div>
+          </div>
+      )}
+
+      {/* 3. MANAGE VIEW (TIME TABLE) */}
+      {viewMode === 'manage' && (
+          <div className="flex flex-col h-full animate-in slide-in-from-bottom-4 duration-500">
+              <TimeTableTab 
+                  schoolId={data.school_db_id || ''} 
+                  schoolName={data.school_name} 
+                  principalName={data.user_name}
+                  totalPeriods={data.total_periods || 8}
+              />
           </div>
       )}
 

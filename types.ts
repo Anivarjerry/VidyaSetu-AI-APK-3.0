@@ -289,3 +289,15 @@ export interface FullHistory {
   leave_log: { type: string; dates: string; status: string; reason: string }[];
   activity_log: { title: string; detail: string; date: string }[]; // Homework for teachers, Submissions for students
 }
+
+// --- TIME TABLE TYPE ---
+export interface TimeTableEntry {
+    id?: string;
+    school_id: string;
+    class_name: string;
+    day_of_week: string;
+    period_number: number;
+    subject: string;
+    teacher_id?: string;
+    teacher_name?: string; // Joined
+}
