@@ -46,14 +46,18 @@ export const ReportModal: React.FC<ReportModalProps> = ({
 
   if (!isOpen || !schoolId) return null;
 
-  const handleDownload = async (action: () => Promise<boolean>) => {
+  const handleDownload = async (action: () => Promise<boolean | {success: boolean, message?: string}>) => {
       setLoading(true);
-      const success = await action();
+      const result = await action();
       setLoading(false);
+      
+      const success = typeof result === 'boolean' ? result : result.success;
+      const message = typeof result === 'object' && result.message ? result.message : "Failed to generate report.";
+
       if (success) {
           if (window.navigator.vibrate) window.navigator.vibrate(50);
       } else {
-          alert("Failed to generate report or no data found.");
+          alert(message);
       }
   };
 
@@ -93,7 +97,11 @@ export const ReportModal: React.FC<ReportModalProps> = ({
                     <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Filter Class</label>
                     <select className="w-full p-3 bg-slate-50 dark:bg-dark-900 border border-slate-100 dark:border-white/10 rounded-xl text-xs font-bold uppercase" value={selectedClass} onChange={(e) => setSelectedClass(e.target.value)}>
                         <option value="">All Classes</option>
-                        {classOptions?.map(c => <option key={c} value={c}>{c}</option>)}
+                        {classOptions && classOptions.length > 0 ? (
+                            classOptions.map(c => <option key={c} value={c}>{c}</option>)
+                        ) : (
+                            <option disabled>No Classes Found</option>
+                        )}
                     </select>
                 </div>
 

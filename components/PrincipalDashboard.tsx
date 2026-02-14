@@ -76,16 +76,19 @@ export const PrincipalDashboard: React.FC<PrincipalDashboardProps> = ({
       else setStack(prev => prev.slice(0, -1));
   });
 
-  // --- LOAD INITIAL DATA FOR ACTION TAB ---
+  // --- LOAD INITIAL DATA (Classes needed for Report Modal Filter) ---
   useEffect(() => {
-      if (viewMode === 'action' && data.school_db_id) {
-          loadRecentPeople();
-          loadClasses();
+      if (data.school_db_id) {
+          loadClasses(); // Load classes immediately for filters
+          if (viewMode === 'action') {
+              loadRecentPeople();
+          }
       }
-  }, [viewMode, searchRole, filterClass]); 
+  }, [viewMode, searchRole, filterClass, data.school_db_id]); 
 
   const loadClasses = async () => {
-      const cls = await fetchSchoolClasses(data.school_db_id!);
+      if (!data.school_db_id) return;
+      const cls = await fetchSchoolClasses(data.school_db_id);
       setSchoolClasses(cls);
   };
 
@@ -355,7 +358,8 @@ export const PrincipalDashboard: React.FC<PrincipalDashboardProps> = ({
       <AttendanceModal isOpen={stack[stack.length-1] === 'attendance'} onClose={() => setStack(prev => prev.slice(0, -1))} schoolId={data.school_db_id || ''} teacherId={data.user_id || ''} />
       
       {data && (<GalleryModal isOpen={isGalleryOpen} onClose={() => setIsGalleryOpen(false)} schoolId={data.school_db_id || ''} userId={data.user_id || ''} canUpload={true} />)}
-      {data && (<ReportModal isOpen={isReportOpen} onClose={() => setIsReportOpen(false)} role='principal' schoolId={data.school_db_id} userId={data.user_id} schoolName={data.school_name} principalName={data.user_name} />)}
+      {/* Updated ReportModal to include classOptions from schoolClasses state */}
+      {data && (<ReportModal isOpen={isReportOpen} onClose={() => setIsReportOpen(false)} role='principal' schoolId={data.school_db_id} userId={data.user_id} schoolName={data.school_name} principalName={data.user_name} classOptions={schoolClasses.map(c => c.class_name)} />)}
       {data && (<ExamModal isOpen={isExamModalOpen} onClose={() => setIsExamModalOpen(false)} role='principal' schoolId={data.school_db_id || ''} userId={data.user_id || ''} />)}
 
       {/* APPROVAL MODAL */}

@@ -1,4 +1,3 @@
-
 import { supabase } from './supabaseClient';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -36,125 +35,131 @@ interface ReportConfig {
 }
 
 const generatePDF = (config: ReportConfig) => {
-    const doc = new jsPDF({
-        orientation: config.orientation || 'p',
-        unit: 'mm',
-        format: 'a4'
-    });
+    try {
+        const doc = new jsPDF({
+            orientation: config.orientation || 'p',
+            unit: 'mm',
+            format: 'a4'
+        });
 
-    const { title, subTitle, summary, headers, data, studentDetails, schoolName, principalName } = config;
-    const pageWidth = doc.internal.pageSize.width;
+        const { title, subTitle, summary, headers, data, studentDetails, schoolName, principalName } = config;
+        const pageWidth = doc.internal.pageSize.width;
 
-    doc.setFillColor(16, 185, 129); 
-    doc.rect(0, 0, pageWidth, 50, 'F');
-    
-    doc.setTextColor(255, 255, 255);
-    
-    let currentY = 15;
+        doc.setFillColor(16, 185, 129); 
+        doc.rect(0, 0, pageWidth, 50, 'F');
+        
+        doc.setTextColor(255, 255, 255);
+        
+        let currentY = 15;
 
-    if (schoolName) {
-        doc.setFontSize(18);
-        doc.setFont("helvetica", "bold");
-        doc.text(schoolName.toUpperCase(), 14, currentY);
-        currentY += 7;
+        if (schoolName) {
+            doc.setFontSize(18);
+            doc.setFont("helvetica", "bold");
+            doc.text(schoolName.toUpperCase(), 14, currentY);
+            currentY += 7;
 
-        if (principalName) {
-            doc.setFontSize(10);
-            doc.setFont("helvetica", "normal");
-            doc.text(`Principal: ${principalName}`, 14, currentY);
-            currentY += 8;
+            if (principalName) {
+                doc.setFontSize(10);
+                doc.setFont("helvetica", "normal");
+                doc.text(`Principal: ${principalName}`, 14, currentY);
+                currentY += 8;
+            } else {
+                currentY += 5;
+            }
         } else {
-            currentY += 5;
+            currentY = 15;
         }
-    } else {
-        currentY = 15;
-    }
 
-    doc.setFontSize(schoolName ? 14 : 18);
-    doc.setFont("helvetica", "bold");
-    doc.text(title.toUpperCase(), 14, currentY);
-    
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "normal");
-    doc.text(subTitle, 14, currentY + 6);
-    doc.text(`Generated: ${new Date().toLocaleDateString()}`, pageWidth - 50, 15);
-
-    if (studentDetails) {
-        const detailY = currentY + 14;
-        doc.setFontSize(9);
+        doc.setFontSize(schoolName ? 14 : 18);
         doc.setFont("helvetica", "bold");
-        doc.text(`Father: ${studentDetails.father}`, 14, detailY);
-        doc.text(`Mother: ${studentDetails.mother}`, 80, detailY);
-        doc.text(`DOB: ${studentDetails.dob}`, 140, detailY);
-        doc.text(`Contact: ${studentDetails.mobile}`, 14, detailY + 6);
-    }
+        doc.text(title.toUpperCase(), 14, currentY);
+        
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "normal");
+        doc.text(subTitle, 14, currentY + 6);
+        doc.text(`Generated: ${new Date().toLocaleDateString()}`, pageWidth - 50, 15);
 
-    let startY = 60;
-    const boxWidth = 45;
-    const boxHeight = 25;
-    const gap = 10;
-    
-    doc.setFontSize(12);
-    doc.setTextColor(0, 0, 0);
-    doc.text("Executive Summary", 14, startY - 2);
-
-    summary.forEach((item, index) => {
-        const x = 14 + (index * (boxWidth + gap));
-        if (x + boxWidth < pageWidth) {
-            doc.setFillColor(245, 247, 250);
-            doc.setDrawColor(220, 220, 220);
-            doc.roundedRect(x, startY, boxWidth, boxHeight, 3, 3, 'FD');
-
-            doc.setFontSize(14);
+        if (studentDetails) {
+            const detailY = currentY + 14;
+            doc.setFontSize(9);
             doc.setFont("helvetica", "bold");
-            doc.setTextColor(item.color || "#10b981");
-            doc.text(String(item.value), x + boxWidth / 2, startY + 10, { align: 'center' });
-
-            doc.setFontSize(8);
-            doc.setFont("helvetica", "bold");
-            doc.setTextColor(100, 116, 139);
-            doc.text(item.label.toUpperCase(), x + boxWidth / 2, startY + 18, { align: 'center' });
+            doc.text(`Father: ${studentDetails.father}`, 14, detailY);
+            doc.text(`Mother: ${studentDetails.mother}`, 80, detailY);
+            doc.text(`DOB: ${studentDetails.dob}`, 140, detailY);
+            doc.text(`Contact: ${studentDetails.mobile}`, 14, detailY + 6);
         }
-    });
 
-    const tableStartY = startY + boxHeight + 10;
-    
-    autoTable(doc, {
-        head: [headers],
-        body: data,
-        startY: tableStartY,
-        theme: 'grid',
-        headStyles: { 
-            fillColor: [16, 185, 129], 
-            textColor: 255,
-            fontSize: config.orientation === 'l' ? 9 : 8,
-            fontStyle: 'bold',
-            halign: 'center'
-        },
-        bodyStyles: {
-            fontSize: config.orientation === 'l' ? 9 : 8,
-            textColor: 50
-        },
-        alternateRowStyles: {
-            fillColor: [248, 250, 252]
-        },
-        styles: {
-            cellPadding: 3,
-            valign: 'middle',
-            overflow: 'linebreak'
-        },
-    });
+        let startY = 60;
+        const boxWidth = 45;
+        const boxHeight = 25;
+        const gap = 10;
+        
+        doc.setFontSize(12);
+        doc.setTextColor(0, 0, 0);
+        doc.text("Executive Summary", 14, startY - 2);
 
-    const pageCount = (doc as any).internal.getNumberOfPages();
-    for(let i = 1; i <= pageCount; i++) {
-        doc.setPage(i);
-        doc.setFontSize(8);
-        doc.setTextColor(150);
-        const footerY = doc.internal.pageSize.height - 10;
-        doc.text(`Page ${i} of ${pageCount} - VidyaSetu AI Official Report`, pageWidth / 2, footerY, { align: 'center' });
+        summary.forEach((item, index) => {
+            const x = 14 + (index * (boxWidth + gap));
+            if (x + boxWidth < pageWidth) {
+                doc.setFillColor(245, 247, 250);
+                doc.setDrawColor(220, 220, 220);
+                doc.roundedRect(x, startY, boxWidth, boxHeight, 3, 3, 'FD');
+
+                doc.setFontSize(14);
+                doc.setFont("helvetica", "bold");
+                doc.setTextColor(item.color || "#10b981");
+                doc.text(String(item.value), x + boxWidth / 2, startY + 10, { align: 'center' });
+
+                doc.setFontSize(8);
+                doc.setFont("helvetica", "bold");
+                doc.setTextColor(100, 116, 139);
+                doc.text(item.label.toUpperCase(), x + boxWidth / 2, startY + 18, { align: 'center' });
+            }
+        });
+
+        const tableStartY = startY + boxHeight + 10;
+        
+        autoTable(doc, {
+            head: [headers],
+            body: data,
+            startY: tableStartY,
+            theme: 'grid',
+            headStyles: { 
+                fillColor: [16, 185, 129], 
+                textColor: 255,
+                fontSize: config.orientation === 'l' ? 9 : 8,
+                fontStyle: 'bold',
+                halign: 'center'
+            },
+            bodyStyles: {
+                fontSize: config.orientation === 'l' ? 9 : 8,
+                textColor: 50
+            },
+            alternateRowStyles: {
+                fillColor: [248, 250, 252]
+            },
+            styles: {
+                cellPadding: 3,
+                valign: 'middle',
+                overflow: 'linebreak'
+            },
+        });
+
+        const pageCount = (doc as any).internal.getNumberOfPages();
+        for(let i = 1; i <= pageCount; i++) {
+            doc.setPage(i);
+            doc.setFontSize(8);
+            doc.setTextColor(150);
+            const footerY = doc.internal.pageSize.height - 10;
+            doc.text(`Page ${i} of ${pageCount} - VidyaSetu AI Official Report`, pageWidth / 2, footerY, { align: 'center' });
+        }
+
+        doc.save(`${title.replace(/\s+/g, '_')}_${Date.now()}.pdf`);
+        return true;
+    } catch(e) {
+        console.error("PDF Generation Error", e);
+        return false;
     }
-
-    doc.save(`${title.replace(/\s+/g, '_')}_${Date.now()}.pdf`);
 };
 
 export const downloadTimeTablePDF = (
@@ -171,7 +176,7 @@ export const downloadTimeTablePDF = (
         e.teacher_name || 'Not Assigned'
     ]);
 
-    generatePDF({
+    return generatePDF({
         schoolName,
         principalName,
         title: `TIME TABLE: ${className}`,
@@ -183,7 +188,6 @@ export const downloadTimeTablePDF = (
         headers: ["Period", "Subject", "Teacher"],
         data: rows
     });
-    return true;
 };
 
 // --- UPDATED REPORT LOGIC TO USE DATE RANGE AND CORRECT CRM ---
@@ -199,11 +203,19 @@ export const downloadPrincipalAttendance = async (schoolId: string, schoolName: 
         else query = query.gte('date', getPastDate(30)); 
 
         const { data, error } = await query;
-        if(error || !data) throw new Error("Fetch failed");
+        
+        // Handle no data case gracefully
+        if(error || !data || data.length === 0) {
+            return { success: false, message: "No attendance records found for the selected period." };
+        }
         
         // Filter by class if provided
         const filtered = className ? data.filter((d: any) => d.students?.class_name === className) : data;
         
+        if (filtered.length === 0) {
+            return { success: false, message: `No data found for class: ${className}` };
+        }
+
         // Calculate stats based on FILTERED data only
         const presentCount = filtered.filter((r:any) => r.status === 'present').length;
         const absentCount = filtered.filter((r:any) => r.status === 'absent').length;
@@ -225,7 +237,7 @@ export const downloadPrincipalAttendance = async (schoolId: string, schoolName: 
             r.status.toUpperCase()
         ]);
 
-        generatePDF({
+        const result = generatePDF({
             schoolName,
             principalName,
             title: "Student Attendance Report",
@@ -234,8 +246,9 @@ export const downloadPrincipalAttendance = async (schoolId: string, schoolName: 
             headers: ["Date", "Student Name", "Roll No", "Class", "Status"],
             data: rows
         });
-        return true;
-    } catch(e) { return false; }
+        
+        return { success: result };
+    } catch(e) { return { success: false, message: "System error during generation." }; }
 };
 
 export const downloadPrincipalAttendanceExcel = async (schoolId: string, className?: string, startDate?: string, endDate?: string) => {
@@ -249,9 +262,10 @@ export const downloadPrincipalAttendanceExcel = async (schoolId: string, classNa
         if (endDate) query = query.lte('date', endDate);
 
         const { data } = await query;
-        if (!data) return false;
+        if (!data || data.length === 0) return { success: false, message: "No records found." };
         
         const filtered = className ? data.filter((d: any) => d.students?.class_name === className) : data;
+        if (filtered.length === 0) return { success: false, message: "No records for selected class." };
 
         const excelData = filtered.map((r: any, index: number) => ({
             "S.No": index + 1,
@@ -263,8 +277,8 @@ export const downloadPrincipalAttendanceExcel = async (schoolId: string, classNa
             "Status": r.status.toUpperCase()
         }));
         exportToExcel(excelData, "Attendance_Report");
-        return true;
-    } catch(e) { return false; }
+        return { success: true };
+    } catch(e) { return { success: false }; }
 };
 
 export const downloadPortalHistory = async (schoolId: string, schoolName: string, principalName: string, role: Role, userId: string, startDate?: string, endDate?: string) => {
@@ -279,7 +293,7 @@ export const downloadPortalHistory = async (schoolId: string, schoolName: string
         if(role === 'teacher') query = query.eq('teacher_user_id', userId);
 
         const { data } = await query;
-        if(!data) throw new Error("No data");
+        if(!data || data.length === 0) return { success: false, message: "No submission activity found." };
 
         const summary = [
             { label: 'Total Periods', value: data.length },
@@ -292,7 +306,7 @@ export const downloadPortalHistory = async (schoolId: string, schoolName: string
             `${r.class_name} - ${r.subject}`,
             (r.homework || '').substring(0, 50)
         ]);
-        generatePDF({
+        const result = generatePDF({
             schoolName,
             principalName: role === 'principal' ? principalName : undefined,
             title: "Portal Submission Report",
@@ -302,8 +316,8 @@ export const downloadPortalHistory = async (schoolId: string, schoolName: string
             data: rows,
             orientation: 'l'
         });
-        return true;
-    } catch(e) { return false; }
+        return { success: result };
+    } catch(e) { return { success: false }; }
 };
 
 export const downloadPortalHistoryExcel = async (schoolId: string, role: Role, userId: string, startDate?: string, endDate?: string) => {
@@ -318,7 +332,7 @@ export const downloadPortalHistoryExcel = async (schoolId: string, role: Role, u
         if(role === 'teacher') query = query.eq('teacher_user_id', userId);
 
         const { data } = await query;
-        if(!data) return false;
+        if(!data || data.length === 0) return { success: false, message: "No data found." };
 
         const excelData = data.map((r: any, index: number) => ({
             "S.No": index + 1,
@@ -333,8 +347,8 @@ export const downloadPortalHistoryExcel = async (schoolId: string, role: Role, u
             "Homework Content": r.homework
         }));
         exportToExcel(excelData, "Portal_Activity_Log");
-        return true;
-    } catch(e) { return false; }
+        return { success: true };
+    } catch(e) { return { success: false }; }
 };
 
 export const downloadLeaveReport = async (schoolId: string, schoolName: string, principalName: string, role: Role, userId: string, startDate?: string, endDate?: string) => {
@@ -348,7 +362,7 @@ export const downloadLeaveReport = async (schoolId: string, schoolName: string, 
         if(role === 'teacher') staffQuery = staffQuery.eq('user_id', userId);
 
         const { data: leaves } = await staffQuery;
-        if(!leaves) return false;
+        if(!leaves || leaves.length === 0) return { success: false, message: "No leave records found." };
 
         const summary = [
             { label: 'Total', value: leaves.length },
@@ -357,7 +371,7 @@ export const downloadLeaveReport = async (schoolId: string, schoolName: string, 
         const rows = leaves.map((r: any) => [
             r.users?.name || 'Staff', r.users?.mobile || '-', r.leave_type, `${r.start_date} to ${r.end_date}`, r.status.toUpperCase()
         ]);
-        generatePDF({
+        const result = generatePDF({
             schoolName,
             principalName: role === 'principal' ? principalName : undefined,
             title: "Staff Leave Report",
@@ -366,8 +380,8 @@ export const downloadLeaveReport = async (schoolId: string, schoolName: string, 
             headers: ["Staff Name", "Mobile", "Type", "Duration", "Status"],
             data: rows
         });
-        return true;
-    } catch(e) { return false; }
+        return { success: result };
+    } catch(e) { return { success: false }; }
 };
 
 export const downloadLeaveReportExcel = async (schoolId: string, role: Role, userId: string, startDate?: string, endDate?: string) => {
@@ -381,7 +395,7 @@ export const downloadLeaveReportExcel = async (schoolId: string, role: Role, use
         if(role === 'teacher') staffQuery = staffQuery.eq('user_id', userId);
 
         const { data: leaves } = await staffQuery;
-        if(!leaves) return false;
+        if(!leaves || leaves.length === 0) return { success: false, message: "No data." };
 
         const excelData = leaves.map((r: any, index: number) => ({
             "S.No": index + 1,
@@ -395,8 +409,8 @@ export const downloadLeaveReportExcel = async (schoolId: string, role: Role, use
             "Principal Comment": r.principal_comment || '-'
         }));
         exportToExcel(excelData, "Staff_Leave_Data");
-        return true;
-    } catch(e) { return false; }
+        return { success: true };
+    } catch(e) { return { success: false }; }
 };
 
 export const downloadStudentDirectory = async (schoolId: string, schoolName: string, principalName: string, className?: string) => {
@@ -409,7 +423,7 @@ export const downloadStudentDirectory = async (schoolId: string, schoolName: str
         if (className) query = query.eq('class_name', className);
         
         const { data, error } = await query;
-        if(error || !data) return false;
+        if(error || !data || data.length === 0) return { success: false, message: "Student directory empty." };
 
         const summary = [
             { label: 'Total Students', value: data.length },
@@ -418,7 +432,7 @@ export const downloadStudentDirectory = async (schoolId: string, schoolName: str
         const rows = data.map((s: any) => [
             s.name, s.class_name, s.father_name, s.users?.mobile || '-', s.users?.address || '-'
         ]);
-        generatePDF({
+        const result = generatePDF({
             schoolName,
             principalName,
             title: "Student Directory",
@@ -427,8 +441,8 @@ export const downloadStudentDirectory = async (schoolId: string, schoolName: str
             headers: ["Name", "Class", "Father Name", "Contact", "Address"],
             data: rows
         });
-        return true;
-    } catch(e) { return false; }
+        return { success: result };
+    } catch(e) { return { success: false }; }
 };
 
 export const downloadStudentDirectoryExcel = async (schoolId: string, className?: string) => {
@@ -441,7 +455,7 @@ export const downloadStudentDirectoryExcel = async (schoolId: string, className?
         if (className) query = query.eq('class_name', className);
         
         const { data, error } = await query;
-        if(error || !data) return false;
+        if(error || !data || data.length === 0) return { success: false, message: "No data." };
 
         const excelData = data.map((s: any, index: number) => ({
             "S.No": index + 1,
@@ -456,8 +470,8 @@ export const downloadStudentDirectoryExcel = async (schoolId: string, className?
             "Address": s.users?.address || '-'
         }));
         exportToExcel(excelData, "Student_Directory");
-        return true;
-    } catch(e) { return false; }
+        return { success: true };
+    } catch(e) { return { success: false }; }
 };
 
 export const downloadExamResultsExcel = async (schoolId: string, className?: string, startDate?: string, endDate?: string, recordId?: string) => {
@@ -479,7 +493,7 @@ export const downloadExamResultsExcel = async (schoolId: string, className?: str
         }
 
         const { data, error } = await query;
-        if (error || !data || data.length === 0) return false;
+        if (error || !data || data.length === 0) return { success: false, message: "No exam records found." };
 
         const excelData = data.map((r: any, index: number) => ({
             "S.No": index + 1,
@@ -494,14 +508,14 @@ export const downloadExamResultsExcel = async (schoolId: string, className?: str
         }));
 
         exportToExcel(excelData, recordId ? `Result_${data[0]?.exam_records?.subject}` : "All_Exam_Results");
-        return true;
-    } catch(e) { return false; }
+        return { success: true };
+    } catch(e) { return { success: false }; }
 };
 
 export const downloadStudentReport = async (schoolId: string, studentId: string, studentName: string, startDate?: string, endDate?: string) => {
     try {
         const { data: student } = await supabase.from('students').select('father_name, mother_name, dob, class_name, users(mobile)').eq('id', studentId).single();
-        if(!student) return false;
+        if(!student) return { success: false, message: "Student profile not found." };
 
         const { data: att } = await supabase.from('attendance').select('status').eq('student_id', studentId);
         const present = att?.filter((a:any) => a.status === 'present').length || 0;
@@ -524,7 +538,7 @@ export const downloadStudentReport = async (schoolId: string, studentId: string,
             e.grade
         ]);
 
-        generatePDF({
+        const result = generatePDF({
             title: `PROGRESS REPORT: ${studentName}`,
             subTitle: `Class: ${student.class_name} | Session 2024-25`,
             summary,
@@ -537,8 +551,8 @@ export const downloadStudentReport = async (schoolId: string, studentId: string,
                 mobile: student.users?.mobile || '-'
             }
         });
-        return true;
-    } catch(e) { return false; }
+        return { success: result };
+    } catch(e) { return { success: false }; }
 };
 
 export const downloadStudentAttendanceReport = async (studentId: string, studentName: string, startDate?: string, endDate?: string) => {
@@ -552,7 +566,7 @@ export const downloadStudentAttendanceReport = async (studentId: string, student
         if(endDate) query = query.lte('date', endDate);
 
         const { data, error } = await query;
-        if(error || !data) return false;
+        if(error || !data || data.length === 0) return { success: false, message: "No attendance data found for this period." };
 
         const summary = [
             { label: 'Total Days', value: data.length },
@@ -564,20 +578,21 @@ export const downloadStudentAttendanceReport = async (studentId: string, student
             r.date, new Date(r.date).toLocaleDateString('en-US', { weekday: 'long' }), r.status.toUpperCase()
         ]);
 
-        generatePDF({
+        const result = generatePDF({
             title: `ATTENDANCE LOG: ${studentName}`,
             subTitle: `${startDate} to ${endDate}`,
             summary,
             headers: ["Date", "Day", "Status"],
             data: rows
         });
-        return true;
-    } catch(e) { return false; }
+        return { success: result };
+    } catch(e) { return { success: false }; }
 };
 
 export const generate360Report = (history: FullHistory, schoolName: string, principalName: string, dateRange: string) => {
     const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
     const width = doc.internal.pageSize.width;
+    const title = `360 Report - ${history.profile.name}`; // Fix: define title
 
     doc.setFillColor(16, 185, 129);
     doc.rect(0, 0, width, 50, 'F');

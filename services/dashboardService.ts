@@ -182,8 +182,6 @@ export const deleteNotice = async (id: string): Promise<{success: boolean, error
 // --- TIME TABLE SERVICES (ROBUST) ---
 export const fetchTimeTable = async (schoolId: string, className: string, day: string): Promise<TimeTableEntry[]> => {
     try {
-        // Use Stale-While-Revalidate logic handled by components/react-query usually, 
-        // but here we just ensure network call works.
         const { data, error } = await supabase
             .from('time_tables')
             .select('*, users!teacher_id(name)')
@@ -209,9 +207,9 @@ export const saveTimeTableEntry = async (entry: TimeTableEntry, skipQueue = fals
     }
 
     try {
-        // IMPORTANT: If teacher_id is empty string, convert to NULL for UUID column
-        // This fixes the "Invalid input syntax for type uuid" error
-        const teacherId = entry.teacher_id && entry.teacher_id.trim() !== '' ? entry.teacher_id : null;
+        // IMPORTANT FIX: Robustly converting empty/invalid teacher_id strings to NULL
+        // Postgres UUID fields throw 'Invalid syntax' for empty strings ""
+        const teacherId = (entry.teacher_id && entry.teacher_id !== 'null' && entry.teacher_id !== 'undefined' && entry.teacher_id.trim() !== '') ? entry.teacher_id : null;
 
         const { error } = await supabase
             .from('time_tables')
@@ -225,11 +223,15 @@ export const saveTimeTableEntry = async (entry: TimeTableEntry, skipQueue = fals
             }, { onConflict: 'school_id,class_name,day_of_week,period_number' });
         
         if (error) {
-            console.error("Supabase Save Error:", error);
+            console.error("Supabase Save Error Details:", error);
+            // This allows user to see specific error if they inspect console
             return false;
         }
         return true;
-    } catch(e) { return false; }
+    } catch(e) { 
+        console.error("Unexpected Save Error", e);
+        return false; 
+    }
 };
 
 // NEW: Copy Time Table Logic
