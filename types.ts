@@ -253,3 +253,39 @@ export interface VisitorEntry {
   photo_data?: string; // Base64
   entry_time?: string;
 }
+
+// --- NEW SEARCH & REPORT TYPES ---
+export interface SearchPerson {
+  id: string;
+  name: string;
+  role: 'student' | 'teacher' | 'driver' | 'gatekeeper';
+  sub_text: string; // Class for student, Mobile for staff
+  photo_url?: string; // Optional
+  father_name?: string; // For searching
+  mother_name?: string; // For searching
+}
+
+export interface FullHistory {
+  profile: {
+    name: string;
+    role: string;
+    id: string;
+    class_name?: string;
+    father_name?: string;
+    mother_name?: string;
+    dob?: string;
+    mobile?: string;
+    address?: string;
+    join_date?: string;
+  };
+  stats: {
+    attendance_rate: number; // Percentage
+    leaves_taken: number;
+    performance_avg?: string; // For students
+    tasks_completed?: number; // For teachers (homework uploads)
+  };
+  attendance_log: { date: string; status: string }[];
+  exam_log: { title: string; subject: string; marks: string; date: string }[];
+  leave_log: { type: string; dates: string; status: string; reason: string }[];
+  activity_log: { title: string; detail: string; date: string }[]; // Homework for teachers, Submissions for students
+}

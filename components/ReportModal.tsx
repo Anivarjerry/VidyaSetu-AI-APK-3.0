@@ -23,13 +23,15 @@ interface ReportModalProps {
   role: Role;
   schoolId?: string;
   userId?: string;
+  schoolName?: string; // New Prop
+  principalName?: string; // New Prop
   classOptions?: string[]; // For Principal to filter
   studentId?: string;      // For Parent
   studentName?: string;    // For Parent
 }
 
 export const ReportModal: React.FC<ReportModalProps> = ({ 
-    isOpen, onClose, role, schoolId, userId, classOptions, studentId, studentName 
+    isOpen, onClose, role, schoolId, userId, schoolName, principalName, classOptions, studentId, studentName 
 }) => {
   const [loading, setLoading] = useState(false);
   const [selectedClass, setSelectedClass] = useState('');
@@ -97,10 +99,10 @@ export const ReportModal: React.FC<ReportModalProps> = ({
 
                 <div className="grid grid-cols-1 gap-3">
                     {[
-                        { icon: <Calendar size={20} className="text-blue-500" />, label: "Attendance Log", sub: "Daily Status Record", pdf: () => downloadPrincipalAttendance(schoolId, selectedClass, startDate, endDate), xls: () => downloadPrincipalAttendanceExcel(schoolId, selectedClass, startDate, endDate) },
-                        { icon: <Users size={20} className="text-purple-500" />, label: "Student Directory", sub: "Full Bio-Data & Contact", pdf: () => downloadStudentDirectory(schoolId, selectedClass), xls: () => downloadStudentDirectoryExcel(schoolId, selectedClass) },
-                        { icon: <BookOpen size={20} className="text-orange-500" />, label: "Portal Activity", sub: "Teacher Submissions", pdf: () => downloadPortalHistory(schoolId, 'principal', userId!, startDate, endDate), xls: () => downloadPortalHistoryExcel(schoolId, 'principal', userId!, startDate, endDate) },
-                        { icon: <CheckCircle2 size={20} className="text-rose-500" />, label: "Staff Leave Data", sub: "Requests & Status", pdf: () => downloadLeaveReport(schoolId, 'principal', userId!, startDate, endDate), xls: () => downloadLeaveReportExcel(schoolId, 'principal', userId!, startDate, endDate) },
+                        { icon: <Calendar size={20} className="text-blue-500" />, label: "Attendance Log", sub: "Daily Status Record", pdf: () => downloadPrincipalAttendance(schoolId, schoolName || 'School', principalName || 'Principal', selectedClass, startDate, endDate), xls: () => downloadPrincipalAttendanceExcel(schoolId, selectedClass, startDate, endDate) },
+                        { icon: <Users size={20} className="text-purple-500" />, label: "Student Directory", sub: "Full Bio-Data & Contact", pdf: () => downloadStudentDirectory(schoolId, schoolName || 'School', principalName || 'Principal', selectedClass), xls: () => downloadStudentDirectoryExcel(schoolId, selectedClass) },
+                        { icon: <BookOpen size={20} className="text-orange-500" />, label: "Portal Activity", sub: "Teacher Submissions", pdf: () => downloadPortalHistory(schoolId, schoolName || 'School', principalName || 'Principal', 'principal', userId!, startDate, endDate), xls: () => downloadPortalHistoryExcel(schoolId, 'principal', userId!, startDate, endDate) },
+                        { icon: <CheckCircle2 size={20} className="text-rose-500" />, label: "Staff Leave Data", sub: "Requests & Status", pdf: () => downloadLeaveReport(schoolId, schoolName || 'School', principalName || 'Principal', 'principal', userId!, startDate, endDate), xls: () => downloadLeaveReportExcel(schoolId, 'principal', userId!, startDate, endDate) },
                         { icon: <Award size={20} className="text-emerald-500" />, label: "Exam Results", sub: "Detailed Marks & Grades", noPdf: true, xls: () => downloadExamResultsExcel(schoolId, selectedClass, startDate, endDate) }
                     ].map((item, idx) => (
                         <div key={idx} className="p-4 bg-white dark:bg-dark-800 border border-slate-100 dark:border-white/5 rounded-[1.5rem] shadow-sm flex flex-col gap-3">
@@ -127,7 +129,7 @@ export const ReportModal: React.FC<ReportModalProps> = ({
         {/* TEACHER OPTIONS */}
         {role === 'teacher' && (
             <div className="space-y-3 premium-subview-enter">
-                <button onClick={() => handleDownload(() => downloadPortalHistory(schoolId, 'teacher', userId!, startDate, endDate))} disabled={loading} className="w-full p-5 bg-white dark:bg-dark-800 border border-slate-100 dark:border-white/5 rounded-3xl shadow-sm active:scale-95 transition-all flex items-center gap-4 group">
+                <button onClick={() => handleDownload(() => downloadPortalHistory(schoolId, schoolName || 'School', principalName || '', 'teacher', userId!, startDate, endDate))} disabled={loading} className="w-full p-5 bg-white dark:bg-dark-800 border border-slate-100 dark:border-white/5 rounded-3xl shadow-sm active:scale-95 transition-all flex items-center gap-4 group">
                     <div className="w-10 h-10 rounded-full bg-blue-500/10 text-blue-500 flex items-center justify-center"><BookOpen size={20} /></div>
                     <div className="text-left">
                         <p className="font-black text-sm uppercase dark:text-white">My Submissions</p>
@@ -136,7 +138,7 @@ export const ReportModal: React.FC<ReportModalProps> = ({
                     {loading && <Loader2 className="ml-auto animate-spin" size={16} />}
                 </button>
 
-                <button onClick={() => handleDownload(() => downloadLeaveReport(schoolId, 'teacher', userId!, startDate, endDate))} disabled={loading} className="w-full p-5 bg-white dark:bg-dark-800 border border-slate-100 dark:border-white/5 rounded-3xl shadow-sm active:scale-95 transition-all flex items-center gap-4 group">
+                <button onClick={() => handleDownload(() => downloadLeaveReport(schoolId, schoolName || 'School', principalName || '', 'teacher', userId!, startDate, endDate))} disabled={loading} className="w-full p-5 bg-white dark:bg-dark-800 border border-slate-100 dark:border-white/5 rounded-3xl shadow-sm active:scale-95 transition-all flex items-center gap-4 group">
                     <div className="w-10 h-10 rounded-full bg-rose-500/10 text-rose-500 flex items-center justify-center"><CheckCircle2 size={20} /></div>
                     <div className="text-left">
                         <p className="font-black text-sm uppercase dark:text-white">My Leaves</p>

@@ -1,5 +1,5 @@
 
-import { DashboardData, PeriodData, Role, ParentHomework, NoticeItem, NoticeRequest, AnalyticsSummary, TeacherProgress, HomeworkAnalyticsData, StudentHomeworkStatus, Student, AttendanceStatus, Vehicle, StaffLeave, AttendanceHistoryItem, StudentLeave, SchoolSummary, SchoolUser, SiblingInfo, GalleryItem, ExamRecord, ExamMark, VisitorEntry } from '../types';
+import { DashboardData, PeriodData, Role, ParentHomework, NoticeItem, NoticeRequest, AnalyticsSummary, TeacherProgress, HomeworkAnalyticsData, StudentHomeworkStatus, Student, AttendanceStatus, Vehicle, StaffLeave, AttendanceHistoryItem, StudentLeave, SchoolSummary, SchoolUser, SiblingInfo, GalleryItem, ExamRecord, ExamMark, VisitorEntry, SearchPerson, FullHistory } from '../types';
 import { supabase } from './supabaseClient';
 
 export const getISTDate = (): string => {
@@ -312,7 +312,6 @@ export const fetchAIContextData = async (role: Role, schoolIdCode: string, userI
 // --- DASHBOARD DATA FETCH ---
 export const fetchDashboardData = async ( sc: string, mob: string, role: Role, pw?: string, sid?: string ): Promise<DashboardData | null> => {
   try {
-    // FIX: Check if 'sc' is a UUID (from internal navigation) or a Code (from login input)
     const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(sc.trim());
     
     let schoolQuery = supabase.from('schools').select('id, name, school_code, is_active, subscription_end_date, total_periods');
@@ -398,9 +397,7 @@ export const incrementGalleryView = async (userId: string): Promise<boolean> => 
     } catch (e) { return true; }
 };
 
-// --- EXAMINATION SERVICES (REWRITTEN) ---
-
-// 1. Create the Exam Parent Record (e.g., "Unit Test 1 - Math - Class 10")
+// --- EXAMINATION SERVICES ---
 export const createExamRecord = async (payload: ExamRecord): Promise<{success: boolean, id?: string, error?: string}> => {
     try {
         const { data, error } = await supabase.from('exam_records').insert({
@@ -423,7 +420,6 @@ export const createExamRecord = async (payload: ExamRecord): Promise<{success: b
     }
 };
 
-// 2. Insert Marks for Students
 export const submitExamResults = async (marks: ExamMark[]): Promise<{success: boolean, error?: string}> => {
     try {
         const { error } = await supabase.from('exam_marks').insert(marks);
@@ -437,7 +433,6 @@ export const submitExamResults = async (marks: ExamMark[]): Promise<{success: bo
     }
 };
 
-// 3. Fetch Exams History (Parent Records)
 export const fetchExamRecords = async (schoolId: string): Promise<ExamRecord[]> => {
     try {
         const { data, error } = await supabase
@@ -451,7 +446,6 @@ export const fetchExamRecords = async (schoolId: string): Promise<ExamRecord[]> 
     } catch (e) { return []; }
 };
 
-// 4. Fetch Marks for a specific Exam
 export const fetchExamResultsByRecord = async (recordId: string): Promise<ExamMark[]> => {
     try {
         const { data, error } = await supabase
@@ -464,7 +458,6 @@ export const fetchExamResultsByRecord = async (recordId: string): Promise<ExamMa
     } catch (e) { return []; }
 };
 
-// 5. Fetch All Results for a Student (For Parent/Student View)
 export const fetchStudentExamResults = async (studentId: string): Promise<any[]> => {
     try {
         const { data, error } = await supabase
@@ -492,10 +485,8 @@ export const addVisitorEntry = async (entry: VisitorEntry) => {
     return !error;
 };
 
-// Updated fetchVisitorEntries to support Date Range
 export const fetchVisitorEntries = async (schoolId: string, startDate: string, endDate?: string) => {
     const start = `${startDate}T00:00:00`;
-    // If no endDate provided, assume single day query (end of startDate)
     const end = `${endDate || startDate}T23:59:59`;
 
     const { data, error } = await supabase
@@ -507,4 +498,136 @@ export const fetchVisitorEntries = async (schoolId: string, startDate: string, e
         .order('entry_time', { ascending: false });
 
     return data || [];
+};
+
+// --- NEW SEARCH & FULL HISTORY SERVICES ---
+
+// Unified Search Function
+export const searchPeople = async (schoolId: string, query: string, role: 'student' | 'staff'): Promise<SearchPerson[]> => {
+    if (!query || query.length < 2) return [];
+    const term = `%${query}%`; // Wildcard search
+
+    try {
+        if (role === 'student') {
+            const { data } = await supabase
+                .from('students')
+                .select('id, name, class_name, father_name, mother_name')
+                .eq('school_id', schoolId)
+                .or(`name.ilike.${term},father_name.ilike.${term},mother_name.ilike.${term}`)
+                .limit(20);
+            
+            return (data || []).map((s: any) => ({
+                id: s.id,
+                name: s.name,
+                role: 'student',
+                sub_text: s.class_name,
+                father_name: s.father_name,
+                mother_name: s.mother_name
+            }));
+        } else {
+            const { data } = await supabase
+                .from('users')
+                .select('id, name, role, mobile')
+                .eq('school_id', schoolId)
+                .in('role', ['teacher', 'driver', 'gatekeeper'])
+                .or(`name.ilike.${term},mobile.ilike.${term}`)
+                .limit(20);
+            
+            return (data || []).map((u: any) => ({
+                id: u.id,
+                name: u.name,
+                role: u.role,
+                sub_text: u.mobile
+            }));
+        }
+    } catch (e) {
+        return [];
+    }
+};
+
+// Fetch Student Full History
+export const fetchStudentFullHistory = async (studentId: string, dateFrom?: string, dateTo?: string): Promise<FullHistory | null> => {
+    try {
+        // 1. Profile
+        const { data: profile } = await supabase.from('students').select('*, users(mobile, address)').eq('id', studentId).single();
+        if (!profile) return null;
+
+        // 2. Attendance Stats
+        const { data: att } = await supabase.from('attendance').select('date, status').eq('student_id', studentId).gte('date', dateFrom || '2020-01-01').lte('date', dateTo || '2099-12-31').order('date', {ascending: false});
+        const present = att?.filter(a => a.status === 'present').length || 0;
+        const totalAtt = att?.length || 0;
+        const rate = totalAtt > 0 ? Math.round((present / totalAtt) * 100) : 0;
+
+        // 3. Exams
+        const examResults = await fetchStudentExamResults(studentId);
+        
+        // 4. Leaves
+        const { data: leaves } = await supabase.from('student_leaves').select('leave_type, start_date, end_date, status, reason').eq('student_id', studentId).order('start_date', {ascending: false});
+
+        // 5. Homework/Activity (Submissions)
+        const { data: subs } = await supabase.from('homework_submissions').select('date, period_number, status').eq('student_id', studentId).order('date', {ascending: false});
+
+        return {
+            profile: {
+                id: profile.id,
+                name: profile.name,
+                role: 'Student',
+                class_name: profile.class_name,
+                father_name: profile.father_name,
+                mother_name: profile.mother_name,
+                dob: profile.dob,
+                mobile: profile.users?.mobile,
+                address: profile.users?.address,
+                join_date: profile.created_at
+            },
+            stats: {
+                attendance_rate: rate,
+                leaves_taken: leaves?.length || 0,
+                performance_avg: "B+", // Placeholder logic
+                tasks_completed: subs?.length || 0
+            },
+            attendance_log: att || [],
+            exam_log: examResults.map(e => ({ title: e.exam_type, subject: e.subject, marks: `${e.obtained} / ${e.total_marks}`, date: e.date })),
+            leave_log: (leaves || []).map((l:any) => ({ type: l.leave_type, dates: `${l.start_date} -> ${l.end_date}`, status: l.status, reason: l.reason })),
+            activity_log: (subs || []).map((s:any) => ({ title: `Homework - Period ${s.period_number}`, detail: s.status, date: s.date }))
+        };
+    } catch(e) { return null; }
+};
+
+// Fetch Staff Full History
+export const fetchStaffFullHistory = async (userId: string, dateFrom?: string, dateTo?: string): Promise<FullHistory | null> => {
+    try {
+        const { data: user } = await supabase.from('users').select('*').eq('id', userId).single();
+        if (!user) return null;
+
+        // Teacher: Homework Uploads
+        let activityLog = [];
+        if (user.role === 'teacher') {
+            const { data: uploads } = await supabase.from('daily_periods').select('date, class_name, subject, homework').eq('teacher_user_id', userId).order('date', {ascending: false}).limit(50);
+            activityLog = (uploads || []).map((u:any) => ({ title: `${u.class_name} - ${u.subject}`, detail: u.homework, date: u.date }));
+        }
+
+        // Leaves
+        const leaves = await fetchUserLeaves(userId);
+
+        return {
+            profile: {
+                id: user.id,
+                name: user.name,
+                role: user.role,
+                mobile: user.mobile,
+                address: user.address,
+                join_date: user.created_at
+            },
+            stats: {
+                attendance_rate: 100, // Staff attendance logic pending
+                leaves_taken: leaves.length,
+                tasks_completed: activityLog.length
+            },
+            attendance_log: [],
+            exam_log: [],
+            leave_log: leaves.map(l => ({ type: l.leave_type, dates: `${l.start_date} -> ${l.end_date}`, status: l.status, reason: l.reason })),
+            activity_log: activityLog
+        };
+    } catch(e) { return null; }
 };

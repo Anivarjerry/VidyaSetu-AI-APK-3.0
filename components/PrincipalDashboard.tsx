@@ -1,7 +1,7 @@
 
-import React, { useState } from 'react';
-import { DashboardData, LoginRequest } from '../types';
-import { Megaphone, MapPin, BarChart2, BookOpen, CalendarRange, UserCheck, Award, Image as ImageIcon, Download, Lock, ChevronRight, Users, ShieldCheck } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { DashboardData, LoginRequest, SearchPerson, FullHistory } from '../types';
+import { Megaphone, MapPin, BarChart2, BookOpen, CalendarRange, UserCheck, Award, Image as ImageIcon, Download, Lock, ChevronRight, Users, ShieldCheck, Search, Filter, FileText, Loader2, User, Check, UserX, Phone, CheckCircle2 } from 'lucide-react';
 import { useModalBackHandler } from '../hooks/useModalBackHandler';
 import { Modal } from './Modal';
 import { NoticeModal } from './NoticeModal';
@@ -14,8 +14,8 @@ import { ExamModal } from './ExamModal';
 import { GalleryModal } from './GalleryModal';
 import { ReportModal } from './ReportModal';
 import { fetchPendingApprovals, updateUserApprovalStatus } from '../services/authService';
-import { fetchVisitorEntries } from '../services/dashboardService';
-import { Loader2, CheckCircle2, UserX, Check, Phone, Clock } from 'lucide-react';
+import { fetchVisitorEntries, searchPeople, fetchStudentFullHistory, fetchStaffFullHistory } from '../services/dashboardService';
+import { generate360Report } from '../services/reportService';
 import { useThemeLanguage } from '../contexts/ThemeLanguageContext';
 
 interface PrincipalDashboardProps {
@@ -24,6 +24,7 @@ interface PrincipalDashboardProps {
   isSchoolActive: boolean;
   onShowPayModal: () => void;
   onRefresh: () => void;
+  viewMode: 'home' | 'action'; // Added viewMode prop to control tabs
 }
 
 export const PrincipalDashboard: React.FC<PrincipalDashboardProps> = ({ 
@@ -31,7 +32,8 @@ export const PrincipalDashboard: React.FC<PrincipalDashboardProps> = ({
   credentials, 
   isSchoolActive, 
   onShowPayModal,
-  onRefresh
+  onRefresh,
+  viewMode
 }) => {
   const { t } = useThemeLanguage();
   const [stack, setStack] = useState<string[]>([]);
@@ -49,8 +51,17 @@ export const PrincipalDashboard: React.FC<PrincipalDashboardProps> = ({
   const [visitorFilter, setVisitorFilter] = useState<'today' | 'yesterday' | 'week'>('today');
   const [selectedVisitorLog, setSelectedVisitorLog] = useState<any>(null);
 
-  useModalBackHandler(stack.length > 0 || isGalleryOpen || isReportOpen || isExamModalOpen || !!selectedVisitorLog, () => {
-      if (selectedVisitorLog) setSelectedVisitorLog(null);
+  // --- ACTION TAB STATES ---
+  const [searchRole, setSearchRole] = useState<'student' | 'staff'>('student');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [searchResults, setSearchResults] = useState<SearchPerson[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+
+  useModalBackHandler(stack.length > 0 || isGalleryOpen || isReportOpen || isExamModalOpen || !!selectedVisitorLog || !!selectedPersonId, () => {
+      if (selectedPersonId) setSelectedPersonId(null);
+      else if (selectedVisitorLog) setSelectedVisitorLog(null);
       else if (isGalleryOpen) setIsGalleryOpen(false);
       else if (isReportOpen) setIsReportOpen(false);
       else if (isExamModalOpen) setIsExamModalOpen(false);
@@ -100,6 +111,44 @@ export const PrincipalDashboard: React.FC<PrincipalDashboardProps> = ({
       setLoadingVisitors(false);
   };
 
+  // Search Logic
+  useEffect(() => {
+      const delayDebounceFn = setTimeout(async () => {
+          if (searchTerm.length >= 2 && data.school_db_id) {
+              setIsSearching(true);
+              const results = await searchPeople(data.school_db_id, searchTerm, searchRole);
+              setSearchResults(results);
+              setIsSearching(false);
+          } else {
+              setSearchResults([]);
+          }
+      }, 500);
+
+      return () => clearTimeout(delayDebounceFn);
+  }, [searchTerm, searchRole, data.school_db_id]);
+
+  const handleGenerate360 = async (person: SearchPerson) => {
+      if (!data.school_db_id) return;
+      setLoadingHistory(true);
+      setSelectedPersonId(person.id);
+      
+      let fullData: FullHistory | null = null;
+      if (person.role === 'student') {
+          fullData = await fetchStudentFullHistory(person.id);
+      } else {
+          fullData = await fetchStaffFullHistory(person.id);
+      }
+
+      if (fullData) {
+          generate360Report(fullData, data.school_name, data.user_name, "All Time Record"); // Pass Principal Name
+      } else {
+          alert("Could not fetch full history.");
+      }
+      
+      setLoadingHistory(false);
+      setSelectedPersonId(null);
+  };
+
   // Effects to load data when stack changes
   React.useEffect(() => {
       if (stack.includes('approvals')) handleLoadApprovals();
@@ -121,34 +170,98 @@ export const PrincipalDashboard: React.FC<PrincipalDashboardProps> = ({
   ];
 
   return (
-    <div className="pb-10">
-      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4 w-full">
-        {cards.map((item, index) => (
-          <div 
-            key={index} 
-            onClick={() => {
-                if (!isSchoolActive) {
-                    onShowPayModal();
-                    return;
-                }
-                if (item.key === 'gallery') setIsGalleryOpen(true);
-                else if (item.key === 'report') setIsReportOpen(true);
-                else if (item.key === 'exam') setIsExamModalOpen(true);
-                else setStack(prev => [...prev, item.key]);
-            }} 
-            className={`glass-card p-5 rounded-[2.5rem] flex items-center justify-between cursor-pointer group active:scale-[0.98] transition-all shadow-sm ${!isSchoolActive ? 'bg-rose-50 dark:bg-rose-950/10 border-rose-100 dark:border-rose-900/20' : ''}`}
-          >
-              <div className="flex items-center gap-4 text-left">
-                  <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-inner transition-all group-hover:scale-105 ${!isSchoolActive ? 'bg-rose-500 text-white' : 'bg-brand-500/10 text-brand-600'}`}>{item.icon}</div>
-                  <div>
-                      <h3 className={`font-black uppercase text-base leading-tight ${!isSchoolActive ? 'text-rose-600' : 'text-slate-800 dark:text-white'}`}>{item.title}</h3>
-                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{item.subtitle}</p>
+    <div className="pb-10 h-full flex flex-col">
+      {/* VIEW SWITCHER */}
+      {viewMode === 'home' ? (
+          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4 w-full animate-in fade-in zoom-in-95 duration-300">
+            {cards.map((item, index) => (
+              <div 
+                key={index} 
+                onClick={() => {
+                    if (!isSchoolActive) {
+                        onShowPayModal();
+                        return;
+                    }
+                    if (item.key === 'gallery') setIsGalleryOpen(true);
+                    else if (item.key === 'report') setIsReportOpen(true);
+                    else if (item.key === 'exam') setIsExamModalOpen(true);
+                    else setStack(prev => [...prev, item.key]);
+                }} 
+                className={`glass-card p-5 rounded-[2.5rem] flex items-center justify-between cursor-pointer group active:scale-[0.98] transition-all shadow-sm ${!isSchoolActive ? 'bg-rose-50 dark:bg-rose-950/10 border-rose-100 dark:border-rose-900/20' : ''}`}
+              >
+                  <div className="flex items-center gap-4 text-left">
+                      <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-inner transition-all group-hover:scale-105 ${!isSchoolActive ? 'bg-rose-500 text-white' : 'bg-brand-500/10 text-brand-600'}`}>{item.icon}</div>
+                      <div>
+                          <h3 className={`font-black uppercase text-base leading-tight ${!isSchoolActive ? 'text-rose-600' : 'text-slate-800 dark:text-white'}`}>{item.title}</h3>
+                          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{item.subtitle}</p>
+                      </div>
+                  </div>
+                  {!isSchoolActive ? <Lock size={20} className="text-rose-400" /> : <ChevronRight size={22} className="text-slate-200 group-hover:text-brand-500 transition-colors" />}
+              </div>
+            ))}
+          </div>
+      ) : (
+          /* ACTION TAB - ADVANCED SEARCH & REPORTS */
+          <div className="flex flex-col h-full animate-in slide-in-from-bottom-4 duration-500">
+              <div className="sticky top-0 z-20 bg-[#F8FAFC]/90 dark:bg-dark-950/90 backdrop-blur-xl pb-4">
+                  <div className="flex bg-slate-100 dark:bg-white/5 p-1.5 rounded-[2rem] border border-slate-200 dark:border-white/10 mb-4 shadow-inner">
+                      <button onClick={() => setSearchRole('student')} className={`flex-1 py-3.5 rounded-[1.6rem] text-[10px] font-black uppercase transition-all flex items-center justify-center gap-2 ${searchRole === 'student' ? 'bg-white dark:bg-brand-500/10 text-brand-600 dark:text-brand-400 shadow-sm border border-slate-100 dark:border-white/5' : 'text-slate-400'}`}>
+                          <Award size={14} /> Student Search
+                      </button>
+                      <button onClick={() => setSearchRole('staff')} className={`flex-1 py-3.5 rounded-[1.6rem] text-[10px] font-black uppercase transition-all flex items-center justify-center gap-2 ${searchRole === 'staff' ? 'bg-white dark:bg-brand-500/10 text-brand-600 dark:text-brand-400 shadow-sm border border-slate-100 dark:border-white/5' : 'text-slate-400'}`}>
+                          <UserCheck size={14} /> Staff Search
+                      </button>
+                  </div>
+
+                  <div className="relative">
+                      <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                      <input 
+                          type="text" 
+                          placeholder={searchRole === 'student' ? "Name, Father's Name, Mother's Name..." : "Name, Mobile Number..."}
+                          value={searchTerm}
+                          onChange={(e) => setSearchTerm(e.target.value)}
+                          className="w-full pl-12 pr-12 py-4 bg-white dark:bg-dark-900 border border-slate-200 dark:border-white/10 rounded-[2rem] outline-none focus:ring-2 focus:ring-brand-500/20 text-xs font-bold text-slate-800 dark:text-white shadow-sm transition-all uppercase tracking-widest"
+                      />
+                      {isSearching && <div className="absolute right-5 top-1/2 -translate-y-1/2"><Loader2 className="animate-spin text-brand-500" size={18} /></div>}
                   </div>
               </div>
-              {!isSchoolActive ? <Lock size={20} className="text-rose-400" /> : <ChevronRight size={22} className="text-slate-200 group-hover:text-brand-500 transition-colors" />}
+
+              <div className="flex-1 overflow-y-auto no-scrollbar pb-20 space-y-3">
+                  {searchTerm.length < 2 ? (
+                      <div className="flex flex-col items-center justify-center h-64 opacity-40 text-center space-y-4">
+                          <Filter size={48} className="text-slate-300 dark:text-slate-600" />
+                          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Type at least 2 chars to search</p>
+                      </div>
+                  ) : searchResults.length === 0 && !isSearching ? (
+                      <div className="flex flex-col items-center justify-center h-64 opacity-40 text-center">
+                          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">No records found</p>
+                      </div>
+                  ) : (
+                      searchResults.map((person) => (
+                          <div key={person.id} className="p-5 bg-white dark:bg-dark-900 rounded-[2.5rem] border border-slate-100 dark:border-white/5 shadow-sm flex items-center justify-between group active:scale-[0.98] transition-all">
+                              <div className="flex items-center gap-4">
+                                  <div className="w-12 h-12 bg-slate-50 dark:bg-white/5 rounded-2xl flex items-center justify-center text-slate-400 font-black text-lg">
+                                      {person.name.charAt(0)}
+                                  </div>
+                                  <div>
+                                      <h4 className="font-black text-slate-800 dark:text-white uppercase text-sm leading-tight">{person.name}</h4>
+                                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{person.sub_text}</p>
+                                      {person.father_name && <p className="text-[9px] text-slate-400">F: {person.father_name}</p>}
+                                  </div>
+                              </div>
+                              <button 
+                                  onClick={() => handleGenerate360(person)}
+                                  disabled={loadingHistory && selectedPersonId === person.id}
+                                  className="p-3 bg-brand-50 dark:bg-brand-500/10 text-brand-600 dark:text-brand-400 rounded-2xl active:scale-90 transition-all hover:bg-brand-100 dark:hover:bg-brand-500/20"
+                              >
+                                  {loadingHistory && selectedPersonId === person.id ? <Loader2 className="animate-spin" size={20} /> : <FileText size={20} />}
+                              </button>
+                          </div>
+                      ))
+                  )}
+              </div>
           </div>
-        ))}
-      </div>
+      )}
 
       {/* MODALS */}
       <NoticeModal isOpen={stack[stack.length-1] === 'notice'} onClose={() => setStack(prev => prev.slice(0, -1))} credentials={credentials} />
@@ -159,7 +272,7 @@ export const PrincipalDashboard: React.FC<PrincipalDashboardProps> = ({
       <AttendanceModal isOpen={stack[stack.length-1] === 'attendance'} onClose={() => setStack(prev => prev.slice(0, -1))} schoolId={data.school_db_id || ''} teacherId={data.user_id || ''} />
       
       {data && (<GalleryModal isOpen={isGalleryOpen} onClose={() => setIsGalleryOpen(false)} schoolId={data.school_db_id || ''} userId={data.user_id || ''} canUpload={true} />)}
-      {data && (<ReportModal isOpen={isReportOpen} onClose={() => setIsReportOpen(false)} role='principal' schoolId={data.school_db_id} userId={data.user_id} />)}
+      {data && (<ReportModal isOpen={isReportOpen} onClose={() => setIsReportOpen(false)} role='principal' schoolId={data.school_db_id} userId={data.user_id} schoolName={data.school_name} principalName={data.user_name} />)}
       {data && (<ExamModal isOpen={isExamModalOpen} onClose={() => setIsExamModalOpen(false)} role='principal' schoolId={data.school_db_id || ''} userId={data.user_id || ''} />)}
 
       {/* APPROVAL MODAL */}

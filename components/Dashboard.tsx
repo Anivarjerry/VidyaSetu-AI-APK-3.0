@@ -18,7 +18,7 @@ import { PrincipalDashboard } from './PrincipalDashboard';
 import { TeacherDashboard } from './TeacherDashboard';
 import { ParentDashboard } from './ParentDashboard';
 import { DriverDashboard } from './DriverDashboard';
-import { AIChatModal } from './AIChatModal'; // Assuming we have this, or remove if not
+import { AIChatModal } from './AIChatModal'; 
 
 interface DashboardProps {
   credentials: LoginRequest;
@@ -30,7 +30,8 @@ interface DashboardProps {
 export const Dashboard: React.FC<DashboardProps> = ({ credentials, role, userName, onLogout }) => {
   const { t } = useThemeLanguage();
   
-  const [currentView, setCurrentView] = useState<'home' | 'profile'>(() => {
+  // Expanded view type to include 'action'
+  const [currentView, setCurrentView] = useState<'home' | 'profile' | 'action'>(() => {
     return (window.history.state?.view === 'profile') ? 'profile' : 'home';
   });
 
@@ -76,14 +77,16 @@ export const Dashboard: React.FC<DashboardProps> = ({ credentials, role, userNam
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
-  const handleViewChange = (view: 'home' | 'profile') => {
+  const handleViewChange = (view: 'home' | 'profile' | 'action') => {
     if (view === currentView) return;
+    
+    // History Management
     if (view === 'home') {
-      if (window.history.state?.view === 'profile') window.history.back();
+      if (window.history.state?.view !== 'home') window.history.back();
       else setCurrentView('home');
     } else {
-      try { window.history.pushState({ view: 'profile' }, '', window.location.href); } catch (e) {}
-      setCurrentView('profile');
+      try { window.history.pushState({ view: view }, '', window.location.href); } catch (e) {}
+      setCurrentView(view);
     }
   };
 
@@ -135,40 +138,44 @@ export const Dashboard: React.FC<DashboardProps> = ({ credentials, role, userNam
 
   return (
     <div className="fixed inset-0 h-screen w-screen bg-[#F8FAFC] dark:bg-dark-950 flex flex-col overflow-hidden transition-colors">
-      <Header onRefresh={handleManualRefresh} onOpenSettings={() => setActiveMenuModal('settings')} onOpenAbout={() => setActiveMenuModal('about')} onOpenHelp={() => setActiveMenuModal('help')} onOpenNotices={() => setIsNoticeListOpen(true)} onLogout={onLogout} currentView={currentView} onChangeView={handleViewChange} />
+      <Header onRefresh={handleManualRefresh} onOpenSettings={() => setActiveMenuModal('settings')} onOpenAbout={() => setActiveMenuModal('about')} onOpenHelp={() => setActiveMenuModal('help')} onOpenNotices={() => setIsNoticeListOpen(true)} onLogout={onLogout} currentView={currentView === 'action' ? 'home' : currentView as any} onChangeView={(v) => handleViewChange(v)} />
 
       {/* Main Container */}
       <main className="flex-1 w-full flex flex-col overflow-hidden relative" style={{ marginTop: 'calc(5.5rem + env(safe-area-inset-top, 0px))', marginBottom: window.innerWidth < 768 ? 'calc(5.5rem + env(safe-area-inset-bottom, 0px))' : '0' }}>
-        {currentView === 'home' ? (
+        
+        {/* VIEW 1: HOME DASHBOARD */}
+        {(currentView === 'home' || currentView === 'action') ? (
             <>
-                <div className="w-full px-4 pt-3 pb-0.5 z-[40] flex-shrink-0">
-                    <div className="max-w-4xl md:max-w-7xl mx-auto w-full">
-                        {initialLoading && !data ? <SkeletonSchoolCard /> : <SchoolInfoCard schoolName={data?.school_name || ''} schoolCode={data?.school_code || ''} onClick={handleSchoolCardClick} />}
-                        
-                        <div className="flex items-center justify-between mt-1 mb-2.5 px-1.5">
-                             <h3 className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em]">
-                                {role === 'parent' || role === 'student' ? t('student_hub') : role === 'teacher' ? t('todays_schedule') : role === 'driver' ? t('bus_route_tracker') : t('principal_portal')}
-                             </h3>
-                             <div className="flex items-center gap-2">
-                                {(role === 'parent' && data?.siblings && data.siblings.length > 1) && (
-                                    <div className="flex gap-1.5">
-                                        {data.siblings.map(sib => (
-                                            <button key={sib.id} onClick={() => handleStudentSwitch(sib.id)} className={`px-3 py-1.5 rounded-xl text-[9px] font-black uppercase transition-all border ${selectedStudentId === sib.id ? 'bg-brand-500 text-white border-brand-500 shadow-md' : 'bg-white dark:bg-white/5 text-slate-400 border-slate-200 dark:border-white/10'}`}>{sib.name.split(' ')[0]}</button>
-                                        ))}
-                                    </div>
-                                )}
-                                <button onClick={handleManualRefresh} disabled={isRefreshing || !isSchoolActive} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[9px] font-black transition-all border ${!isSchoolActive ? 'bg-rose-50 dark:bg-rose-900/10 text-rose-500 border-rose-100 dark:border-rose-800' : 'bg-brand-500/10 dark:bg-slate-800/40 text-brand-500 border-brand-500/10 active:scale-90 shadow-sm'}`}><RefreshCw size={10} className={isRefreshing ? "animate-spin" : ""} />{isSchoolActive ? t('sync') : 'LOCKED'}</button>
-                             </div>
+                {currentView === 'home' && (
+                    <div className="w-full px-4 pt-3 pb-0.5 z-[40] flex-shrink-0 animate-in fade-in zoom-in-95 duration-300">
+                        <div className="max-w-4xl md:max-w-7xl mx-auto w-full">
+                            {initialLoading && !data ? <SkeletonSchoolCard /> : <SchoolInfoCard schoolName={data?.school_name || ''} schoolCode={data?.school_code || ''} onClick={handleSchoolCardClick} />}
+                            
+                            <div className="flex items-center justify-between mt-1 mb-2.5 px-1.5">
+                                <h3 className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em]">
+                                    {role === 'parent' || role === 'student' ? t('student_hub') : role === 'teacher' ? t('todays_schedule') : role === 'driver' ? t('bus_route_tracker') : t('principal_portal')}
+                                </h3>
+                                <div className="flex items-center gap-2">
+                                    {(role === 'parent' && data?.siblings && data.siblings.length > 1) && (
+                                        <div className="flex gap-1.5">
+                                            {data.siblings.map(sib => (
+                                                <button key={sib.id} onClick={() => handleStudentSwitch(sib.id)} className={`px-3 py-1.5 rounded-xl text-[9px] font-black uppercase transition-all border ${selectedStudentId === sib.id ? 'bg-brand-500 text-white border-brand-500 shadow-md' : 'bg-white dark:bg-white/5 text-slate-400 border-slate-200 dark:border-white/10'}`}>{sib.name.split(' ')[0]}</button>
+                                            ))}
+                                        </div>
+                                    )}
+                                    <button onClick={handleManualRefresh} disabled={isRefreshing || !isSchoolActive} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[9px] font-black transition-all border ${!isSchoolActive ? 'bg-rose-50 dark:bg-rose-900/10 text-rose-500 border-rose-100 dark:border-rose-800' : 'bg-brand-500/10 dark:bg-slate-800/40 text-brand-500 border-brand-500/10 active:scale-90 shadow-sm'}`}><RefreshCw size={10} className={isRefreshing ? "animate-spin" : ""} />{isSchoolActive ? t('sync') : 'LOCKED'}</button>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                </div>
+                )}
 
                 <div className="flex-1 overflow-y-auto w-full px-4 pb-4 no-scrollbar">
-                    <div className="max-w-4xl md:max-w-7xl mx-auto w-full">
-                         <div className={`w-full transition-opacity duration-300 pb-10 ${isRefreshing ? 'opacity-40' : 'opacity-100'}`}>
+                    <div className="max-w-4xl md:max-w-7xl mx-auto w-full h-full">
+                         <div className={`w-full h-full transition-opacity duration-300 pb-10 ${isRefreshing ? 'opacity-40' : 'opacity-100'}`}>
                             
                             {/* DYNAMIC DASHBOARD COMPONENT BASED ON ROLE */}
-                            {data && role === 'principal' && <PrincipalDashboard data={data} credentials={credentials} isSchoolActive={isSchoolActive} onShowPayModal={() => setShowPayModal(true)} onRefresh={handleManualRefresh} />}
+                            {data && role === 'principal' && <PrincipalDashboard data={data} credentials={credentials} isSchoolActive={isSchoolActive} onShowPayModal={() => setShowPayModal(true)} onRefresh={handleManualRefresh} viewMode={currentView === 'action' ? 'action' : 'home'} />}
                             {data && role === 'teacher' && <TeacherDashboard data={data} credentials={credentials} isSchoolActive={isSchoolActive} onShowLocked={() => showLockedFeature('school')} onRefresh={handleManualRefresh} />}
                             {data && (role === 'parent' || role === 'student') && <ParentDashboard data={data} credentials={credentials} role={role} isSchoolActive={isSchoolActive} isUserActive={isUserActive} onShowLocked={showLockedFeature} onRefresh={handleManualRefresh} isRefreshing={isRefreshing} />}
                             {data && role === 'driver' && <DriverDashboard data={data} isSchoolActive={isSchoolActive} onShowLocked={() => showLockedFeature('school')} />}
@@ -178,6 +185,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ credentials, role, userNam
                 </div>
             </>
         ) : (
+            // VIEW 2: PROFILE
             <div className="flex-1 overflow-y-auto px-4 w-full no-scrollbar">
                 <div className="max-w-4xl md:max-w-7xl mx-auto w-full pt-4">
                     <ProfileView data={data} isLoading={initialLoading} onLogout={onLogout} credentials={credentials} onOpenSubscription={() => { if ((role === 'parent' || role === 'student') && !isSchoolActive) setShowLockPopup(t('upgrade_school_first')); else setShowPayModal(true); }} onOpenHelp={() => setActiveMenuModal('help')} onOpenAbout={() => setActiveMenuModal('about')} />
@@ -186,10 +194,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ credentials, role, userNam
         )}
       </main>
 
-      <BottomNav currentView={currentView} onChangeView={handleViewChange} />
+      {/* Show Action Button only for Principal */}
+      <BottomNav currentView={currentView} onChangeView={handleViewChange} showAction={role === 'principal'} />
       
-      {/* FLOATING AI BUTTON */}
-      {currentView === 'home' && isSchoolActive && (
+      {/* FLOATING AI BUTTON (Only on Home/Action) */}
+      {currentView !== 'profile' && isSchoolActive && (
           <button 
             onClick={() => setIsAIChatOpen(true)}
             className="fixed bottom-[calc(6rem+env(safe-area-inset-bottom,0px))] right-6 z-40 w-14 h-14 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full shadow-2xl shadow-indigo-500/40 flex items-center justify-center text-white active:scale-90 transition-all hover:scale-105 border-2 border-white/20 animate-in zoom-in duration-300"

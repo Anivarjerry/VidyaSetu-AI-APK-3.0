@@ -3,7 +3,7 @@ import { supabase } from './supabaseClient';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
-import { Role } from '../types';
+import { Role, FullHistory } from '../types';
 
 // Helper to get Past Date
 const getPastDate = (days: number) => {
@@ -21,6 +21,8 @@ const exportToExcel = (data: any[], fileName: string) => {
 };
 
 interface ReportConfig {
+    schoolName?: string;
+    principalName?: string;
     title: string;
     subTitle: string;
     summary: { label: string; value: string | number; color?: string }[];
@@ -36,42 +38,64 @@ interface ReportConfig {
 }
 
 const generatePDF = (config: ReportConfig) => {
-    // Initialize PDF with orientation support
     const doc = new jsPDF({
         orientation: config.orientation || 'p',
         unit: 'mm',
         format: 'a4'
     });
 
-    const { title, subTitle, summary, headers, data, studentDetails } = config;
+    const { title, subTitle, summary, headers, data, studentDetails, schoolName, principalName } = config;
     const pageWidth = doc.internal.pageSize.width;
 
-    // 1. Header Section
+    // Header Section
     doc.setFillColor(16, 185, 129); // Emerald 500
-    doc.rect(0, 0, pageWidth, 40, 'F'); // Increased height for details
+    doc.rect(0, 0, pageWidth, 50, 'F'); // Increased height for branding
     
     doc.setTextColor(255, 255, 255);
-    doc.setFontSize(18);
+    
+    let currentY = 15;
+
+    // School Branding (If Provided)
+    if (schoolName) {
+        doc.setFontSize(18);
+        doc.setFont("helvetica", "bold");
+        doc.text(schoolName.toUpperCase(), 14, currentY);
+        currentY += 7;
+
+        if (principalName) {
+            doc.setFontSize(10);
+            doc.setFont("helvetica", "normal");
+            doc.text(`Principal: ${principalName}`, 14, currentY);
+            currentY += 8;
+        } else {
+            currentY += 5;
+        }
+    } else {
+        currentY = 15;
+    }
+
+    // Report Title
+    doc.setFontSize(schoolName ? 14 : 18);
     doc.setFont("helvetica", "bold");
-    doc.text(title.toUpperCase(), 14, 15);
+    doc.text(title.toUpperCase(), 14, currentY);
     
     doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
-    doc.text(subTitle, 14, 22);
+    doc.text(subTitle, 14, currentY + 6);
     doc.text(`Generated: ${new Date().toLocaleDateString()}`, pageWidth - 50, 15);
 
-    // Student Extra Details in Header
     if (studentDetails) {
+        const detailY = currentY + 14;
         doc.setFontSize(9);
         doc.setFont("helvetica", "bold");
-        doc.text(`Father: ${studentDetails.father}`, 14, 30);
-        doc.text(`Mother: ${studentDetails.mother}`, 80, 30);
-        doc.text(`DOB: ${studentDetails.dob}`, 140, 30);
-        doc.text(`Contact: ${studentDetails.mobile}`, 14, 36);
+        doc.text(`Father: ${studentDetails.father}`, 14, detailY);
+        doc.text(`Mother: ${studentDetails.mother}`, 80, detailY);
+        doc.text(`DOB: ${studentDetails.dob}`, 140, detailY);
+        doc.text(`Contact: ${studentDetails.mobile}`, 14, detailY + 6);
     }
 
-    // 2. Graphical Summary (Boxes)
-    let startY = 50; // Pushed down
+    // Graphical Summary
+    let startY = 60;
     const boxWidth = 45;
     const boxHeight = 25;
     const gap = 10;
@@ -82,29 +106,24 @@ const generatePDF = (config: ReportConfig) => {
 
     summary.forEach((item, index) => {
         const x = 14 + (index * (boxWidth + gap));
-        
-        // Prevent drawing off-screen in portrait
         if (x + boxWidth < pageWidth) {
-            // Box BG
-            doc.setFillColor(245, 247, 250); // Light Grey
+            doc.setFillColor(245, 247, 250);
             doc.setDrawColor(220, 220, 220);
             doc.roundedRect(x, startY, boxWidth, boxHeight, 3, 3, 'FD');
 
-            // Value
             doc.setFontSize(14);
             doc.setFont("helvetica", "bold");
-            doc.setTextColor(item.color || "#10b981"); // Default Emerald
+            doc.setTextColor(item.color || "#10b981");
             doc.text(String(item.value), x + boxWidth / 2, startY + 10, { align: 'center' });
 
-            // Label
             doc.setFontSize(8);
             doc.setFont("helvetica", "bold");
-            doc.setTextColor(100, 116, 139); // Slate 500
+            doc.setTextColor(100, 116, 139);
             doc.text(item.label.toUpperCase(), x + boxWidth / 2, startY + 18, { align: 'center' });
         }
     });
 
-    // 3. Table
+    // Table
     const tableStartY = startY + boxHeight + 10;
     
     autoTable(doc, {
@@ -148,25 +167,22 @@ const generatePDF = (config: ReportConfig) => {
 
 // --- API ACTIONS ---
 
-// 1. PRINCIPAL: Attendance
-const fetchAttendanceData = async (schoolId: string, className?: string, startDate?: string, endDate?: string) => {
-    let query = supabase.from('attendance')
-        .select('date, status, students(name, class_name, roll_number, father_name)')
-        .eq('school_id', schoolId)
-        .order('date', { ascending: false });
-
-    if (startDate) query = query.gte('date', startDate);
-    if (endDate) query = query.lte('date', endDate);
-    else query = query.gte('date', getPastDate(60));
-
-    const { data, error } = await query;
-    if(error || !data) throw new Error("Fetch failed");
-    return className ? data.filter((d: any) => d.students?.class_name === className) : data;
-};
-
-export const downloadPrincipalAttendance = async (schoolId: string, className?: string, startDate?: string, endDate?: string) => {
+export const downloadPrincipalAttendance = async (schoolId: string, schoolName: string, principalName: string, className?: string, startDate?: string, endDate?: string) => {
     try {
-        const filtered = await fetchAttendanceData(schoolId, className, startDate, endDate);
+        let query = supabase.from('attendance')
+            .select('date, status, students(name, class_name, roll_number, father_name)')
+            .eq('school_id', schoolId)
+            .order('date', { ascending: false });
+
+        if (startDate) query = query.gte('date', startDate);
+        if (endDate) query = query.lte('date', endDate);
+        else query = query.gte('date', getPastDate(60));
+
+        const { data, error } = await query;
+        if(error || !data) throw new Error("Fetch failed");
+        
+        const filtered = className ? data.filter((d: any) => d.students?.class_name === className) : data;
+        
         const summary = [
             { label: 'Records', value: filtered.length },
             { label: 'Present', value: filtered.filter((r:any) => r.status === 'present').length, color: '#10b981' },
@@ -177,6 +193,8 @@ export const downloadPrincipalAttendance = async (schoolId: string, className?: 
             r.date, r.students?.name || 'Unknown', r.students?.roll_number || '-', r.students?.class_name || 'N/A', r.status.toUpperCase()
         ]);
         generatePDF({
+            schoolName,
+            principalName,
             title: "Student Attendance History",
             subTitle: `${startDate} to ${endDate} | Class: ${className || 'All'}`,
             summary,
@@ -189,8 +207,20 @@ export const downloadPrincipalAttendance = async (schoolId: string, className?: 
 
 export const downloadPrincipalAttendanceExcel = async (schoolId: string, className?: string, startDate?: string, endDate?: string) => {
     try {
-        const data = await fetchAttendanceData(schoolId, className, startDate, endDate);
-        const excelData = data.map((r: any, index: number) => ({
+        let query = supabase.from('attendance')
+            .select('date, status, students(name, class_name, roll_number, father_name)')
+            .eq('school_id', schoolId)
+            .order('date', { ascending: false });
+
+        if (startDate) query = query.gte('date', startDate);
+        if (endDate) query = query.lte('date', endDate);
+
+        const { data } = await query;
+        if (!data) return false;
+        
+        const filtered = className ? data.filter((d: any) => d.students?.class_name === className) : data;
+
+        const excelData = filtered.map((r: any, index: number) => ({
             "S.No": index + 1,
             "Date": r.date,
             "Student Name": r.students?.name || 'Unknown',
@@ -204,25 +234,20 @@ export const downloadPrincipalAttendanceExcel = async (schoolId: string, classNa
     } catch(e) { return false; }
 };
 
-// 2. PRINCIPAL & TEACHER: Portal History
-const fetchPortalData = async (schoolId: string, role: Role, userId: string, startDate?: string, endDate?: string) => {
-    let query = supabase.from('daily_periods')
-        .select('date, period_number, class_name, subject, homework, homework_type, lesson, users(name, mobile)')
-        .eq('school_id', schoolId)
-        .order('date', { ascending: false });
-
-    if (startDate) query = query.gte('date', startDate);
-    if (endDate) query = query.lte('date', endDate);
-    if(role === 'teacher') query = query.eq('teacher_user_id', userId);
-
-    const { data, error } = await query;
-    if(error || !data) throw new Error("Fetch failed");
-    return data;
-};
-
-export const downloadPortalHistory = async (schoolId: string, role: Role, userId: string, startDate?: string, endDate?: string) => {
+export const downloadPortalHistory = async (schoolId: string, schoolName: string, principalName: string, role: Role, userId: string, startDate?: string, endDate?: string) => {
     try {
-        const data = await fetchPortalData(schoolId, role, userId, startDate, endDate);
+        let query = supabase.from('daily_periods')
+            .select('date, period_number, class_name, subject, homework, homework_type, lesson, users(name, mobile)')
+            .eq('school_id', schoolId)
+            .order('date', { ascending: false });
+
+        if (startDate) query = query.gte('date', startDate);
+        if (endDate) query = query.lte('date', endDate);
+        if(role === 'teacher') query = query.eq('teacher_user_id', userId);
+
+        const { data } = await query;
+        if(!data) throw new Error("No data");
+
         const summary = [
             { label: 'Total Periods', value: data.length },
             { label: 'Subjects', value: new Set(data.map((d:any) => d.subject)).size, color: '#3b82f6' }
@@ -235,6 +260,8 @@ export const downloadPortalHistory = async (schoolId: string, role: Role, userId
             (r.homework || '').substring(0, 50)
         ]);
         generatePDF({
+            schoolName,
+            principalName: role === 'principal' ? principalName : undefined, // Only show principal name if principal is downloading
             title: "Portal Submission Report",
             subTitle: `${startDate} to ${endDate}`,
             summary,
@@ -248,7 +275,18 @@ export const downloadPortalHistory = async (schoolId: string, role: Role, userId
 
 export const downloadPortalHistoryExcel = async (schoolId: string, role: Role, userId: string, startDate?: string, endDate?: string) => {
     try {
-        const data = await fetchPortalData(schoolId, role, userId, startDate, endDate);
+        let query = supabase.from('daily_periods')
+            .select('date, period_number, class_name, subject, homework, homework_type, lesson, users(name, mobile)')
+            .eq('school_id', schoolId)
+            .order('date', { ascending: false });
+
+        if (startDate) query = query.gte('date', startDate);
+        if (endDate) query = query.lte('date', endDate);
+        if(role === 'teacher') query = query.eq('teacher_user_id', userId);
+
+        const { data } = await query;
+        if(!data) return false;
+
         const excelData = data.map((r: any, index: number) => ({
             "S.No": index + 1,
             "Date": r.date,
@@ -266,23 +304,19 @@ export const downloadPortalHistoryExcel = async (schoolId: string, role: Role, u
     } catch(e) { return false; }
 };
 
-// 3. LEAVE REPORT
-const fetchLeaveData = async (schoolId: string, role: Role, userId: string, startDate?: string, endDate?: string) => {
-    let staffQuery = supabase.from('staff_leaves')
-        .select('leave_type, start_date, end_date, status, reason, principal_comment, users(name, mobile)')
-        .eq('school_id', schoolId);
-
-    if (startDate) staffQuery = staffQuery.gte('created_at', startDate);
-    if (endDate) staffQuery = staffQuery.lte('created_at', endDate);
-    if(role === 'teacher') staffQuery = staffQuery.eq('user_id', userId);
-
-    const { data } = await staffQuery;
-    return data || [];
-};
-
-export const downloadLeaveReport = async (schoolId: string, role: Role, userId: string, startDate?: string, endDate?: string) => {
+export const downloadLeaveReport = async (schoolId: string, schoolName: string, principalName: string, role: Role, userId: string, startDate?: string, endDate?: string) => {
     try {
-        const leaves = await fetchLeaveData(schoolId, role, userId, startDate, endDate);
+        let staffQuery = supabase.from('staff_leaves')
+            .select('leave_type, start_date, end_date, status, reason, principal_comment, users(name, mobile)')
+            .eq('school_id', schoolId);
+
+        if (startDate) staffQuery = staffQuery.gte('created_at', startDate);
+        if (endDate) staffQuery = staffQuery.lte('created_at', endDate);
+        if(role === 'teacher') staffQuery = staffQuery.eq('user_id', userId);
+
+        const { data: leaves } = await staffQuery;
+        if(!leaves) return false;
+
         const summary = [
             { label: 'Total', value: leaves.length },
             { label: 'Approved', value: leaves.filter((l:any) => l.status === 'approved').length, color: '#10b981' }
@@ -291,6 +325,8 @@ export const downloadLeaveReport = async (schoolId: string, role: Role, userId: 
             r.users?.name || 'Staff', r.users?.mobile || '-', r.leave_type, `${r.start_date} to ${r.end_date}`, r.status.toUpperCase()
         ]);
         generatePDF({
+            schoolName,
+            principalName: role === 'principal' ? principalName : undefined,
             title: "Staff Leave Report",
             subTitle: `${startDate} to ${endDate}`,
             summary,
@@ -303,7 +339,17 @@ export const downloadLeaveReport = async (schoolId: string, role: Role, userId: 
 
 export const downloadLeaveReportExcel = async (schoolId: string, role: Role, userId: string, startDate?: string, endDate?: string) => {
     try {
-        const leaves = await fetchLeaveData(schoolId, role, userId, startDate, endDate);
+        let staffQuery = supabase.from('staff_leaves')
+            .select('leave_type, start_date, end_date, status, reason, principal_comment, users(name, mobile)')
+            .eq('school_id', schoolId);
+
+        if (startDate) staffQuery = staffQuery.gte('created_at', startDate);
+        if (endDate) staffQuery = staffQuery.lte('created_at', endDate);
+        if(role === 'teacher') staffQuery = staffQuery.eq('user_id', userId);
+
+        const { data: leaves } = await staffQuery;
+        if(!leaves) return false;
+
         const excelData = leaves.map((r: any, index: number) => ({
             "S.No": index + 1,
             "Staff Name": r.users?.name || 'Staff',
@@ -320,8 +366,7 @@ export const downloadLeaveReportExcel = async (schoolId: string, role: Role, use
     } catch(e) { return false; }
 };
 
-// 4. STUDENT DIRECTORY (PRINCIPAL)
-export const downloadStudentDirectory = async (schoolId: string, className?: string) => {
+export const downloadStudentDirectory = async (schoolId: string, schoolName: string, principalName: string, className?: string) => {
     try {
         let query = supabase.from('students')
             .select('name, class_name, section, roll_number, father_name, mother_name, dob, users(mobile, address)')
@@ -341,6 +386,8 @@ export const downloadStudentDirectory = async (schoolId: string, className?: str
             s.name, s.class_name, s.father_name, s.users?.mobile || '-', s.users?.address || '-'
         ]);
         generatePDF({
+            schoolName,
+            principalName,
             title: "Student Directory",
             subTitle: className ? `Class: ${className}` : "All Classes",
             summary,
@@ -380,16 +427,8 @@ export const downloadStudentDirectoryExcel = async (schoolId: string, className?
     } catch(e) { return false; }
 };
 
-// 5. EXAM RESULT EXCEL (UPDATED)
-export const downloadExamResultsExcel = async (
-  schoolId: string, 
-  className?: string, 
-  startDate?: string, 
-  endDate?: string,
-  recordId?: string // Optional specific record ID
-) => {
+export const downloadExamResultsExcel = async (schoolId: string, className?: string, startDate?: string, endDate?: string, recordId?: string) => {
     try {
-        // Query to join marks with exam details
         let query = supabase.from('exam_marks')
             .select(`
                 student_name, 
@@ -401,11 +440,8 @@ export const downloadExamResultsExcel = async (
             .eq('exam_records.school_id', schoolId);
 
         if (recordId) {
-            // Specific Exam Download (From ExamModal)
             query = query.eq('record_id', recordId);
         } else {
-            // General Download Center Logic (All time, or filtered by Class only)
-            // REMOVED DATE FILTERING to allow "All Time Data" download as requested
             if (className) query = query.eq('exam_records.class_name', className);
         }
 
@@ -429,26 +465,23 @@ export const downloadExamResultsExcel = async (
     } catch(e) { return false; }
 };
 
-// 6. SINGLE STUDENT REPORT (PDF)
+// 6. SINGLE STUDENT REPORT (PDF) - BASIC
 export const downloadStudentReport = async (schoolId: string, studentId: string, studentName: string, startDate?: string, endDate?: string) => {
     try {
-        // 1. Fetch Student Info
         const { data: student } = await supabase.from('students').select('father_name, mother_name, dob, class_name, users(mobile)').eq('id', studentId).single();
         if(!student) return false;
 
-        // 2. Fetch Attendance Stats
         const { data: att } = await supabase.from('attendance').select('status').eq('student_id', studentId);
         const present = att?.filter((a:any) => a.status === 'present').length || 0;
         const totalAtt = att?.length || 0;
         const attPercentage = totalAtt > 0 ? Math.round((present / totalAtt) * 100) : 0;
 
-        // 3. Fetch Exam Results
         const { data: exams } = await supabase.from('exam_marks').select('obtained_marks, grade, is_absent, exam_records(exam_title, subject, total_marks, exam_date)').eq('student_id', studentId).order('created_at', { ascending: false });
         
         const summary = [
             { label: 'Attendance', value: `${attPercentage}%`, color: attPercentage < 75 ? '#ef4444' : '#10b981' },
             { label: 'Exams Taken', value: exams?.length || 0 },
-            { label: 'Average Grade', value: 'B+' } // Placeholder logic
+            { label: 'Average Grade', value: 'B+' } 
         ];
 
         const examRows = (exams || []).map((e: any) => [
@@ -476,7 +509,6 @@ export const downloadStudentReport = async (schoolId: string, studentId: string,
     } catch(e) { return false; }
 };
 
-// 7. STUDENT ATTENDANCE ONLY REPORT
 export const downloadStudentAttendanceReport = async (studentId: string, studentName: string, startDate?: string, endDate?: string) => {
     try {
         let query = supabase.from('attendance')
@@ -509,4 +541,174 @@ export const downloadStudentAttendanceReport = async (studentId: string, student
         });
         return true;
     } catch(e) { return false; }
+};
+
+// --- NEW: 360 DEGREE PROFILE REPORT (ROBUST) ---
+export const generate360Report = (history: FullHistory, schoolName: string, principalName: string, dateRange: string) => {
+    const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
+    const width = doc.internal.pageSize.width;
+
+    // --- PAGE 1: OVERVIEW ---
+    
+    // Header Bar
+    doc.setFillColor(16, 185, 129); // Emerald
+    doc.rect(0, 0, width, 50, 'F');
+    
+    // Title
+    doc.setTextColor(255, 255, 255);
+    
+    // School Name (Top Left)
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(20);
+    doc.text(schoolName.toUpperCase(), 20, 20);
+    
+    // Principal Name (Below School Name)
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Principal: ${principalName}`, 20, 28);
+    
+    // Report Title (Right Aligned)
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(16);
+    doc.text(history.profile.role.toUpperCase() + " HISTORY", width - 20, 20, { align: 'right' });
+    
+    // Period (Below Title)
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Period: ${dateRange}`, width - 20, 28, { align: 'right' });
+
+    // Profile Box
+    const startY = 60;
+    doc.setDrawColor(220);
+    doc.setFillColor(250, 250, 250);
+    doc.roundedRect(15, startY, width - 30, 60, 3, 3, 'FD');
+
+    // Avatar Placeholder (Fallback Icon)
+    doc.setFillColor(220, 220, 220);
+    doc.circle(35, startY + 30, 15, 'F');
+    doc.setTextColor(100);
+    doc.setFontSize(16);
+    doc.text(history.profile.name.charAt(0), 35, startY + 32, { align: 'center' });
+
+    // Details Text
+    doc.setTextColor(0);
+    doc.setFontSize(14);
+    doc.text(history.profile.name, 60, startY + 15);
+    doc.setFontSize(10);
+    doc.setTextColor(100);
+    
+    const details = [
+        `ID: ${history.profile.id.substring(0, 8).toUpperCase()}`,
+        `Role: ${history.profile.role}`,
+        `Mobile: ${history.profile.mobile || 'N/A'}`,
+        `Class: ${history.profile.class_name || 'N/A'}`,
+        `Father: ${history.profile.father_name || 'N/A'}`,
+        `Mother: ${history.profile.mother_name || 'N/A'}`,
+        `DOB: ${history.profile.dob || 'N/A'}`,
+        `Address: ${history.profile.address || 'N/A'}`
+    ];
+
+    let dy = 25;
+    let dx = 60;
+    details.forEach((line, i) => {
+        if (i === 4) { dy = 25; dx = 130; } // New column
+        doc.text(line, dx, startY + dy);
+        dy += 6;
+    });
+
+    // Stats Grid
+    const statY = startY + 70;
+    const statW = (width - 40) / 4;
+    const stats = [
+        { label: "Attendance", value: `${history.stats.attendance_rate}%`, color: [16, 185, 129] },
+        { label: "Leaves", value: history.stats.leaves_taken, color: [245, 158, 11] },
+        { label: "Tasks/Acts", value: history.stats.tasks_completed, color: [59, 130, 246] },
+        { label: "Performance", value: history.stats.performance_avg || "N/A", color: [139, 92, 246] }
+    ];
+
+    stats.forEach((s, i) => {
+        doc.setFillColor(s.color[0], s.color[1], s.color[2]);
+        doc.rect(20 + (i * statW), statY, statW - 5, 25, 'F');
+        doc.setTextColor(255);
+        doc.setFontSize(12);
+        doc.text(String(s.value), 20 + (i * statW) + (statW - 5)/2, statY + 10, { align: 'center' });
+        doc.setFontSize(7);
+        doc.text(s.label.toUpperCase(), 20 + (i * statW) + (statW - 5)/2, statY + 18, { align: 'center' });
+    });
+
+    // --- PAGE 2: DETAILED TABLES ---
+    doc.addPage();
+    let currentY = 20;
+
+    // 1. Attendance Log
+    if (history.attendance_log.length > 0) {
+        doc.setTextColor(0);
+        doc.setFontSize(12);
+        doc.text("ATTENDANCE LOG (Recent 30 Days)", 14, currentY);
+        currentY += 5;
+        autoTable(doc, {
+            startY: currentY,
+            head: [['Date', 'Status']],
+            body: history.attendance_log.slice(0, 30).map(a => [a.date, a.status.toUpperCase()]),
+            theme: 'striped',
+            headStyles: { fillColor: [100, 116, 139] },
+            styles: { fontSize: 8 }
+        });
+        currentY = (doc as any).lastAutoTable.finalY + 15;
+    }
+
+    // 2. Exam Log (Students)
+    if (history.profile.role === 'Student' && history.exam_log.length > 0) {
+        doc.text("EXAM PERFORMANCE", 14, currentY);
+        currentY += 5;
+        autoTable(doc, {
+            startY: currentY,
+            head: [['Date', 'Title', 'Subject', 'Marks']],
+            body: history.exam_log.map(e => [e.date, e.title, e.subject, e.marks]),
+            theme: 'grid',
+            headStyles: { fillColor: [139, 92, 246] },
+            styles: { fontSize: 8 }
+        });
+        currentY = (doc as any).lastAutoTable.finalY + 15;
+    }
+
+    // 3. Activity/Homework Log
+    if (history.activity_log.length > 0) {
+        doc.text(history.profile.role === 'Student' ? "HOMEWORK SUBMISSIONS" : "WORK ACTIVITY LOG", 14, currentY);
+        currentY += 5;
+        autoTable(doc, {
+            startY: currentY,
+            head: [['Date', 'Title', 'Details']],
+            body: history.activity_log.map(a => [a.date, a.title, a.detail]),
+            theme: 'striped',
+            headStyles: { fillColor: [59, 130, 246] },
+            styles: { fontSize: 8 }
+        });
+        currentY = (doc as any).lastAutoTable.finalY + 15;
+    }
+
+    // 4. Leave History
+    if (history.leave_log.length > 0) {
+        doc.text("LEAVE HISTORY", 14, currentY);
+        currentY += 5;
+        autoTable(doc, {
+            startY: currentY,
+            head: [['Type', 'Duration', 'Reason', 'Status']],
+            body: history.leave_log.map(l => [l.type, l.dates, l.reason, l.status.toUpperCase()]),
+            theme: 'plain',
+            headStyles: { fillColor: [245, 158, 11] },
+            styles: { fontSize: 8 }
+        });
+    }
+
+    // Footer
+    const pageCount = (doc as any).internal.getNumberOfPages();
+    for(let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setFontSize(8);
+        doc.setTextColor(150);
+        doc.text(`Generated by VidyaSetu AI - Page ${i} of ${pageCount}`, width / 2, 290, { align: 'center' });
+    }
+
+    doc.save(`${history.profile.name}_360_Report.pdf`);
 };
