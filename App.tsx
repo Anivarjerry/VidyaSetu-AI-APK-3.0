@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { LoginCard } from './components/LoginCard';
 import { Dashboard } from './components/Dashboard';
 import { AdminDashboard } from './components/AdminDashboard';
@@ -7,6 +7,7 @@ import { GatekeeperDashboard } from './components/GatekeeperDashboard';
 import { loginUser, updateUserToken } from './services/authService';
 import { LoginRequest, Role } from './types';
 import { ThemeLanguageProvider } from './contexts/ThemeLanguageContext';
+import { NavigationProvider } from './contexts/NavigationContext'; // Import Global Nav
 import { requestForToken, onMessageListener } from './services/firebase';
 
 const AppContent: React.FC = () => {
@@ -52,25 +53,37 @@ const AppContent: React.FC = () => {
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
 
+  // --- SPLASH SCREEN REMOVAL ---
+  useEffect(() => {
+      // Logic: Wait for React to mount, then remove splash
+      const splash = document.getElementById('splash-screen');
+      if (splash) {
+          // Delay slightly to ensure smooth transition
+          setTimeout(() => {
+              splash.style.transition = 'opacity 0.5s ease-out';
+              splash.style.opacity = '0';
+              setTimeout(() => splash.remove(), 500);
+          }, 1500); // Keep splash for at least 1.5s
+      }
+  }, []);
+
   // --- FIREBASE NOTIFICATION INIT ---
   useEffect(() => {
     const initNotifications = async () => {
       if ('serviceWorker' in navigator) {
           try {
-              const reg = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+              // Ensure SW is registered in root scope
+              const reg = await navigator.serviceWorker.register('/firebase-messaging-sw.js', { scope: '/' });
               console.log('Service Worker Registered!', reg);
           } catch (err) {
               console.error('Service Worker Failed', err);
           }
       }
 
-      console.log("Requesting Notification Permission...");
       const token = await requestForToken();
       if (token && authData.userId) {
         console.log("FCM Token Generated:", token);
         await updateUserToken(authData.userId, token);
-      } else {
-        console.warn("FCM Token failed to generate. Check console for 'permission' or 'network' errors.");
       }
     };
 
@@ -81,7 +94,6 @@ const AppContent: React.FC = () => {
         .then((payload: any) => {
           if (payload) {
              console.log("Foreground Message:", payload);
-             // Use Native Notification if permitted, else Alert
              if (Notification.permission === 'granted') {
                  new Notification(payload.notification?.title || 'VidyaSetu Alert', {
                      body: payload.notification?.body,
@@ -161,9 +173,11 @@ const AppContent: React.FC = () => {
 
 const App: React.FC = () => (
   <ThemeLanguageProvider>
-    <div className="fixed inset-0 bg-white dark:bg-dark-950">
-      <AppContent />
-    </div>
+    <NavigationProvider>
+      <div className="fixed inset-0 bg-white dark:bg-dark-950">
+        <AppContent />
+      </div>
+    </NavigationProvider>
   </ThemeLanguageProvider>
 );
 

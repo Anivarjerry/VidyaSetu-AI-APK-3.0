@@ -13,7 +13,7 @@ import { useThemeLanguage } from '../contexts/ThemeLanguageContext';
 import { RefreshCw, Lock, School as SchoolIcon, User, Loader2, Sparkles } from 'lucide-react';
 import { SubscriptionModal } from './SubscriptionModal';
 import { Modal } from './Modal';
-import { useSmartNavigation } from '../hooks/useSmartNavigation'; // NEW HOOK
+import { useNavigation } from '../contexts/NavigationContext'; // NEW GLOBAL CONTEXT
 import { PrincipalDashboard } from './PrincipalDashboard';
 import { TeacherDashboard } from './TeacherDashboard';
 import { ParentDashboard } from './ParentDashboard';
@@ -30,8 +30,8 @@ interface DashboardProps {
 export const Dashboard: React.FC<DashboardProps> = ({ credentials, role, userName, onLogout }) => {
   const { t } = useThemeLanguage();
   
-  // Use New Navigation Hook (Handles Back Button & Stacks)
-  const { currentTab, navigateTab, modalStack, openModal, closeModal, closeAllModals } = useSmartNavigation('home');
+  // Use Global Navigation Context
+  const { currentTab, switchTab, modalStack, openModal, closeModal, closeAllModals } = useNavigation();
 
   const [data, setData] = useState<DashboardData | null>(null);
   const [isSchoolActive, setIsSchoolActive] = useState(true);
@@ -124,7 +124,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ credentials, role, userNam
         onOpenNotices={() => openModal('notices')} 
         onLogout={onLogout} 
         currentView={currentTab === 'profile' ? 'profile' : 'home'} 
-        onChangeView={(v) => navigateTab(v as any)} 
+        onChangeView={(v) => switchTab(v as any)} 
       />
 
       {/* Main Container */}
@@ -179,7 +179,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ credentials, role, userNam
         )}
       </main>
 
-      <BottomNav currentView={currentTab} onChangeView={navigateTab} showAction={role === 'principal'} />
+      <BottomNav currentView={currentTab} onChangeView={switchTab} showAction={role === 'principal'} />
       
       {currentTab !== 'profile' && isSchoolActive && (
           <button 
@@ -190,7 +190,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ credentials, role, userNam
           </button>
       )}
 
-      {/* GLOBAL MODALS - CONTROLLED BY STACK */}
+      {/* GLOBAL MODALS - CONTROLLED BY CONTEXT OR LOCAL STATE FOR ALERTS */}
       <Modal isOpen={!!showLockPopup} onClose={() => setShowLockPopup(null)} title="ACCESS RESTRICTED">
           <div className="text-center py-4 space-y-6">
               <div className="w-20 h-20 bg-rose-500/10 text-rose-500 rounded-[2rem] flex items-center justify-center mx-auto shadow-inner"><Lock size={40} /></div>
@@ -208,7 +208,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ credentials, role, userNam
       <AboutModal isOpen={activeMenuModal === 'about'} onClose={() => setActiveMenuModal(null)} />
       <HelpModal isOpen={activeMenuModal === 'help'} onClose={() => setActiveMenuModal(null)} />
       
-      {/* Dynamic Modals via Stack */}
+      {/* Dynamic Modals via Global Navigation Stack */}
       <NoticeListModal isOpen={modalStack.includes('notices')} onClose={closeModal} schoolId={credentials.school_id} role={role} />
       <AIChatModal isOpen={modalStack.includes('ai_chat')} onClose={closeModal} userName={data?.user_name || 'User'} role={role} className={data?.class_name} dashboardData={data} />
       

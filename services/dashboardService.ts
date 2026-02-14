@@ -12,7 +12,9 @@ export const getISTDate = (): string => {
   return `${year}-${month}-${day}`;
 };
 
-// --- CACHING HELPER ---
+// --- CACHING HELPER (IMPROVED: NETWORK FIRST) ---
+// If Online: Fetch Network -> Save to Cache -> Return Network Data
+// If Offline or Error: Return Cached Data
 const fetchWithCache = async <T>(key: string, fetcher: () => Promise<T>): Promise<T | null> => {
     const cached = localStorage.getItem(key);
     let cachedData: T | null = null;
@@ -21,51 +23,44 @@ const fetchWithCache = async <T>(key: string, fetcher: () => Promise<T>): Promis
         try { cachedData = JSON.parse(cached); } catch (e) { console.error("Cache parse error", e); }
     }
 
-    if (!navigator.onLine) {
-        return cachedData;
-    }
-
-    try {
-        const freshData = await fetcher();
-        if (freshData) {
-            localStorage.setItem(key, JSON.stringify(freshData));
-            return freshData;
+    if (navigator.onLine) {
+        try {
+            const freshData = await fetcher();
+            if (freshData) {
+                localStorage.setItem(key, JSON.stringify(freshData));
+                return freshData;
+            }
+        } catch (e) {
+            console.error("Fetch failed, falling back to cache", e);
+            // Fallback to cache if network call fails
+            return cachedData;
         }
-    } catch (e) {
-        console.error("Fetch failed, falling back to cache", e);
     }
 
+    // Offline mode: Return cache
     return cachedData; 
 };
 
-// --- NEW: SMART PREFETCHER (Prevents White Screen Crash) ---
+// --- PREFETCHER ---
 export const prefetchAllDashboardData = async (schoolId: string, role: Role, userId: string, classVal?: string) => {
     if (!navigator.onLine || !schoolId) return;
     
     console.log("Starting Background Prefetch...");
     const today = getISTDate();
 
-    // 1. Common Data (Notices, Gallery)
-    fetchNotices(schoolId, role); // Caches automatically
-    fetchGalleryImages(schoolId, today.slice(0, 7)); // Current Month Gallery
+    // Fire and forget requests to populate cache
+    fetchNotices(schoolId, role); 
+    fetchGalleryImages(schoolId, today.slice(0, 7)); 
 
-    // 2. Role Specific Data
     if (role === 'teacher') {
-        // Prefetch Classes, Leaves, and Today's Period History
         fetchSchoolClasses(schoolId);
         fetchUserLeaves(userId);
-        fetchTeacherHistory(schoolId, '', today); // Requires mobile logic inside service, might skip exact mobile match here relying on user_id inside specific funcs
+        fetchTeacherHistory(schoolId, '', today); 
     } 
     else if (role === 'parent' || role === 'student') {
-        // Prefetch Homework, Leaves
-        if (classVal) {
-             // We can't easily prefetch homework without knowing section/studentId perfectly here, 
-             // but we can prefetch Leaves
-             if (role === 'student') fetchStudentLeavesForParent(userId); // Actually needs parent ID logic
-        }
+        if (role === 'student') fetchStudentLeavesForParent(userId); 
     }
     else if (role === 'driver') {
-        // Prefetch Vehicles
         fetchVehicles(schoolId);
     }
     else if (role === 'gatekeeper') {
@@ -153,7 +148,6 @@ export const fetchStudentOptionsForParent = async (parentId: string) => {
 
 const getSchoolUUID = async (schoolCode: string): Promise<string | null> => {
     try {
-        // Simple cache for UUID lookup
         const cacheKey = `vidyasetu_uuid_${schoolCode}`;
         const cached = localStorage.getItem(cacheKey);
         if (cached) return cached;
@@ -216,7 +210,6 @@ export const submitAttendance = async (sid: string, tid: string, cn: string, rec
 
 // --- NOTICE SERVICES ---
 export const fetchNotices = async (schoolCode: string, role: string): Promise<NoticeItem[]> => {
-  // Can be school ID or Code, try to treat as ID first if UUID-like, else resolve
   let schoolUUID = schoolCode;
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(schoolCode)) {
       const resolved = await getSchoolUUID(schoolCode);
@@ -252,7 +245,7 @@ export const deleteNotice = async (id: string): Promise<{success: boolean, error
   } catch (e: any) { return { success: false, error: e.message }; }
 };
 
-// --- TIME TABLE SERVICES (ROBUST) ---
+// --- TIME TABLE SERVICES ---
 export const fetchTimeTable = async (schoolId: string, className: string, day: string): Promise<TimeTableEntry[]> => {
     return fetchWithCache(`tt_${schoolId}_${className}_${day}`, async () => {
         const { data, error } = await supabase
@@ -304,15 +297,9 @@ export const saveTimeTableEntry = async (entry: TimeTableEntry, skipQueue = fals
                 teacher_id: teacherId 
             }, { onConflict: 'school_id,class_name,day_of_week,period_number' });
         
-        if (error) {
-            console.error("Supabase Save Error Details:", error);
-            return false;
-        }
+        if (error) return false;
         return true;
-    } catch(e) { 
-        console.error("Unexpected Save Error", e);
-        return false; 
-    }
+    } catch(e) { return false; }
 };
 
 export const copyTimeTableDay = async (schoolId: string, className: string, sourceDay: string, targetDays: string[]) => {
@@ -397,7 +384,6 @@ export const fetchHomeworkAnalytics = async (sc: string, date: string): Promise<
 };
 
 export const fetchTeacherHistory = async (sc: string, mob: string, d: string): Promise<PeriodData[]> => {
-  // If we have a user_id based flow in components, this might need ID. But here we resolve via mobile if needed
   let schoolUUID = sc;
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(sc)) {
       const resolved = await getSchoolUUID(sc);
@@ -406,7 +392,6 @@ export const fetchTeacherHistory = async (sc: string, mob: string, d: string): P
   }
   
   return fetchWithCache(`teacher_hist_${mob || 'uid'}_${d}`, async () => {
-      // If mob is actually ID
       let userId = mob;
       if (mob.length >= 10 && !mob.includes('-')) {
           const { data: user } = await supabase.from('users').select('id').eq('mobile', mob).eq('school_id', schoolUUID).maybeSingle();

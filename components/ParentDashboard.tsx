@@ -2,8 +2,8 @@
 import React, { useState } from 'react';
 import { DashboardData, LoginRequest, ParentHomework } from '../types';
 import { UserCheck, CalendarRange, Truck, BookOpen, Lock, ChevronRight, PieChart, Image as ImageIcon } from 'lucide-react';
-import { useModalBackHandler } from '../hooks/useModalBackHandler';
 import { useThemeLanguage } from '../contexts/ThemeLanguageContext';
+import { useNavigation } from '../contexts/NavigationContext';
 import { AttendanceHistoryModal } from './AttendanceHistoryModal';
 import { StudentLeaveRequestModal } from './LeaveModals';
 import { TransportTrackerModal } from './TransportTrackerModal';
@@ -35,18 +35,8 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
   isRefreshing
 }) => {
   const { t } = useThemeLanguage();
-  const [stack, setStack] = useState<string[]>([]);
+  const { modalStack, openModal, closeModal } = useNavigation();
   const [selectedHomework, setSelectedHomework] = useState<ParentHomework | null>(null);
-  
-  // Shared Features
-  const [isGalleryOpen, setIsGalleryOpen] = useState(false);
-  const [isReportOpen, setIsReportOpen] = useState(false);
-
-  useModalBackHandler(stack.length > 0 || isGalleryOpen || isReportOpen, () => {
-      if (isGalleryOpen) setIsGalleryOpen(false);
-      else if (isReportOpen) setIsReportOpen(false);
-      else setStack(prev => prev.slice(0, -1));
-  });
 
   const isFeatureLocked = !isSchoolActive || !isUserActive;
 
@@ -55,25 +45,7 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
           if (!isSchoolActive) onShowLocked('school');
           else onShowLocked('parent');
       } else {
-          setStack(prev => [...prev, key]);
-      }
-  };
-
-  const handleGalleryClick = () => {
-      if (isFeatureLocked) {
-          if (!isSchoolActive) onShowLocked('school');
-          else onShowLocked('parent');
-      } else {
-          setIsGalleryOpen(true);
-      }
-  };
-
-  const handleReportClick = () => {
-      if (isFeatureLocked) {
-          if (!isSchoolActive) onShowLocked('school');
-          else onShowLocked('parent');
-      } else {
-          setIsReportOpen(true);
+          openModal(key);
       }
   };
 
@@ -88,7 +60,7 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
         <div className="space-y-3">
             {/* Gallery */}
             <div 
-                onClick={handleGalleryClick} 
+                onClick={() => handleCardClick('gallery')} 
                 className={`glass-card p-5 rounded-[2.5rem] flex items-center justify-between cursor-pointer group active:scale-[0.98] transition-all shadow-sm ${isFeatureLocked ? 'bg-rose-50 dark:bg-rose-950/10 border-rose-100 dark:border-rose-900/20' : ''}`}
             >
                 <div className="flex items-center gap-4 text-left">
@@ -105,7 +77,7 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
 
             {/* Exam Result Analytics */}
             <div 
-                onClick={handleReportClick} 
+                onClick={() => handleCardClick('reports')} 
                 className={`glass-card p-5 rounded-[2.5rem] flex items-center justify-between cursor-pointer group active:scale-[0.98] transition-all shadow-sm ${isFeatureLocked ? 'bg-rose-50 dark:bg-rose-950/10 border-rose-100 dark:border-rose-900/20' : ''}`}
             >
                 <div className="flex items-center gap-4 text-left">
@@ -124,7 +96,7 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
         {/* MAIN FEATURES */}
         <div className="space-y-3">
             {/* 3. Attendance Status */}
-            <div onClick={() => isSchoolActive ? setStack(prev => [...prev, 'attendance_history']) : onShowLocked('school')} className={`glass-card p-5 rounded-[2.5rem] flex items-center justify-between active:scale-[0.98] transition-all cursor-pointer shadow-sm ${!isSchoolActive ? 'bg-rose-50 dark:bg-rose-950/10 border-rose-100 dark:border-rose-900/20' : ''}`}>
+            <div onClick={() => isSchoolActive ? openModal('attendance_history') : onShowLocked('school')} className={`glass-card p-5 rounded-[2.5rem] flex items-center justify-between active:scale-[0.98] transition-all cursor-pointer shadow-sm ${!isSchoolActive ? 'bg-rose-50 dark:bg-rose-950/10 border-rose-100 dark:border-rose-900/20' : ''}`}>
                 <div className="flex items-center gap-4">
                     <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-inner ${!isSchoolActive ? 'bg-rose-500 text-white' : 'bg-brand-500/10 text-brand-600'}`}><UserCheck size={28} /></div>
                     <div><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5">{t('attendance_status')}</p><h4 className={`text-base font-black uppercase leading-tight ${!isSchoolActive ? 'text-rose-600' : 'text-slate-800 dark:text-white'}`}>{t('current')}: <span className={data?.today_attendance === 'present' ? 'text-emerald-500' : data?.today_attendance === 'absent' ? 'text-rose-500' : 'text-brand-500'}>{data?.today_attendance ? t(data.today_attendance) : t('waiting')}</span></h4></div>
@@ -148,17 +120,17 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
         </div>
 
         {/* MODALS */}
-        <AttendanceHistoryModal isOpen={stack[stack.length-1] === 'attendance_history'} onClose={() => setStack(prev => prev.slice(0, -1))} studentId={data.student_id || ''} studentName={data.student_name || ''} />
-        <StudentLeaveRequestModal isOpen={stack[stack.length-1] === 'apply_leave'} onClose={() => setStack(prev => prev.slice(0, -1))} parentId={role === 'student' ? (data.linked_parent_id || data.user_id || '') : (data.user_id || '')} studentId={data.student_id || ''} schoolId={data.school_db_id || ''} />
-        <TransportTrackerModal isOpen={stack[stack.length-1] === 'live_transport'} onClose={() => setStack(prev => prev.slice(0, -1))} schoolId={data.school_db_id || ''} />
+        <AttendanceHistoryModal isOpen={modalStack[modalStack.length-1] === 'attendance_history'} onClose={closeModal} studentId={data.student_id || ''} studentName={data.student_name || ''} />
+        <StudentLeaveRequestModal isOpen={modalStack[modalStack.length-1] === 'apply_leave'} onClose={closeModal} parentId={role === 'student' ? (data.linked_parent_id || data.user_id || '') : (data.user_id || '')} studentId={data.student_id || ''} schoolId={data.school_db_id || ''} />
+        <TransportTrackerModal isOpen={modalStack[modalStack.length-1] === 'live_transport'} onClose={closeModal} schoolId={data.school_db_id || ''} />
         
         {/* HOMEWORK MODALS */}
-        <HomeworkListModal isOpen={stack.includes('daily_tasks')} onClose={() => setStack(prev => prev.filter(k => k !== 'daily_tasks' && k !== 'homework_details'))} dashboardData={data} credentials={credentials} isSubscribed={isUserActive} onLockClick={() => onShowLocked('parent')} onViewHomework={(hw) => { setSelectedHomework(hw); setStack(prev => [...prev, 'homework_details']); }} onRefresh={onRefresh} isRefreshing={isRefreshing} refreshTrigger={0} />
-        <ParentHomeworkModal isOpen={stack[stack.length-1] === 'homework_details'} onClose={() => setStack(prev => prev.slice(0, -1))} data={selectedHomework} onComplete={async () => { if(selectedHomework) await updateParentHomeworkStatus(credentials.school_id, data.class_name || '', data.section || '', data.student_id || '', credentials.mobile, selectedHomework.period, selectedHomework.subject, getISTDate()); setStack(prev => prev.slice(0, -1)); onRefresh(); }} isSubmitting={false} />
+        <HomeworkListModal isOpen={modalStack.includes('daily_tasks')} onClose={() => { if(modalStack.includes('homework_details')) closeModal(); closeModal(); }} dashboardData={data} credentials={credentials} isSubscribed={isUserActive} onLockClick={() => onShowLocked('parent')} onViewHomework={(hw) => { setSelectedHomework(hw); openModal('homework_details'); }} onRefresh={onRefresh} isRefreshing={isRefreshing} refreshTrigger={0} />
+        <ParentHomeworkModal isOpen={modalStack[modalStack.length-1] === 'homework_details'} onClose={closeModal} data={selectedHomework} onComplete={async () => { if(selectedHomework) await updateParentHomeworkStatus(credentials.school_id, data.class_name || '', data.section || '', data.student_id || '', credentials.mobile, selectedHomework.period, selectedHomework.subject, getISTDate()); closeModal(); onRefresh(); }} isSubmitting={false} />
 
         {/* SHARED */}
-        <GalleryModal isOpen={isGalleryOpen} onClose={() => setIsGalleryOpen(false)} schoolId={data.school_db_id || ''} userId={data.user_id || ''} canUpload={false} />
-        <ReportModal isOpen={isReportOpen} onClose={() => setIsReportOpen(false)} role={role} schoolId={data.school_db_id} userId={data.user_id} studentId={data.student_id} studentName={data.student_name} />
+        <GalleryModal isOpen={modalStack.includes('gallery')} onClose={closeModal} schoolId={data.school_db_id || ''} userId={data.user_id || ''} canUpload={false} />
+        <ReportModal isOpen={modalStack.includes('reports')} onClose={closeModal} role={role} schoolId={data.school_db_id} userId={data.user_id} studentId={data.student_id} studentName={data.student_name} />
     </div>
   );
 };
