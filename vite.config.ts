@@ -14,10 +14,9 @@ export default defineConfig(({ mode }) => {
       plugins: [
         react(),
         VitePWA({
-          // REMOVED 'registerType: autoUpdate' to stop reload loops
-          // registerType: 'prompt', 
+          registerType: 'autoUpdate', 
           devOptions: {
-            enabled: false // Disable PWA in dev to prevent caching issues while coding
+            enabled: true 
           },
           workbox: {
             globPatterns: ['**/*.{js,css,html,ico,png,svg,json}'],
@@ -27,13 +26,32 @@ export default defineConfig(({ mode }) => {
             navigateFallback: '/index.html',
             runtimeCaching: [
               {
+                // Supabase API requests should use StaleWhileRevalidate for offline support
                 urlPattern: /^https:\/\/.*\.supabase\.co\/.*/i,
-                handler: 'NetworkFirst', // Changed to NetworkFirst for better data consistency
+                handler: 'StaleWhileRevalidate', 
                 options: {
                   cacheName: 'supabase-api-cache',
                   expiration: {
-                    maxEntries: 50,
-                    maxAgeSeconds: 60 * 60 // 1 hour only
+                    maxEntries: 100,
+                    maxAgeSeconds: 60 * 60 * 24 // 24 hours
+                  },
+                  cacheableResponse: {
+                    statuses: [0, 200]
+                  }
+                }
+              },
+              {
+                // Font caching
+                urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
+                handler: 'CacheFirst',
+                options: {
+                  cacheName: 'google-fonts-cache',
+                  expiration: {
+                    maxEntries: 10,
+                    maxAgeSeconds: 60 * 60 * 24 * 365 // 1 year
+                  },
+                  cacheableResponse: {
+                    statuses: [0, 200]
                   }
                 }
               }
@@ -41,17 +59,15 @@ export default defineConfig(({ mode }) => {
           },
           includeAssets: ['android/android-launchericon-192-192.png', 'ios/180.png'], 
           manifest: {
-            // FIXED: Standardized ID and Scope to prevent ghost windows
-            id: 'vidyasetu-ai-production-v1', 
-            name: 'Vidyasetu AI',
-            short_name: 'Vidyasetu',
+            id: '/', 
+            name: 'VidyaSetu AI',
+            short_name: 'VidyaSetu',
             description: 'Premium School Management System with Real-time Tracking.',
             start_url: '/',
             scope: '/',
             display: 'standalone',
-            // Removed 'display_override' array to force standard standalone behavior across all Android versions
             background_color: '#ffffff',
-            theme_color: '#ffffff',
+            theme_color: '#10b981',
             orientation: 'portrait',
             categories: ['education', 'productivity'],
             icons: [
