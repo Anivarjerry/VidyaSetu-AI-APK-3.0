@@ -2,13 +2,23 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
-// import { registerSW } from 'virtual:pwa-register';
+// @ts-ignore
+import { registerSW } from 'virtual:pwa-register';
 
-// Disable auto-reload SW logic for now to ensure stability
-// const updateSW = registerSW({
-//   onNeedRefresh() {},
-//   onOfflineReady() {},
-// });
+// Register Service Worker for Offline Capabilities
+const updateSW = registerSW({
+  onNeedRefresh() {
+    console.log("New content available, reloading...");
+    // Optional: Show a toast here to let user reload manually
+    // updateSW(true); // Auto update
+  },
+  onOfflineReady() {
+    console.log("App is ready for offline usage.");
+  },
+  onRegisterError(error: any) {
+    console.error('SW registration error', error);
+  },
+});
 
 const container = document.getElementById('root');
 if (container) {

@@ -14,9 +14,12 @@ export default defineConfig(({ mode }) => {
       plugins: [
         react(),
         VitePWA({
+          // Manual injection allows better control in index.tsx
+          injectRegister: null, 
           registerType: 'autoUpdate', 
           devOptions: {
-            enabled: true 
+            enabled: true,
+            type: 'module',
           },
           workbox: {
             globPatterns: ['**/*.{js,css,html,ico,png,svg,json}'],
@@ -24,24 +27,11 @@ export default defineConfig(({ mode }) => {
             clientsClaim: true,
             skipWaiting: true,
             navigateFallback: '/index.html',
+            // Do not cache Supabase/API calls in the SW cache, let the app logic handle it via IDB
+            navigateFallbackDenylist: [/^\/api/, /^https:\/\/.*\.supabase\.co/],
             runtimeCaching: [
               {
-                // Supabase API requests should use StaleWhileRevalidate for offline support
-                urlPattern: /^https:\/\/.*\.supabase\.co\/.*/i,
-                handler: 'StaleWhileRevalidate', 
-                options: {
-                  cacheName: 'supabase-api-cache',
-                  expiration: {
-                    maxEntries: 100,
-                    maxAgeSeconds: 60 * 60 * 24 // 24 hours
-                  },
-                  cacheableResponse: {
-                    statuses: [0, 200]
-                  }
-                }
-              },
-              {
-                // Font caching
+                // Fonts - Cache First
                 urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
                 handler: 'CacheFirst',
                 options: {
@@ -54,16 +44,30 @@ export default defineConfig(({ mode }) => {
                     statuses: [0, 200]
                   }
                 }
+              },
+              {
+                // Static Assets (Images) - Stale While Revalidate
+                urlPattern: /\.(?:png|jpg|jpeg|svg|ico)$/,
+                handler: 'StaleWhileRevalidate',
+                options: {
+                  cacheName: 'images-cache',
+                  expiration: {
+                    maxEntries: 50,
+                    maxAgeSeconds: 30 * 24 * 60 * 60, // 30 Days
+                  },
+                },
               }
             ]
           },
           includeAssets: ['android/android-launchericon-192-192.png', 'ios/180.png'], 
           manifest: {
-            id: '/', 
+            // Fixed ID prevents duplicate installs if URL changes slightly
+            id: 'vidyasetu-ai-app-v2', 
             name: 'VidyaSetu AI',
             short_name: 'VidyaSetu',
             description: 'Premium School Management System with Real-time Tracking.',
-            start_url: '/',
+            // Adding query param ensures unique PWA session, fixing duplicate apps on some launchers
+            start_url: '/?source=pwa', 
             scope: '/',
             display: 'standalone',
             background_color: '#ffffff',
