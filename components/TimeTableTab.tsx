@@ -146,7 +146,7 @@ export const TimeTableTab: React.FC<TimeTableTabProps> = ({ schoolId, schoolName
     const displayPeriods = (totalPeriods && totalPeriods > 0) ? totalPeriods : 8;
 
     return (
-        <div className="flex flex-col h-full bg-slate-50 dark:bg-dark-950 pb-40">
+        <div className="flex flex-col h-full bg-slate-50 dark:bg-dark-950">
             {/* Header Controls */}
             <div className="sticky top-0 z-10 bg-white/80 dark:bg-dark-900/80 backdrop-blur-xl p-4 space-y-4 shadow-sm">
                 <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2">
@@ -195,7 +195,7 @@ export const TimeTableTab: React.FC<TimeTableTabProps> = ({ schoolId, schoolName
             </div>
 
             {/* Grid Content */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+            <div className="flex-1 overflow-y-auto p-4 space-y-3 pb-40">
                 {!selectedClass ? (
                     <div className="flex flex-col items-center justify-center h-64 text-slate-400 opacity-50">
                         <Calendar size={48} className="mb-4" />
