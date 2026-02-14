@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { DashboardData, LoginRequest, PeriodData } from '../types';
 import { UserCheck, CalendarRange, History, BookOpen, Lock, ChevronRight, CheckCircle2, Sparkles, Image as ImageIcon, FileText, FileCheck } from 'lucide-react';
 import { useThemeLanguage } from '../contexts/ThemeLanguageContext';
-import { useNavigation } from '../contexts/NavigationContext'; // Import Global Nav
+import { useModalBackHandler } from '../hooks/useModalBackHandler';
 import { AttendanceModal } from './AttendanceModal';
 import { LeaveRequestModal } from './LeaveModals';
 import { TeacherHistoryModal } from './TeacherHistoryModal';
@@ -30,14 +30,19 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
   onRefresh
 }) => {
   const { t } = useThemeLanguage();
-  const { modalStack, openModal, closeModal } = useNavigation();
+  
+  // Local State for Modals (Replaces NavigationContext)
+  const [activeModal, setActiveModal] = useState<string | null>(null);
   const [selectedPeriod, setSelectedPeriod] = useState<number | null>(null);
+
+  // Back Button Handler
+  useModalBackHandler(!!activeModal, () => setActiveModal(null));
 
   const handlePeriodSubmit = async (pData: PeriodData) => {
     const success = await submitPeriodData(credentials.school_id, credentials.mobile, pData, data.user_name, 'submit');
     if (success) { 
         // Close Edit Period Modal, but Keep Homework Grid Open
-        closeModal(); 
+        setActiveModal('homework'); 
         onRefresh(); 
     } else alert("Submission Failed!");
   };
@@ -53,12 +58,8 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
           onShowLocked();
           return;
       }
-      openModal(key);
+      setActiveModal(key);
   };
-
-  // Check active modals
-  const isHomeworkGridOpen = modalStack.includes('homework');
-  const isEditPeriodOpen = modalStack.includes('edit_period');
 
   return (
     <div className="space-y-4 pb-10">
@@ -66,7 +67,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
        <div className="space-y-3">
             {/* Gallery */}
             <div 
-                onClick={() => isSchoolActive ? openModal('gallery') : onShowLocked()} 
+                onClick={() => isSchoolActive ? setActiveModal('gallery') : onShowLocked()} 
                 className={`glass-card p-5 rounded-[2.5rem] flex items-center justify-between cursor-pointer group active:scale-[0.98] transition-all shadow-sm ${!isSchoolActive ? 'bg-rose-50 dark:bg-rose-950/10 border-rose-100 dark:border-rose-900/20' : ''}`}
             >
                 <div className="flex items-center gap-4 text-left">
@@ -83,7 +84,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
 
             {/* Exam Management */}
             <div 
-                onClick={() => isSchoolActive ? openModal('exam_mgmt') : onShowLocked()} 
+                onClick={() => isSchoolActive ? setActiveModal('exam_mgmt') : onShowLocked()} 
                 className={`glass-card p-5 rounded-[2.5rem] flex items-center justify-between cursor-pointer group active:scale-[0.98] transition-all shadow-sm ${!isSchoolActive ? 'bg-rose-50 dark:bg-rose-950/10 border-rose-100 dark:border-rose-900/20' : ''}`}
             >
                 <div className="flex items-center gap-4 text-left">
@@ -100,7 +101,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
 
             {/* Download History */}
             <div 
-                onClick={() => isSchoolActive ? openModal('reports') : onShowLocked()} 
+                onClick={() => isSchoolActive ? setActiveModal('reports') : onShowLocked()} 
                 className={`glass-card p-5 rounded-[2.5rem] flex items-center justify-between cursor-pointer group active:scale-[0.98] transition-all shadow-sm ${!isSchoolActive ? 'bg-rose-50 dark:bg-rose-950/10 border-rose-100 dark:border-rose-900/20' : ''}`}
             >
                 <div className="flex items-center gap-4 text-left">
@@ -128,13 +129,13 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
           ))}
        </div>
 
-       {/* MODALS using Global Stack */}
-       <AttendanceModal isOpen={modalStack[modalStack.length-1] === 'attendance'} onClose={closeModal} schoolId={data.school_db_id || ''} teacherId={data.user_id || ''} />
-       <LeaveRequestModal isOpen={modalStack[modalStack.length-1] === 'leave'} onClose={closeModal} userId={data.user_id || ''} schoolId={data.school_db_id || ''} />
-       <TeacherHistoryModal isOpen={modalStack[modalStack.length-1] === 'history'} onClose={closeModal} credentials={credentials} />
+       {/* MODALS */}
+       <AttendanceModal isOpen={activeModal === 'attendance'} onClose={() => setActiveModal(null)} schoolId={data.school_db_id || ''} teacherId={data.user_id || ''} />
+       <LeaveRequestModal isOpen={activeModal === 'leave'} onClose={() => setActiveModal(null)} userId={data.user_id || ''} schoolId={data.school_db_id || ''} />
+       <TeacherHistoryModal isOpen={activeModal === 'history'} onClose={() => setActiveModal(null)} credentials={credentials} />
        
        {/* HOMEWORK GRID MODAL */}
-       <Modal isOpen={isHomeworkGridOpen} onClose={closeModal} title="TODAY'S PORTAL">
+       <Modal isOpen={activeModal === 'homework'} onClose={() => setActiveModal(null)} title="TODAY'S PORTAL">
            <div className="space-y-4 premium-subview-enter">
                <div className="flex items-center gap-3 bg-brand-50 dark:bg-brand-500/10 p-5 rounded-[2.5rem] border border-brand-100 dark:border-brand-500/20">
                    <div className="w-14 h-14 bg-white dark:bg-dark-900 rounded-2xl flex items-center justify-center text-brand-600 shadow-sm shrink-0"><Sparkles size={28} /></div>
@@ -146,7 +147,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                        const pData = data?.periods?.find(p => p.period_number === num); 
                        const isSubmitted = pData?.status === 'submitted'; 
                        return (
-                           <div key={num} onClick={(e) => { e.stopPropagation(); setSelectedPeriod(num); openModal('edit_period'); }} className={`glass-card p-4 rounded-[2rem] transition-all h-36 flex flex-col justify-between cursor-pointer active:scale-95 ${isSubmitted ? 'border-brand-500/30 bg-brand-50 dark:bg-brand-500/5 shadow-inner' : ''}`}>
+                           <div key={num} onClick={(e) => { e.stopPropagation(); setSelectedPeriod(num); setActiveModal('edit_period'); }} className={`glass-card p-4 rounded-[2rem] transition-all h-36 flex flex-col justify-between cursor-pointer active:scale-95 ${isSubmitted ? 'border-brand-500/30 bg-brand-50 dark:bg-brand-500/5 shadow-inner' : ''}`}>
                                <div className="flex justify-between items-start text-left"><span className="text-[9px] font-black uppercase text-slate-400 tracking-widest">P {num}</span>{isSubmitted && <div className="text-brand-500"><CheckCircle2 size={16} /></div>}</div>
                                <div className="min-w-0 text-left"><p className="text-sm font-black truncate uppercase text-slate-800 dark:text-white leading-tight">{pData?.subject || 'Waiting'}</p><p className="text-[9px] font-bold text-slate-400 uppercase truncate">{pData?.class_name || 'Empty'}</p></div>
                                <button className={`w-full py-2 rounded-2xl text-[8px] font-black uppercase tracking-widest ${isSubmitted ? 'bg-brand-500 text-white shadow-lg' : 'bg-slate-100 dark:bg-slate-700 text-slate-400'}`}>{isSubmitted ? 'EDIT' : 'SET'}</button>
@@ -155,13 +156,13 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                    })}
                </div>
                
-               <button onClick={closeModal} className="w-full py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest border-t border-slate-50 dark:border-white/5">Close Portal</button>
+               <button onClick={() => setActiveModal(null)} className="w-full py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest border-t border-slate-50 dark:border-white/5">Close Portal</button>
            </div>
        </Modal>
        
        <PeriodModal 
-           isOpen={isEditPeriodOpen} 
-           onClose={closeModal} 
+           isOpen={activeModal === 'edit_period'} 
+           onClose={() => setActiveModal('homework')} 
            periodNumber={selectedPeriod || 1} 
            onSubmit={handlePeriodSubmit} 
            initialData={data?.periods?.find(p => p.period_number === selectedPeriod)} 
@@ -169,9 +170,9 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
        />
 
        {/* Extra Shared Modals */}
-       <GalleryModal isOpen={modalStack.includes('gallery')} onClose={closeModal} schoolId={data.school_db_id || ''} userId={data.user_id || ''} canUpload={true} />
-       <ExamModal isOpen={modalStack.includes('exam_mgmt')} onClose={closeModal} role='teacher' schoolId={data.school_db_id || ''} userId={data.user_id || ''} assignedSubject={data.assigned_subject} />
-       <ReportModal isOpen={modalStack.includes('reports')} onClose={closeModal} role='teacher' schoolId={data.school_db_id} userId={data.user_id} />
+       <GalleryModal isOpen={activeModal === 'gallery'} onClose={() => setActiveModal(null)} schoolId={data.school_db_id || ''} userId={data.user_id || ''} canUpload={true} />
+       <ExamModal isOpen={activeModal === 'exam_mgmt'} onClose={() => setActiveModal(null)} role='teacher' schoolId={data.school_db_id || ''} userId={data.user_id || ''} assignedSubject={data.assigned_subject} />
+       <ReportModal isOpen={activeModal === 'reports'} onClose={() => setActiveModal(null)} role='teacher' schoolId={data.school_db_id} userId={data.user_id} />
     </div>
   );
 };

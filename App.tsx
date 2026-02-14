@@ -72,9 +72,11 @@ const AppContent: React.FC = () => {
       if ('serviceWorker' in navigator) {
           try {
               // Standard registration without scope complications
-              await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+              // Changed to relative path './' to fix origin mismatch errors
+              await navigator.serviceWorker.register('./firebase-messaging-sw.js');
           } catch (err) {
-              console.error('Service Worker Failed', err);
+              // Fail silently or log warning, but don't crash
+              console.warn('Service Worker Registration Warning:', err);
           }
       }
 

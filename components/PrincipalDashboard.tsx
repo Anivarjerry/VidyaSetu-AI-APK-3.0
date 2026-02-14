@@ -2,7 +2,8 @@
 import React, { useState, useEffect } from 'react';
 import { DashboardData, LoginRequest, SearchPerson, FullHistory } from '../types';
 import { Megaphone, MapPin, BarChart2, BookOpen, CalendarRange, UserCheck, Award, Image as ImageIcon, Download, Lock, ChevronRight, Users, ShieldCheck, Search, Filter, FileText, Loader2, User, Check, UserX, Phone, CheckCircle2, RefreshCw, Calendar, ListFilter } from 'lucide-react';
-import { useNavigation } from '../contexts/NavigationContext'; // Global Nav
+import { useModalBackHandler } from '../hooks/useModalBackHandler';
+import { useNavigation } from '../contexts/NavigationContext'; // REMOVED THIS USAGE
 import { Modal } from './Modal';
 import { NoticeModal } from './NoticeModal';
 import { TransportTrackerModal } from './TransportTrackerModal';
@@ -37,8 +38,11 @@ export const PrincipalDashboard: React.FC<PrincipalDashboardProps> = ({
   viewMode
 }) => {
   const { t } = useThemeLanguage();
-  const { modalStack, openModal, closeModal } = useNavigation();
+  const [activeModal, setActiveModal] = useState<string | null>(null);
   
+  // Back Handler for Local Modals
+  useModalBackHandler(!!activeModal, () => setActiveModal(null));
+
   // Approvals & Visitors
   const [pendingApprovals, setPendingApprovals] = useState<any[]>([]);
   const [isLoadingApprovals, setIsLoadingApprovals] = useState(false);
@@ -62,10 +66,9 @@ export const PrincipalDashboard: React.FC<PrincipalDashboardProps> = ({
   const [filterClass, setFilterClass] = useState('');
   const [schoolClasses, setSchoolClasses] = useState<any[]>([]);
 
-  // --- LOAD INITIAL DATA (Classes needed for Report Modal Filter) ---
   useEffect(() => {
       if (data.school_db_id) {
-          loadClasses(); // Load classes immediately for filters
+          loadClasses(); 
           if (viewMode === 'action') {
               loadRecentPeople();
           }
@@ -85,7 +88,6 @@ export const PrincipalDashboard: React.FC<PrincipalDashboardProps> = ({
       setLoadingRecent(false);
   };
 
-  // Search Logic
   useEffect(() => {
       const delayDebounceFn = setTimeout(async () => {
           if (searchTerm.length >= 2 && data.school_db_id) {
@@ -170,11 +172,11 @@ export const PrincipalDashboard: React.FC<PrincipalDashboardProps> = ({
       setLoadingVisitors(false);
   };
 
-  // Effects to load data when stack changes
-  React.useEffect(() => {
-      if (modalStack.includes('approvals')) handleLoadApprovals();
-      if (modalStack.includes('visitor_logs')) handleLoadVisitorLogs();
-  }, [modalStack, visitorFilter]);
+  // Effects to load data when modal opens
+  useEffect(() => {
+      if (activeModal === 'approvals') handleLoadApprovals();
+      if (activeModal === 'visitor_logs') handleLoadVisitorLogs();
+  }, [activeModal, visitorFilter]);
 
   const cards = [
     { key: "approvals", title: "Identity Approvals", subtitle: "Verify New Signups", icon: <Users size={24} /> },
@@ -204,7 +206,7 @@ export const PrincipalDashboard: React.FC<PrincipalDashboardProps> = ({
                         onShowPayModal();
                         return;
                     }
-                    openModal(item.key);
+                    setActiveModal(item.key);
                 }} 
                 className={`glass-card p-5 rounded-[2.5rem] flex items-center justify-between cursor-pointer group active:scale-[0.98] transition-all shadow-sm ${!isSchoolActive ? 'bg-rose-50 dark:bg-rose-950/10 border-rose-100 dark:border-rose-900/20' : ''}`}
               >
@@ -333,20 +335,20 @@ export const PrincipalDashboard: React.FC<PrincipalDashboardProps> = ({
       )}
 
       {/* MODALS */}
-      <NoticeModal isOpen={modalStack[modalStack.length-1] === 'notice'} onClose={closeModal} credentials={credentials} />
-      <TransportTrackerModal isOpen={modalStack[modalStack.length-1] === 'transport'} onClose={closeModal} schoolId={data.school_db_id || ''} />
-      <AnalyticsModal isOpen={modalStack[modalStack.length-1] === 'teacher_analytics'} onClose={closeModal} schoolCode={credentials.school_id} />
-      <HomeworkAnalyticsModal isOpen={modalStack[modalStack.length-1] === 'parents_analytics'} onClose={closeModal} schoolCode={credentials.school_id} />
-      <StaffLeaveManagementModal isOpen={modalStack[modalStack.length-1] === 'leave_management'} onClose={closeModal} schoolId={data.school_db_id || ''} />
-      <AttendanceModal isOpen={modalStack[modalStack.length-1] === 'attendance'} onClose={closeModal} schoolId={data.school_db_id || ''} teacherId={data.user_id || ''} />
+      <NoticeModal isOpen={activeModal === 'notice'} onClose={() => setActiveModal(null)} credentials={credentials} />
+      <TransportTrackerModal isOpen={activeModal === 'transport'} onClose={() => setActiveModal(null)} schoolId={data.school_db_id || ''} />
+      <AnalyticsModal isOpen={activeModal === 'teacher_analytics'} onClose={() => setActiveModal(null)} schoolCode={credentials.school_id} />
+      <HomeworkAnalyticsModal isOpen={activeModal === 'parents_analytics'} onClose={() => setActiveModal(null)} schoolCode={credentials.school_id} />
+      <StaffLeaveManagementModal isOpen={activeModal === 'leave_management'} onClose={() => setActiveModal(null)} schoolId={data.school_db_id || ''} />
+      <AttendanceModal isOpen={activeModal === 'attendance'} onClose={() => setActiveModal(null)} schoolId={data.school_db_id || ''} teacherId={data.user_id || ''} />
       
-      {data && (<GalleryModal isOpen={modalStack.includes('gallery')} onClose={closeModal} schoolId={data.school_db_id || ''} userId={data.user_id || ''} canUpload={true} />)}
+      {data && (<GalleryModal isOpen={activeModal === 'gallery'} onClose={() => setActiveModal(null)} schoolId={data.school_db_id || ''} userId={data.user_id || ''} canUpload={true} />)}
       {/* Updated ReportModal to include classOptions from schoolClasses state */}
-      {data && (<ReportModal isOpen={modalStack.includes('report')} onClose={closeModal} role='principal' schoolId={data.school_db_id} userId={data.user_id} schoolName={data.school_name} principalName={data.user_name} classOptions={schoolClasses.map(c => c.class_name)} />)}
-      {data && (<ExamModal isOpen={modalStack.includes('exam')} onClose={closeModal} role='principal' schoolId={data.school_db_id || ''} userId={data.user_id || ''} />)}
+      {data && (<ReportModal isOpen={activeModal === 'report'} onClose={() => setActiveModal(null)} role='principal' schoolId={data.school_db_id} userId={data.user_id} schoolName={data.school_name} principalName={data.user_name} classOptions={schoolClasses.map(c => c.class_name)} />)}
+      {data && (<ExamModal isOpen={activeModal === 'exam'} onClose={() => setActiveModal(null)} role='principal' schoolId={data.school_db_id || ''} userId={data.user_id || ''} />)}
 
       {/* APPROVAL MODAL */}
-      <Modal isOpen={modalStack.includes('approvals')} onClose={closeModal} title="PENDING APPROVALS">
+      <Modal isOpen={activeModal === 'approvals'} onClose={() => setActiveModal(null)} title="PENDING APPROVALS">
           <div className="flex flex-col h-[70vh]">
               {isLoadingApprovals ? (
                   <div className="flex items-center justify-center h-full"><Loader2 className="animate-spin text-indigo-500" size={32} /></div>
@@ -378,7 +380,7 @@ export const PrincipalDashboard: React.FC<PrincipalDashboardProps> = ({
       </Modal>
 
       {/* VISITOR LOGS MODAL */}
-      <Modal isOpen={modalStack.includes('visitor_logs')} onClose={closeModal} title="VISITOR LOGS">
+      <Modal isOpen={activeModal === 'visitor_logs'} onClose={() => setActiveModal(null)} title="VISITOR LOGS">
           <div className="flex flex-col h-[75vh]">
               <div className="flex items-center gap-2 mb-4 bg-slate-50 dark:bg-white/5 p-2 rounded-2xl overflow-x-auto no-scrollbar">
                   <button onClick={() => setVisitorFilter('today')} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase whitespace-nowrap transition-all ${visitorFilter === 'today' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'text-slate-400 bg-white dark:bg-dark-900 border border-slate-100 dark:border-white/5'}`}>Today</button>
