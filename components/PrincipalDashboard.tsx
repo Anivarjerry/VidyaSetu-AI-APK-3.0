@@ -1,7 +1,6 @@
-
 import React, { useState, useEffect } from 'react';
 import { DashboardData, LoginRequest, SearchPerson, FullHistory } from '../types';
-import { Megaphone, MapPin, BarChart2, BookOpen, CalendarRange, UserCheck, Award, Image as ImageIcon, Download, Lock, ChevronRight, Users, ShieldCheck, Search, Filter, FileText, Loader2, User, Check, UserX, Phone, CheckCircle2 } from 'lucide-react';
+import { Megaphone, MapPin, BarChart2, BookOpen, CalendarRange, UserCheck, Award, Image as ImageIcon, Download, Lock, ChevronRight, Users, ShieldCheck, Search, Filter, FileText, Loader2, User, Check, UserX, Phone, CheckCircle2, RefreshCw, Calendar, ListFilter } from 'lucide-react';
 import { useModalBackHandler } from '../hooks/useModalBackHandler';
 import { Modal } from './Modal';
 import { NoticeModal } from './NoticeModal';
@@ -14,7 +13,7 @@ import { ExamModal } from './ExamModal';
 import { GalleryModal } from './GalleryModal';
 import { ReportModal } from './ReportModal';
 import { fetchPendingApprovals, updateUserApprovalStatus } from '../services/authService';
-import { fetchVisitorEntries, searchPeople, fetchStudentFullHistory, fetchStaffFullHistory } from '../services/dashboardService';
+import { fetchVisitorEntries, searchPeople, fetchRecentPeople, fetchStudentFullHistory, fetchStaffFullHistory, fetchSchoolClasses } from '../services/dashboardService';
 import { generate360Report } from '../services/reportService';
 import { useThemeLanguage } from '../contexts/ThemeLanguageContext';
 
@@ -24,7 +23,7 @@ interface PrincipalDashboardProps {
   isSchoolActive: boolean;
   onShowPayModal: () => void;
   onRefresh: () => void;
-  viewMode: 'home' | 'action'; // Added viewMode prop to control tabs
+  viewMode: 'home' | 'action'; 
 }
 
 export const PrincipalDashboard: React.FC<PrincipalDashboardProps> = ({ 
@@ -55,9 +54,16 @@ export const PrincipalDashboard: React.FC<PrincipalDashboardProps> = ({
   const [searchRole, setSearchRole] = useState<'student' | 'staff'>('student');
   const [searchTerm, setSearchTerm] = useState('');
   const [searchResults, setSearchResults] = useState<SearchPerson[]>([]);
+  const [recentList, setRecentList] = useState<SearchPerson[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [loadingRecent, setLoadingRecent] = useState(false);
   const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null);
   const [loadingHistory, setLoadingHistory] = useState(false);
+
+  // Filters
+  const [showFilters, setShowFilters] = useState(false);
+  const [filterClass, setFilterClass] = useState('');
+  const [schoolClasses, setSchoolClasses] = useState<any[]>([]);
 
   useModalBackHandler(stack.length > 0 || isGalleryOpen || isReportOpen || isExamModalOpen || !!selectedVisitorLog || !!selectedPersonId, () => {
       if (selectedPersonId) setSelectedPersonId(null);
@@ -67,6 +73,68 @@ export const PrincipalDashboard: React.FC<PrincipalDashboardProps> = ({
       else if (isExamModalOpen) setIsExamModalOpen(false);
       else setStack(prev => prev.slice(0, -1));
   });
+
+  // --- LOAD INITIAL DATA FOR ACTION TAB ---
+  useEffect(() => {
+      if (viewMode === 'action' && data.school_db_id) {
+          loadRecentPeople();
+          loadClasses();
+      }
+  }, [viewMode, searchRole, filterClass]); 
+
+  const loadClasses = async () => {
+      const cls = await fetchSchoolClasses(data.school_db_id!);
+      setSchoolClasses(cls);
+  };
+
+  const loadRecentPeople = async () => {
+      setLoadingRecent(true);
+      const list = await fetchRecentPeople(data.school_db_id!, searchRole, filterClass);
+      setRecentList(list);
+      setLoadingRecent(false);
+  };
+
+  // Search Logic
+  useEffect(() => {
+      const delayDebounceFn = setTimeout(async () => {
+          if (searchTerm.length >= 2 && data.school_db_id) {
+              setIsSearching(true);
+              const results = await searchPeople(data.school_db_id, searchTerm, searchRole);
+              setSearchResults(results);
+              setIsSearching(false);
+          } else {
+              setSearchResults([]);
+          }
+      }, 500);
+
+      return () => clearTimeout(delayDebounceFn);
+  }, [searchTerm, searchRole, data.school_db_id]);
+
+  const handleGenerate360 = async (person: SearchPerson) => {
+      if (!data.school_db_id) return;
+      setLoadingHistory(true);
+      setSelectedPersonId(person.id);
+      
+      let fullData: FullHistory | null = null;
+      try {
+          if (person.role === 'student') {
+              fullData = await fetchStudentFullHistory(person.id);
+          } else {
+              fullData = await fetchStaffFullHistory(person.id);
+          }
+
+          if (fullData) {
+              generate360Report(fullData, data.school_name, data.user_name, "All Time Record"); 
+          } else {
+              alert("Could not fetch full data. Please check if the user profile is linked correctly.");
+          }
+      } catch(e) {
+          alert("Error generating report.");
+      }
+      
+      setLoadingHistory(false);
+      setSelectedPersonId(null);
+  };
 
   // Loaders
   const handleLoadApprovals = async () => {
@@ -109,44 +177,6 @@ export const PrincipalDashboard: React.FC<PrincipalDashboardProps> = ({
       const logs = await fetchVisitorEntries(data.school_db_id, startDate, endDate);
       setVisitorLogs(logs);
       setLoadingVisitors(false);
-  };
-
-  // Search Logic
-  useEffect(() => {
-      const delayDebounceFn = setTimeout(async () => {
-          if (searchTerm.length >= 2 && data.school_db_id) {
-              setIsSearching(true);
-              const results = await searchPeople(data.school_db_id, searchTerm, searchRole);
-              setSearchResults(results);
-              setIsSearching(false);
-          } else {
-              setSearchResults([]);
-          }
-      }, 500);
-
-      return () => clearTimeout(delayDebounceFn);
-  }, [searchTerm, searchRole, data.school_db_id]);
-
-  const handleGenerate360 = async (person: SearchPerson) => {
-      if (!data.school_db_id) return;
-      setLoadingHistory(true);
-      setSelectedPersonId(person.id);
-      
-      let fullData: FullHistory | null = null;
-      if (person.role === 'student') {
-          fullData = await fetchStudentFullHistory(person.id);
-      } else {
-          fullData = await fetchStaffFullHistory(person.id);
-      }
-
-      if (fullData) {
-          generate360Report(fullData, data.school_name, data.user_name, "All Time Record"); // Pass Principal Name
-      } else {
-          alert("Could not fetch full history.");
-      }
-      
-      setLoadingHistory(false);
-      setSelectedPersonId(null);
   };
 
   // Effects to load data when stack changes
@@ -204,60 +234,96 @@ export const PrincipalDashboard: React.FC<PrincipalDashboardProps> = ({
           /* ACTION TAB - ADVANCED SEARCH & REPORTS */
           <div className="flex flex-col h-full animate-in slide-in-from-bottom-4 duration-500">
               <div className="sticky top-0 z-20 bg-[#F8FAFC]/90 dark:bg-dark-950/90 backdrop-blur-xl pb-4">
+                  {/* ROLE SWITCHER */}
                   <div className="flex bg-slate-100 dark:bg-white/5 p-1.5 rounded-[2rem] border border-slate-200 dark:border-white/10 mb-4 shadow-inner">
-                      <button onClick={() => setSearchRole('student')} className={`flex-1 py-3.5 rounded-[1.6rem] text-[10px] font-black uppercase transition-all flex items-center justify-center gap-2 ${searchRole === 'student' ? 'bg-white dark:bg-brand-500/10 text-brand-600 dark:text-brand-400 shadow-sm border border-slate-100 dark:border-white/5' : 'text-slate-400'}`}>
+                      <button onClick={() => { setSearchRole('student'); setSearchTerm(''); }} className={`flex-1 py-3.5 rounded-[1.6rem] text-[10px] font-black uppercase transition-all flex items-center justify-center gap-2 ${searchRole === 'student' ? 'bg-white dark:bg-brand-500/10 text-brand-600 dark:text-brand-400 shadow-sm border border-slate-100 dark:border-white/5' : 'text-slate-400'}`}>
                           <Award size={14} /> Student Search
                       </button>
-                      <button onClick={() => setSearchRole('staff')} className={`flex-1 py-3.5 rounded-[1.6rem] text-[10px] font-black uppercase transition-all flex items-center justify-center gap-2 ${searchRole === 'staff' ? 'bg-white dark:bg-brand-500/10 text-brand-600 dark:text-brand-400 shadow-sm border border-slate-100 dark:border-white/5' : 'text-slate-400'}`}>
+                      <button onClick={() => { setSearchRole('staff'); setSearchTerm(''); }} className={`flex-1 py-3.5 rounded-[1.6rem] text-[10px] font-black uppercase transition-all flex items-center justify-center gap-2 ${searchRole === 'staff' ? 'bg-white dark:bg-brand-500/10 text-brand-600 dark:text-brand-400 shadow-sm border border-slate-100 dark:border-white/5' : 'text-slate-400'}`}>
                           <UserCheck size={14} /> Staff Search
                       </button>
                   </div>
 
-                  <div className="relative">
-                      <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                      <input 
-                          type="text" 
-                          placeholder={searchRole === 'student' ? "Name, Father's Name, Mother's Name..." : "Name, Mobile Number..."}
-                          value={searchTerm}
-                          onChange={(e) => setSearchTerm(e.target.value)}
-                          className="w-full pl-12 pr-12 py-4 bg-white dark:bg-dark-900 border border-slate-200 dark:border-white/10 rounded-[2rem] outline-none focus:ring-2 focus:ring-brand-500/20 text-xs font-bold text-slate-800 dark:text-white shadow-sm transition-all uppercase tracking-widest"
-                      />
-                      {isSearching && <div className="absolute right-5 top-1/2 -translate-y-1/2"><Loader2 className="animate-spin text-brand-500" size={18} /></div>}
+                  {/* SEARCH BAR & FILTER TOGGLE & REFRESH */}
+                  <div className="flex gap-2 items-center mb-4">
+                      <div className="relative flex-1">
+                          <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                          <input 
+                              type="text" 
+                              placeholder={searchRole === 'student' ? "Name, Father's Name..." : "Name, Mobile Number..."}
+                              value={searchTerm}
+                              onChange={(e) => setSearchTerm(e.target.value)}
+                              className="w-full pl-12 pr-10 py-4 bg-white dark:bg-dark-900 border border-slate-200 dark:border-white/10 rounded-[2rem] outline-none focus:ring-2 focus:ring-brand-500/20 text-xs font-bold text-slate-800 dark:text-white shadow-sm transition-all uppercase tracking-widest"
+                          />
+                          {isSearching && <div className="absolute right-4 top-1/2 -translate-y-1/2"><Loader2 className="animate-spin text-brand-500" size={16} /></div>}
+                      </div>
+                      
+                      <button 
+                          onClick={() => setShowFilters(!showFilters)} 
+                          className={`w-14 h-14 rounded-[1.8rem] flex items-center justify-center transition-all active:scale-95 ${showFilters ? 'bg-brand-500 text-white shadow-lg shadow-brand-500/20' : 'bg-white dark:bg-dark-900 border border-slate-200 dark:border-white/10 text-slate-400'}`}
+                      >
+                          <ListFilter size={20} />
+                      </button>
+
+                      <button 
+                          onClick={() => { loadRecentPeople(); setSearchTerm(''); }} 
+                          className="w-14 h-14 rounded-[1.8rem] bg-white dark:bg-dark-900 border border-slate-200 dark:border-white/10 flex items-center justify-center text-emerald-500 active:scale-95 transition-all shadow-sm"
+                      >
+                          <RefreshCw size={20} className={loadingRecent ? 'animate-spin' : ''} />
+                      </button>
                   </div>
+
+                  {/* FILTER PANEL */}
+                  {showFilters && (
+                      <div className="p-4 bg-white dark:bg-dark-900 rounded-[2rem] border border-slate-100 dark:border-white/5 shadow-sm mb-4 animate-in slide-in-from-top-2">
+                          <p className="text-[9px] font-black uppercase text-slate-400 mb-2 ml-1">Smart Filters</p>
+                          <div className="flex gap-3">
+                              {searchRole === 'student' && (
+                                  <select 
+                                      value={filterClass} 
+                                      onChange={(e) => setFilterClass(e.target.value)} 
+                                      className="flex-1 p-3 bg-slate-50 dark:bg-white/5 border-none rounded-xl text-xs font-bold uppercase outline-none"
+                                  >
+                                      <option value="">All Classes</option>
+                                      {schoolClasses.map(c => <option key={c.id} value={c.class_name}>{c.class_name}</option>)}
+                                  </select>
+                              )}
+                              <select className="flex-1 p-3 bg-slate-50 dark:bg-white/5 border-none rounded-xl text-xs font-bold uppercase outline-none text-slate-400 cursor-not-allowed" disabled>
+                                  <option>Session 2024-25</option>
+                              </select>
+                          </div>
+                      </div>
+                  )}
               </div>
 
+              {/* LIST VIEW */}
               <div className="flex-1 overflow-y-auto no-scrollbar pb-20 space-y-3">
-                  {searchTerm.length < 2 ? (
-                      <div className="flex flex-col items-center justify-center h-64 opacity-40 text-center space-y-4">
-                          <Filter size={48} className="text-slate-300 dark:text-slate-600" />
-                          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Type at least 2 chars to search</p>
-                      </div>
-                  ) : searchResults.length === 0 && !isSearching ? (
-                      <div className="flex flex-col items-center justify-center h-64 opacity-40 text-center">
-                          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">No records found</p>
-                      </div>
+                  {/* CASE 1: SEARCHING ACTIVE */}
+                  {searchTerm.length >= 2 ? (
+                      searchResults.length === 0 && !isSearching ? (
+                          <div className="text-center py-20 opacity-40 font-black text-[10px] uppercase tracking-widest">No matching records</div>
+                      ) : (
+                          searchResults.map((person) => (
+                              <PersonCard key={person.id} person={person} onAction={handleGenerate360} loading={loadingHistory && selectedPersonId === person.id} />
+                          ))
+                      )
                   ) : (
-                      searchResults.map((person) => (
-                          <div key={person.id} className="p-5 bg-white dark:bg-dark-900 rounded-[2.5rem] border border-slate-100 dark:border-white/5 shadow-sm flex items-center justify-between group active:scale-[0.98] transition-all">
-                              <div className="flex items-center gap-4">
-                                  <div className="w-12 h-12 bg-slate-50 dark:bg-white/5 rounded-2xl flex items-center justify-center text-slate-400 font-black text-lg">
-                                      {person.name.charAt(0)}
-                                  </div>
-                                  <div>
-                                      <h4 className="font-black text-slate-800 dark:text-white uppercase text-sm leading-tight">{person.name}</h4>
-                                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{person.sub_text}</p>
-                                      {person.father_name && <p className="text-[9px] text-slate-400">F: {person.father_name}</p>}
-                                  </div>
-                              </div>
-                              <button 
-                                  onClick={() => handleGenerate360(person)}
-                                  disabled={loadingHistory && selectedPersonId === person.id}
-                                  className="p-3 bg-brand-50 dark:bg-brand-500/10 text-brand-600 dark:text-brand-400 rounded-2xl active:scale-90 transition-all hover:bg-brand-100 dark:hover:bg-brand-500/20"
-                              >
-                                  {loadingHistory && selectedPersonId === person.id ? <Loader2 className="animate-spin" size={20} /> : <FileText size={20} />}
-                              </button>
+                      /* CASE 2: DEFAULT RECENT LIST */
+                      loadingRecent ? (
+                          <div className="text-center py-20"><Loader2 className="animate-spin mx-auto text-brand-500" /></div>
+                      ) : recentList.length === 0 ? (
+                          <div className="flex flex-col items-center justify-center h-64 opacity-40 text-center space-y-4">
+                              <Filter size={48} className="text-slate-300 dark:text-slate-600" />
+                              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">No recent records found</p>
                           </div>
-                      ))
+                      ) : (
+                          <>
+                              <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 pl-2 mb-2">Recently Added / Viewed</p>
+                              {recentList.map((person) => (
+                                  <PersonCard key={person.id} person={person} onAction={handleGenerate360} loading={loadingHistory && selectedPersonId === person.id} />
+                              ))}
+                          </>
+                      )
                   )}
               </div>
           </div>
@@ -347,3 +413,32 @@ export const PrincipalDashboard: React.FC<PrincipalDashboardProps> = ({
     </div>
   );
 };
+
+interface PersonCardProps {
+  person: SearchPerson;
+  onAction: (p: SearchPerson) => void;
+  loading: boolean;
+}
+
+// Reusable Person Card
+const PersonCard: React.FC<PersonCardProps> = ({ person, onAction, loading }) => (
+    <div className="p-5 bg-white dark:bg-dark-900 rounded-[2.5rem] border border-slate-100 dark:border-white/5 shadow-sm flex items-center justify-between group active:scale-[0.98] transition-all">
+        <div className="flex items-center gap-4">
+            <div className="w-12 h-12 bg-slate-50 dark:bg-white/5 rounded-2xl flex items-center justify-center text-slate-400 font-black text-lg">
+                {person.name.charAt(0)}
+            </div>
+            <div>
+                <h4 className="font-black text-slate-800 dark:text-white uppercase text-sm leading-tight">{person.name}</h4>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{person.sub_text}</p>
+                {person.father_name && <p className="text-[9px] text-slate-400">F: {person.father_name}</p>}
+            </div>
+        </div>
+        <button 
+            onClick={() => onAction(person)}
+            disabled={loading}
+            className="p-3 bg-brand-50 dark:bg-brand-500/10 text-brand-600 dark:text-brand-400 rounded-2xl active:scale-90 transition-all hover:bg-brand-100 dark:hover:bg-brand-500/20"
+        >
+            {loading ? <Loader2 className="animate-spin" size={20} /> : <FileText size={20} />}
+        </button>
+    </div>
+);
