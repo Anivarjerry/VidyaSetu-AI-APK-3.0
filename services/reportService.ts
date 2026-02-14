@@ -5,14 +5,12 @@ import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import { Role, FullHistory, TimeTableEntry } from '../types';
 
-// Helper to get Past Date
 const getPastDate = (days: number) => {
     const d = new Date();
     d.setDate(d.getDate() - days);
     return d.toISOString().split('T')[0];
 };
 
-// --- EXCEL HELPER ---
 const exportToExcel = (data: any[], fileName: string) => {
     const worksheet = XLSX.utils.json_to_sheet(data);
     const workbook = XLSX.utils.book_new();
@@ -28,7 +26,7 @@ interface ReportConfig {
     summary: { label: string; value: string | number; color?: string }[];
     headers: string[];
     data: any[][];
-    orientation?: 'p' | 'l'; // Portrait or Landscape
+    orientation?: 'p' | 'l'; 
     studentDetails?: {
         father: string;
         mother: string;
@@ -47,15 +45,13 @@ const generatePDF = (config: ReportConfig) => {
     const { title, subTitle, summary, headers, data, studentDetails, schoolName, principalName } = config;
     const pageWidth = doc.internal.pageSize.width;
 
-    // Header Section
-    doc.setFillColor(16, 185, 129); // Emerald 500
-    doc.rect(0, 0, pageWidth, 50, 'F'); // Increased height for branding
+    doc.setFillColor(16, 185, 129); 
+    doc.rect(0, 0, pageWidth, 50, 'F');
     
     doc.setTextColor(255, 255, 255);
     
     let currentY = 15;
 
-    // School Branding (If Provided)
     if (schoolName) {
         doc.setFontSize(18);
         doc.setFont("helvetica", "bold");
@@ -74,7 +70,6 @@ const generatePDF = (config: ReportConfig) => {
         currentY = 15;
     }
 
-    // Report Title
     doc.setFontSize(schoolName ? 14 : 18);
     doc.setFont("helvetica", "bold");
     doc.text(title.toUpperCase(), 14, currentY);
@@ -94,7 +89,6 @@ const generatePDF = (config: ReportConfig) => {
         doc.text(`Contact: ${studentDetails.mobile}`, 14, detailY + 6);
     }
 
-    // Graphical Summary
     let startY = 60;
     const boxWidth = 45;
     const boxHeight = 25;
@@ -123,7 +117,6 @@ const generatePDF = (config: ReportConfig) => {
         }
     });
 
-    // Table
     const tableStartY = startY + boxHeight + 10;
     
     autoTable(doc, {
@@ -152,7 +145,6 @@ const generatePDF = (config: ReportConfig) => {
         },
     });
 
-    // Footer
     const pageCount = (doc as any).internal.getNumberOfPages();
     for(let i = 1; i <= pageCount; i++) {
         doc.setPage(i);
@@ -165,7 +157,6 @@ const generatePDF = (config: ReportConfig) => {
     doc.save(`${title.replace(/\s+/g, '_')}_${Date.now()}.pdf`);
 };
 
-// --- TIME TABLE PDF ---
 export const downloadTimeTablePDF = (
     entries: TimeTableEntry[], 
     schoolName: string, 
@@ -195,8 +186,7 @@ export const downloadTimeTablePDF = (
     return true;
 };
 
-// --- API ACTIONS (Existing...) ---
-
+// --- UPDATED REPORT LOGIC TO USE DATE RANGE ---
 export const downloadPrincipalAttendance = async (schoolId: string, schoolName: string, principalName: string, className?: string, startDate?: string, endDate?: string) => {
     try {
         let query = supabase.from('attendance')
@@ -204,29 +194,37 @@ export const downloadPrincipalAttendance = async (schoolId: string, schoolName: 
             .eq('school_id', schoolId)
             .order('date', { ascending: false });
 
+        // Apply filters directly to query to ensure data matches range
         if (startDate) query = query.gte('date', startDate);
         if (endDate) query = query.lte('date', endDate);
-        else query = query.gte('date', getPastDate(60));
+        else query = query.gte('date', getPastDate(30)); // Default 30 days if no range
 
         const { data, error } = await query;
         if(error || !data) throw new Error("Fetch failed");
         
         const filtered = className ? data.filter((d: any) => d.students?.class_name === className) : data;
         
+        // CRM Calculation based ONLY on filtered data (correct logic)
         const summary = [
-            { label: 'Records', value: filtered.length },
+            { label: 'Total Records', value: filtered.length },
             { label: 'Present', value: filtered.filter((r:any) => r.status === 'present').length, color: '#10b981' },
             { label: 'Absent', value: filtered.filter((r:any) => r.status === 'absent').length, color: '#ef4444' },
             { label: 'Leaves', value: filtered.filter((r:any) => r.status === 'leave').length, color: '#f59e0b' }
         ];
+        
         const rows = filtered.map((r: any) => [
-            r.date, r.students?.name || 'Unknown', r.students?.roll_number || '-', r.students?.class_name || 'N/A', r.status.toUpperCase()
+            r.date, 
+            r.students?.name || 'Unknown', 
+            r.students?.roll_number || '-', 
+            r.students?.class_name || 'N/A', 
+            r.status.toUpperCase()
         ]);
+
         generatePDF({
             schoolName,
             principalName,
-            title: "Student Attendance History",
-            subTitle: `${startDate} to ${endDate} | Class: ${className || 'All'}`,
+            title: "Student Attendance Report",
+            subTitle: `Range: ${startDate || 'Last 30 Days'} to ${endDate || 'Today'} | Class: ${className || 'All'}`,
             summary,
             headers: ["Date", "Student Name", "Roll No", "Class", "Status"],
             data: rows
@@ -291,7 +289,7 @@ export const downloadPortalHistory = async (schoolId: string, schoolName: string
         ]);
         generatePDF({
             schoolName,
-            principalName: role === 'principal' ? principalName : undefined, // Only show principal name if principal is downloading
+            principalName: role === 'principal' ? principalName : undefined,
             title: "Portal Submission Report",
             subTitle: `${startDate} to ${endDate}`,
             summary,
@@ -495,7 +493,6 @@ export const downloadExamResultsExcel = async (schoolId: string, className?: str
     } catch(e) { return false; }
 };
 
-// 6. SINGLE STUDENT REPORT (PDF) - BASIC
 export const downloadStudentReport = async (schoolId: string, studentId: string, studentName: string, startDate?: string, endDate?: string) => {
     try {
         const { data: student } = await supabase.from('students').select('father_name, mother_name, dob, class_name, users(mobile)').eq('id', studentId).single();
@@ -573,54 +570,42 @@ export const downloadStudentAttendanceReport = async (studentId: string, student
     } catch(e) { return false; }
 };
 
-// --- NEW: 360 DEGREE PROFILE REPORT (ROBUST) ---
 export const generate360Report = (history: FullHistory, schoolName: string, principalName: string, dateRange: string) => {
     const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
     const width = doc.internal.pageSize.width;
 
-    // --- PAGE 1: OVERVIEW ---
-    
-    // Header Bar
-    doc.setFillColor(16, 185, 129); // Emerald
+    doc.setFillColor(16, 185, 129);
     doc.rect(0, 0, width, 50, 'F');
     
-    // Title
     doc.setTextColor(255, 255, 255);
     
-    // School Name (Top Left)
     doc.setFont("helvetica", "bold");
     doc.setFontSize(20);
     doc.text(schoolName.toUpperCase(), 20, 20);
     
-    // Principal Name (Below School Name)
     doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
     doc.text(`Principal: ${principalName}`, 20, 28);
     
-    // Report Title (Right Aligned)
     doc.setFont("helvetica", "bold");
     doc.setFontSize(16);
     doc.text(history.profile.role.toUpperCase() + " HISTORY", width - 20, 20, { align: 'right' });
     
-    // Period (Below Title)
     doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
     doc.text(`Period: ${dateRange}`, width - 20, 28, { align: 'right' });
 
-    // Profile Box
     const startY = 60;
     doc.setDrawColor(220);
     doc.setFillColor(250, 250, 250);
     doc.roundedRect(15, startY, width - 30, 60, 3, 3, 'FD');
 
-    // Avatar Placeholder (Fallback Icon)
     doc.setFillColor(220, 220, 220);
     doc.circle(35, startY + 30, 15, 'F');
     doc.setTextColor(100);
     doc.setFontSize(16);
     doc.text(history.profile.name.charAt(0), 35, startY + 32, { align: 'center' });
 
-    // Details Text
     doc.setTextColor(0);
     doc.setFontSize(14);
     doc.text(history.profile.name, 60, startY + 15);
@@ -641,12 +626,11 @@ export const generate360Report = (history: FullHistory, schoolName: string, prin
     let dy = 25;
     let dx = 60;
     details.forEach((line, i) => {
-        if (i === 4) { dy = 25; dx = 130; } // New column
+        if (i === 4) { dy = 25; dx = 130; } 
         doc.text(line, dx, startY + dy);
         dy += 6;
     });
 
-    // Stats Grid
     const statY = startY + 70;
     const statW = (width - 40) / 4;
     const stats = [
@@ -666,11 +650,9 @@ export const generate360Report = (history: FullHistory, schoolName: string, prin
         doc.text(s.label.toUpperCase(), 20 + (i * statW) + (statW - 5)/2, statY + 18, { align: 'center' });
     });
 
-    // --- PAGE 2: DETAILED TABLES ---
     doc.addPage();
     let currentY = 20;
 
-    // 1. Attendance Log
     if (history.attendance_log.length > 0) {
         doc.setTextColor(0);
         doc.setFontSize(12);
@@ -687,7 +669,6 @@ export const generate360Report = (history: FullHistory, schoolName: string, prin
         currentY = (doc as any).lastAutoTable.finalY + 15;
     }
 
-    // 2. Exam Log (Students)
     if (history.profile.role === 'Student' && history.exam_log.length > 0) {
         doc.text("EXAM PERFORMANCE", 14, currentY);
         currentY += 5;
@@ -702,7 +683,6 @@ export const generate360Report = (history: FullHistory, schoolName: string, prin
         currentY = (doc as any).lastAutoTable.finalY + 15;
     }
 
-    // 3. Activity/Homework Log
     if (history.activity_log.length > 0) {
         doc.text(history.profile.role === 'Student' ? "HOMEWORK SUBMISSIONS" : "WORK ACTIVITY LOG", 14, currentY);
         currentY += 5;
@@ -717,7 +697,6 @@ export const generate360Report = (history: FullHistory, schoolName: string, prin
         currentY = (doc as any).lastAutoTable.finalY + 15;
     }
 
-    // 4. Leave History
     if (history.leave_log.length > 0) {
         doc.text("LEAVE HISTORY", 14, currentY);
         currentY += 5;
@@ -731,7 +710,6 @@ export const generate360Report = (history: FullHistory, schoolName: string, prin
         });
     }
 
-    // Footer
     const pageCount = (doc as any).internal.getNumberOfPages();
     for(let i = 1; i <= pageCount; i++) {
         doc.setPage(i);

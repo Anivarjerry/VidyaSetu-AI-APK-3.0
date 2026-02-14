@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { Modal } from './Modal';
-import { FileText, Download, Loader2, Users, Calendar, BookOpen, CheckCircle2, Sheet, FileSpreadsheet, Award } from 'lucide-react';
+import { FileText, Download, Loader2, Users, Calendar, BookOpen, CheckCircle2, FileSpreadsheet, Award } from 'lucide-react';
 import { Role } from '../types';
 import { 
     downloadPrincipalAttendance, 
@@ -23,11 +23,11 @@ interface ReportModalProps {
   role: Role;
   schoolId?: string;
   userId?: string;
-  schoolName?: string; // New Prop
-  principalName?: string; // New Prop
-  classOptions?: string[]; // For Principal to filter
-  studentId?: string;      // For Parent
-  studentName?: string;    // For Parent
+  schoolName?: string;
+  principalName?: string;
+  classOptions?: string[];
+  studentId?: string;
+  studentName?: string;
 }
 
 export const ReportModal: React.FC<ReportModalProps> = ({ 

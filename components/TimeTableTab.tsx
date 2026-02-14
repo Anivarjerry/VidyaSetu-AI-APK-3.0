@@ -1,9 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
-import { fetchSchoolClasses, fetchClassSubjects, fetchTeachersForTimeTable, fetchTimeTable, saveTimeTableEntry, updateSchoolPeriods } from '../services/dashboardService';
+import { fetchSchoolClasses, fetchClassSubjects, fetchTeachersForTimeTable, fetchTimeTable, saveTimeTableEntry, copyTimeTableDay } from '../services/dashboardService';
 import { downloadTimeTablePDF } from '../services/reportService';
-import { TimeTableEntry, DashboardData } from '../types';
-import { Loader2, Plus, FileText, Check, ChevronDown, Calendar, GraduationCap, Clock, Save, Copy, X } from 'lucide-react';
+import { TimeTableEntry } from '../types';
+import { Loader2, Plus, FileText, Calendar, GraduationCap, Save, Copy, X, Check, RefreshCw } from 'lucide-react';
 
 interface TimeTableTabProps {
     schoolId: string;
@@ -31,6 +31,7 @@ export const TimeTableTab: React.FC<TimeTableTabProps> = ({ schoolId, schoolName
     
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
+    const [copying, setCopying] = useState(false);
 
     useEffect(() => {
         loadInitialData();
@@ -100,9 +101,18 @@ export const TimeTableTab: React.FC<TimeTableTabProps> = ({ schoolId, schoolName
             await loadEntries();
             setIsEditOpen(false);
         } else {
-            alert("Failed to save entry");
+            alert("Failed to save entry. Check DB permissions.");
         }
         setSaving(false);
+    };
+
+    const handleCopyDay = async () => {
+        if(!confirm(`Copy ${selectedDay}'s schedule to all other days for ${selectedClass}?`)) return;
+        setCopying(true);
+        const success = await copyTimeTableDay(schoolId, selectedClass, selectedDay, DAYS);
+        if (success) alert("Schedule copied successfully!");
+        else alert("Failed to copy schedule.");
+        setCopying(false);
     };
 
     const handleDownload = () => {
@@ -111,6 +121,9 @@ export const TimeTableTab: React.FC<TimeTableTabProps> = ({ schoolId, schoolName
     };
 
     const getTeacherName = (id: string) => teachers.find(t => t.id === id)?.name || 'Unknown';
+
+    // Ensure we show at least 8 periods if totalPeriods is 0 or low
+    const displayPeriods = (totalPeriods && totalPeriods > 0) ? totalPeriods : 8;
 
     return (
         <div className="flex flex-col h-full bg-slate-50 dark:bg-dark-950 pb-20">
@@ -140,6 +153,17 @@ export const TimeTableTab: React.FC<TimeTableTabProps> = ({ schoolId, schoolName
                             {classes.map(c => <option key={c.id} value={c.class_name}>{c.class_name}</option>)}
                         </select>
                     </div>
+                    {/* COPY BUTTON */}
+                    {selectedClass && (
+                        <button 
+                            onClick={handleCopyDay}
+                            disabled={copying}
+                            className="w-12 h-12 flex items-center justify-center bg-orange-50 dark:bg-orange-500/10 text-orange-500 rounded-2xl border border-orange-100 dark:border-orange-500/20 shadow-sm active:scale-95"
+                            title="Copy to All Days"
+                        >
+                            {copying ? <Loader2 className="animate-spin" size={20} /> : <Copy size={20} />}
+                        </button>
+                    )}
                     <button 
                         onClick={handleDownload} 
                         disabled={!selectedClass}
@@ -160,7 +184,7 @@ export const TimeTableTab: React.FC<TimeTableTabProps> = ({ schoolId, schoolName
                 ) : loading ? (
                     <div className="text-center py-20"><Loader2 className="animate-spin mx-auto text-indigo-500" /></div>
                 ) : (
-                    Array.from({ length: totalPeriods }).map((_, i) => {
+                    Array.from({ length: displayPeriods }).map((_, i) => {
                         const pNum = i + 1;
                         const entry = entries.find(e => e.period_number === pNum);
                         

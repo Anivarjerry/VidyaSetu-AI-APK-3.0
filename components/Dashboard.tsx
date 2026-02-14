@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { DashboardData, LoginRequest, Role } from '../types';
-import { fetchDashboardData, fetchSchoolSummary, fetchSchoolClasses } from '../services/dashboardService';
+import { fetchDashboardData, fetchSchoolSummary } from '../services/dashboardService';
 import { Header } from './Header';
 import { BottomNav } from './BottomNav';
 import { SkeletonSchoolCard } from './Skeletons';
@@ -10,7 +10,7 @@ import { SchoolInfoCard } from './SchoolInfoCard';
 import { SettingsModal, AboutModal, HelpModal } from './MenuModals';
 import { NoticeListModal } from './NoticeListModal';
 import { useThemeLanguage } from '../contexts/ThemeLanguageContext';
-import { RefreshCw, Lock, ChevronRight, School as SchoolIcon, User, ChevronLeft, Loader2, Sparkles } from 'lucide-react';
+import { RefreshCw, Lock, School as SchoolIcon, User, Loader2, Sparkles } from 'lucide-react';
 import { SubscriptionModal } from './SubscriptionModal';
 import { Modal } from './Modal';
 import { useModalBackHandler } from '../hooks/useModalBackHandler';
@@ -30,10 +30,9 @@ interface DashboardProps {
 export const Dashboard: React.FC<DashboardProps> = ({ credentials, role, userName, onLogout }) => {
   const { t } = useThemeLanguage();
   
-  // Expanded view type to include 'action' and 'manage'
+  // View State (Main Tabs)
   const [currentView, setCurrentView] = useState<'home' | 'profile' | 'action' | 'manage'>(() => {
-    const view = window.history.state?.view;
-    return (view === 'profile' || view === 'action' || view === 'manage') ? view : 'home';
+    return 'home';
   });
 
   const [data, setData] = useState<DashboardData | null>(null);
@@ -53,48 +52,47 @@ export const Dashboard: React.FC<DashboardProps> = ({ credentials, role, userNam
   const [isNoticeListOpen, setIsNoticeListOpen] = useState(false);
   const [isSchoolDetailOpen, setIsSchoolDetailOpen] = useState(false);
   
-  // School Detail Logic (Kept here as it's common)
+  // School Detail Logic
   const [schoolSummary, setSchoolSummary] = useState<any>(null);
   const [loadingSchoolSummary, setLoadingSchoolSummary] = useState(false);
 
   // New AI Chat State
   const [isAIChatOpen, setIsAIChatOpen] = useState(false);
 
+  // Back Handler for Modals
   useModalBackHandler(isSchoolDetailOpen || isNoticeListOpen || isAIChatOpen, () => {
       if (isAIChatOpen) setIsAIChatOpen(false);
       else if (isNoticeListOpen) setIsNoticeListOpen(false);
       else setIsSchoolDetailOpen(false);
   });
 
+  // Custom Back Handler for Tabs (Android Native Feel)
   useEffect(() => {
     const handlePopState = (e: PopStateEvent) => {
-      if (e.state && e.state.view) setCurrentView(e.state.view);
-      else setCurrentView('home');
+        // If we are NOT on home, go to home
+        if (currentView !== 'home') {
+            e.preventDefault();
+            setCurrentView('home');
+            // We replace state to stay on the same "history stack level"
+            window.history.replaceState({ view: 'home' }, '', window.location.href);
+        } else {
+            // If we ARE on home, standard behavior (Exit App / Minimize)
+            // No action needed, let browser handle it
+        }
     };
-    if (!window.history.state) {
-      try { window.history.replaceState({ view: 'home' }, '', window.location.href); } catch (e) {}
+
+    // Push a state when we enter non-home views to allow "back" to catch it
+    if (currentView !== 'home') {
+        window.history.pushState({ view: currentView }, '', window.location.href);
     }
+
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
-  }, []);
+  }, [currentView]);
 
   const handleViewChange = (view: 'home' | 'profile' | 'action' | 'manage') => {
     if (view === currentView) return;
-    
-    // History Management
-    if (view === 'home') {
-      // If going home, we try to go back if possible to keep history clean, else replace
-      if (window.history.state?.view !== 'home') {
-          // Simple navigation for now to avoid complexity
-          try { window.history.pushState({ view: 'home' }, '', window.location.href); } catch (e) {}
-          setCurrentView('home');
-      } else {
-          setCurrentView('home');
-      }
-    } else {
-      try { window.history.pushState({ view: view }, '', window.location.href); } catch (e) {}
-      setCurrentView(view);
-    }
+    setCurrentView(view);
   };
 
   const fetchGenericData = useCallback(async (targetStudent?: string) => {
@@ -116,7 +114,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ credentials, role, userNam
   }, [fetchGenericData]);
 
   const handleManualRefresh = async () => {
-    if (!isSchoolActive && role !== 'principal') return; // Principal might refresh to check subscription
+    if (!isSchoolActive && role !== 'principal') return; 
     setIsRefreshing(true);
     await fetchGenericData(selectedStudentId || undefined);
     setTimeout(() => setIsRefreshing(false), 700);
@@ -181,7 +179,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ credentials, role, userNam
                     <div className="max-w-4xl md:max-w-7xl mx-auto w-full h-full">
                          <div className={`w-full h-full transition-opacity duration-300 pb-10 ${isRefreshing ? 'opacity-40' : 'opacity-100'}`}>
                             
-                            {/* DYNAMIC DASHBOARD COMPONENT BASED ON ROLE */}
                             {data && role === 'principal' && <PrincipalDashboard data={data} credentials={credentials} isSchoolActive={isSchoolActive} onShowPayModal={() => setShowPayModal(true)} onRefresh={handleManualRefresh} viewMode={currentView} />}
                             {data && role === 'teacher' && <TeacherDashboard data={data} credentials={credentials} isSchoolActive={isSchoolActive} onShowLocked={() => showLockedFeature('school')} onRefresh={handleManualRefresh} />}
                             {data && (role === 'parent' || role === 'student') && <ParentDashboard data={data} credentials={credentials} role={role} isSchoolActive={isSchoolActive} isUserActive={isUserActive} onShowLocked={showLockedFeature} onRefresh={handleManualRefresh} isRefreshing={isRefreshing} />}
@@ -192,7 +189,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ credentials, role, userNam
                 </div>
             </>
         ) : (
-            // VIEW 2: PROFILE
             <div className="flex-1 overflow-y-auto px-4 w-full no-scrollbar">
                 <div className="max-w-4xl md:max-w-7xl mx-auto w-full pt-4">
                     <ProfileView data={data} isLoading={initialLoading} onLogout={onLogout} credentials={credentials} onOpenSubscription={() => { if ((role === 'parent' || role === 'student') && !isSchoolActive) setShowLockPopup(t('upgrade_school_first')); else setShowPayModal(true); }} onOpenHelp={() => setActiveMenuModal('help')} onOpenAbout={() => setActiveMenuModal('about')} />
@@ -201,10 +197,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ credentials, role, userNam
         )}
       </main>
 
-      {/* Show Action Button only for Principal */}
       <BottomNav currentView={currentView} onChangeView={handleViewChange} showAction={role === 'principal'} />
       
-      {/* FLOATING AI BUTTON (Only on Home/Action) */}
       {currentView !== 'profile' && isSchoolActive && (
           <button 
             onClick={() => setIsAIChatOpen(true)}
@@ -214,65 +208,26 @@ export const Dashboard: React.FC<DashboardProps> = ({ credentials, role, userNam
           </button>
       )}
 
-      {/* --- GLOBAL MODALS --- */}
-      
-      {/* 1. LOCK POPUP */}
+      {/* GLOBAL MODALS */}
       <Modal isOpen={!!showLockPopup} onClose={() => setShowLockPopup(null)} title="ACCESS RESTRICTED">
           <div className="text-center py-4 space-y-6">
               <div className="w-20 h-20 bg-rose-500/10 text-rose-500 rounded-[2rem] flex items-center justify-center mx-auto shadow-inner"><Lock size={40} /></div>
               <div><h4 className="text-xl font-black uppercase text-slate-800 dark:text-white tracking-tight">Services Blocked</h4><p className="text-xs text-slate-400 font-bold uppercase mt-3 px-4 leading-relaxed italic">"{showLockPopup}"</p></div>
               {((role === 'principal' && lockSource === 'school') || ((role === 'parent' || role === 'student') && lockSource === 'user')) ? (
-                  <button onClick={() => { setShowLockPopup(null); setShowPayModal(true); }} className="w-full py-5 rounded-[2rem] bg-emerald-500 text-white font-black uppercase text-xs tracking-widest shadow-xl shadow-emerald-500/20 active:scale-95 transition-all flex items-center justify-center gap-2">{lockSource === 'school' ? 'RENEW SCHOOL PLAN' : 'UNLOCK PREMIUM NOW'} <ChevronRight size={14} /></button>
+                  <button onClick={() => { setShowLockPopup(null); setShowPayModal(true); }} className="w-full py-5 rounded-[2rem] bg-emerald-500 text-white font-black uppercase text-xs tracking-widest shadow-xl shadow-emerald-500/20 active:scale-95 transition-all flex items-center justify-center gap-2">{lockSource === 'school' ? 'RENEW SCHOOL PLAN' : 'UNLOCK PREMIUM NOW'} <User size={14} /></button>
               ) : (
                   <button onClick={() => setShowLockPopup(null)} className="w-full py-5 rounded-[2rem] bg-slate-900 dark:bg-white/10 text-white font-black uppercase text-xs tracking-widest shadow-xl">Got it</button>
               )}
           </div>
       </Modal>
 
-      {/* 2. PAYMENT MODAL */}
       <Modal isOpen={showPayModal} onClose={() => setShowPayModal(false)} title="PREMIUM UPGRADE"><SubscriptionModal role={role} /></Modal>
-      
-      {/* 3. SETTINGS & INFO MODALS */}
       <SettingsModal isOpen={activeMenuModal === 'settings'} onClose={() => setActiveMenuModal(null)} />
       <AboutModal isOpen={activeMenuModal === 'about'} onClose={() => setActiveMenuModal(null)} />
       <HelpModal isOpen={activeMenuModal === 'help'} onClose={() => setActiveMenuModal(null)} />
-      
-      {/* 4. NOTICES */}
       <NoticeListModal isOpen={isNoticeListOpen} onClose={() => setIsNoticeListOpen(false)} schoolId={credentials.school_id} role={role} />
-
-      {/* 5. SCHOOL DETAIL MODAL */}
-      <Modal isOpen={isSchoolDetailOpen} onClose={() => setIsSchoolDetailOpen(false)} title="INSTITUTION PROFILE">
-        <div className="flex flex-col h-[50vh]">
-             <div className="space-y-6 overflow-y-auto no-scrollbar pb-4 flex-1 relative premium-subview-enter">
-                {loadingSchoolSummary ? <div className="text-center py-10"><Loader2 className="animate-spin mx-auto text-brand-500" /></div> : (
-                    <>
-                        <div className="p-6 rounded-[2.5rem] bg-slate-900 dark:bg-slate-800 text-white shadow-xl relative overflow-hidden mt-2">
-                            <div className="relative z-10 text-center">
-                                <div className="w-16 h-16 bg-white/10 rounded-2xl flex items-center justify-center mx-auto mb-3 backdrop-blur-md border border-white/20"><SchoolIcon size={32} /></div>
-                                <h2 className="text-xl font-black uppercase tracking-tight leading-tight">{schoolSummary?.school_name || data?.school_name}</h2>
-                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Code: {schoolSummary?.school_code || data?.school_code}</p>
-                            </div>
-                        </div>
-                        <div className="p-5 rounded-[2rem] bg-brand-50 dark:bg-brand-500/10 border border-brand-100 dark:border-brand-500/20 flex items-center gap-4">
-                            <div className="w-12 h-12 rounded-2xl bg-brand-500 text-white flex items-center justify-center shadow-lg shadow-brand-500/20"><User size={24} /></div>
-                            <div>
-                                <p className="text-[9px] font-black text-brand-600 uppercase tracking-widest mb-0.5">Principal</p>
-                                <h4 className="text-sm font-black text-slate-800 dark:text-white uppercase">{schoolSummary?.principal_name || 'Not Assigned'}</h4>
-                            </div>
-                        </div>
-                        <div className="grid grid-cols-2 gap-3">
-                            <div className="p-4 rounded-[2rem] bg-white dark:bg-white/5 border border-slate-100 dark:border-white/10 shadow-sm"><p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">Teaching Staff</p><span className="text-3xl font-black text-slate-800 dark:text-white">{schoolSummary?.total_teachers || 0}</span></div>
-                            <div className="p-4 rounded-[2rem] bg-white dark:bg-white/5 border border-slate-100 dark:border-white/10 shadow-sm"><p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">Transport</p><span className="text-3xl font-black text-slate-800 dark:text-white">{schoolSummary?.total_drivers || 0}</span></div>
-                        </div>
-                    </>
-                )}
-             </div>
-        </div>
-      </Modal>
-
-      {/* 6. AI CHAT MODAL */}
+      <Modal isOpen={isSchoolDetailOpen} onClose={() => setIsSchoolDetailOpen(false)} title="INSTITUTION PROFILE"><div className="flex flex-col h-[50vh]"><div className="space-y-6 overflow-y-auto no-scrollbar pb-4 flex-1 relative premium-subview-enter">{loadingSchoolSummary ? <div className="text-center py-10"><Loader2 className="animate-spin mx-auto text-brand-500" /></div> : (<><div className="p-6 rounded-[2.5rem] bg-slate-900 dark:bg-slate-800 text-white shadow-xl relative overflow-hidden mt-2"><div className="relative z-10 text-center"><div className="w-16 h-16 bg-white/10 rounded-2xl flex items-center justify-center mx-auto mb-3 backdrop-blur-md border border-white/20"><SchoolIcon size={32} /></div><h2 className="text-xl font-black uppercase tracking-tight leading-tight">{schoolSummary?.school_name || data?.school_name}</h2><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Code: {schoolSummary?.school_code || data?.school_code}</p></div></div><div className="p-5 rounded-[2rem] bg-brand-50 dark:bg-brand-500/10 border border-brand-100 dark:border-brand-500/20 flex items-center gap-4"><div className="w-12 h-12 rounded-2xl bg-brand-500 text-white flex items-center justify-center shadow-lg shadow-brand-500/20"><User size={24} /></div><div><p className="text-[9px] font-black text-brand-600 uppercase tracking-widest mb-0.5">Principal</p><h4 className="text-sm font-black text-slate-800 dark:text-white uppercase">{schoolSummary?.principal_name || 'Not Assigned'}</h4></div></div><div className="grid grid-cols-2 gap-3"><div className="p-4 rounded-[2rem] bg-white dark:bg-white/5 border border-slate-100 dark:border-white/10 shadow-sm"><p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">Teaching Staff</p><span className="text-3xl font-black text-slate-800 dark:text-white">{schoolSummary?.total_teachers || 0}</span></div><div className="p-4 rounded-[2rem] bg-white dark:bg-white/5 border border-slate-100 dark:border-white/10 shadow-sm"><p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">Transport</p><span className="text-3xl font-black text-slate-800 dark:text-white">{schoolSummary?.total_drivers || 0}</span></div></div></>)}</div></div></Modal>
       <AIChatModal isOpen={isAIChatOpen} onClose={() => setIsAIChatOpen(false)} userName={data?.user_name || 'User'} role={role} className={data?.class_name} dashboardData={data} />
-
     </div>
   );
 };
