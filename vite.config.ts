@@ -14,24 +14,24 @@ export default defineConfig(({ mode }) => {
       plugins: [
         react(),
         VitePWA({
-          // Manual injection allows better control in index.tsx
-          injectRegister: null, 
+          // Changed back to 'auto' to ensure the SW script is actually injected into index.html
+          injectRegister: 'auto', 
           registerType: 'autoUpdate', 
           devOptions: {
-            enabled: true,
-            type: 'module',
+            enabled: true
           },
           workbox: {
+            // CRITICAL: Explicitly cache index.html and assets
             globPatterns: ['**/*.{js,css,html,ico,png,svg,json}'],
             cleanupOutdatedCaches: true,
             clientsClaim: true,
             skipWaiting: true,
+            // CRITICAL: This tells the browser "If offline and requesting a page, give index.html"
             navigateFallback: '/index.html',
-            // Do not cache Supabase/API calls in the SW cache, let the app logic handle it via IDB
-            navigateFallbackDenylist: [/^\/api/, /^https:\/\/.*\.supabase\.co/],
+            navigateFallbackDenylist: [/^\/api/], 
             runtimeCaching: [
               {
-                // Fonts - Cache First
+                // Cache Google Fonts
                 urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
                 handler: 'CacheFirst',
                 options: {
@@ -46,7 +46,7 @@ export default defineConfig(({ mode }) => {
                 }
               },
               {
-                // Static Assets (Images) - Stale While Revalidate
+                // Cache Images
                 urlPattern: /\.(?:png|jpg|jpeg|svg|ico)$/,
                 handler: 'StaleWhileRevalidate',
                 options: {
@@ -61,19 +61,16 @@ export default defineConfig(({ mode }) => {
           },
           includeAssets: ['android/android-launchericon-192-192.png', 'ios/180.png'], 
           manifest: {
-            // Fixed ID prevents duplicate installs if URL changes slightly
-            id: 'vidyasetu-ai-app-v2', 
+            id: 'vidyasetu-v3', // Changed ID slightly to force a fresh install prompt if needed
             name: 'VidyaSetu AI',
             short_name: 'VidyaSetu',
-            description: 'Premium School Management System with Real-time Tracking.',
-            // Adding query param ensures unique PWA session, fixing duplicate apps on some launchers
-            start_url: '/?source=pwa', 
+            description: 'Premium School Management System',
+            start_url: '.', // Using dot is safest for relative paths
             scope: '/',
             display: 'standalone',
             background_color: '#ffffff',
             theme_color: '#10b981',
             orientation: 'portrait',
-            categories: ['education', 'productivity'],
             icons: [
               {
                 src: 'android/android-launchericon-192-192.png',

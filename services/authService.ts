@@ -67,7 +67,7 @@ export const loginUser = async (credentials: LoginRequest): Promise<LoginRespons
         );
     } catch (err: any) { adminResult = { error: err, data: null }; }
 
-    if (adminResult.data) {
+    if (adminResult && adminResult.data) {
       // Check Secret Code
       if (adminResult.data.secret_code === password) {
           console.log("Admin Login Successful");
@@ -110,7 +110,9 @@ export const loginUser = async (credentials: LoginRequest): Promise<LoginRespons
         userResult = { error: e, data: null };
     }
 
-    const { data: userData, error: userError } = userResult;
+    // SAFE GUARD: Check if userResult is properly defined
+    const userData = userResult?.data;
+    const userError = userResult?.error;
 
     if (userError) return { status: 'error', message: `Login failed: ${userError.message}` };
     
