@@ -179,7 +179,7 @@ const AppContent: React.FC = () => {
 
 const App: React.FC = () => (
   <ThemeLanguageProvider>
-    <div className="fixed inset-0 bg-white dark:bg-dark-950">
+    <div className="fixed inset-0 h-full w-full bg-white dark:bg-dark-950 flex flex-col">
       <AppContent />
     </div>
   </ThemeLanguageProvider>

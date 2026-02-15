@@ -69,8 +69,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
       return Array.from({ length: count }, (_, i) => i + 1);
   };
 
-  const handleCardClick = (key: string, e: React.MouseEvent) => {
-      e.stopPropagation();
+  const handleCardClick = (key: string) => {
       if (!isSchoolActive) {
           onShowLocked();
           return;
@@ -83,64 +82,37 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
       }
   };
 
+  // Define all dashboard items in one array for the grid
+  const dashboardItems = [
+      { key: 'homework', title: "Daily Portal", sub: "Update Work", icon: <BookOpen size={20} />, color: "text-brand-600", bg: "bg-brand-500/10" },
+      { key: 'attendance', title: t('attendance'), sub: t('digital_register'), icon: <UserCheck size={20} />, color: "text-blue-600", bg: "bg-blue-500/10" },
+      { key: 'exam_mgmt', title: "Results", sub: "Marks Entry", icon: <FileCheck size={20} />, color: "text-purple-600", bg: "bg-purple-500/10" },
+      { key: 'gallery', title: "Gallery", sub: "Photos", icon: <ImageIcon size={20} />, color: "text-orange-600", bg: "bg-orange-500/10" },
+      { key: 'leave', title: t('staff_leave'), sub: "Request Off", icon: <CalendarRange size={20} />, color: "text-rose-600", bg: "bg-rose-500/10" },
+      { key: 'history', title: "History", sub: "View Logs", icon: <History size={20} />, color: "text-indigo-600", bg: "bg-indigo-500/10" },
+      { key: 'reports', title: "Downloads", sub: "PDF Reports", icon: <FileText size={20} />, color: "text-slate-600", bg: "bg-slate-500/10" },
+  ];
+
   return (
-    <div className="space-y-3 pb-10">
-       {/* SHARED TOP CARDS */}
-       <div className="grid grid-cols-2 gap-2">
-            {/* Gallery */}
-            <div 
-                onClick={() => isSchoolActive ? setActiveModal('gallery') : onShowLocked()} 
-                className={`glass-card p-4 rounded-[1.8rem] flex flex-col items-center justify-center gap-2 cursor-pointer group active:scale-[0.98] transition-all shadow-sm ${!isSchoolActive ? 'bg-rose-50 dark:bg-rose-950/10 border-rose-100 dark:border-rose-900/20' : ''}`}
-            >
-                <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-inner transition-all group-hover:scale-105 ${!isSchoolActive ? 'bg-rose-500 text-white' : 'bg-brand-500/10 text-brand-600'}`}>
-                    <ImageIcon size={20} />
+    <div className="pb-24">
+       {/* UNIFIED GRID LAYOUT */}
+       <div className="grid grid-cols-2 gap-3 animate-in fade-in zoom-in-95 duration-300">
+            {dashboardItems.map((item) => (
+                <div 
+                    key={item.key}
+                    onClick={() => handleCardClick(item.key)}
+                    className={`glass-card p-4 rounded-[1.8rem] flex flex-col justify-center items-center text-center gap-2 cursor-pointer group active:scale-[0.98] transition-all shadow-sm relative overflow-hidden ${!isSchoolActive ? 'bg-rose-50 dark:bg-rose-950/10 border-rose-100 dark:border-rose-900/20 opacity-80' : 'bg-white dark:bg-dark-900'}`}
+                >
+                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-inner transition-transform group-hover:scale-110 ${!isSchoolActive ? 'bg-rose-500 text-white' : `${item.bg} ${item.color}`}`}>
+                        {item.icon}
+                    </div>
+                    <div>
+                        <h3 className={`font-black uppercase text-xs leading-tight ${!isSchoolActive ? 'text-rose-600' : 'text-slate-800 dark:text-white'}`}>{item.title}</h3>
+                        <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">{item.sub}</p>
+                    </div>
+                    {!isSchoolActive && <div className="absolute top-2 right-2"><Lock size={12} className="text-rose-400" /></div>}
                 </div>
-                <div className="text-center">
-                    <h3 className={`font-black uppercase text-xs leading-tight ${!isSchoolActive ? 'text-rose-600' : 'text-slate-800 dark:text-white'}`}>Gallery</h3>
-                </div>
-            </div>
-
-            {/* Exam Management */}
-            <div 
-                onClick={() => isSchoolActive ? setActiveModal('exam_mgmt') : onShowLocked()} 
-                className={`glass-card p-4 rounded-[1.8rem] flex flex-col items-center justify-center gap-2 cursor-pointer group active:scale-[0.98] transition-all shadow-sm ${!isSchoolActive ? 'bg-rose-50 dark:bg-rose-950/10 border-rose-100 dark:border-rose-900/20' : ''}`}
-            >
-                <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-inner transition-all group-hover:scale-105 ${!isSchoolActive ? 'bg-rose-500 text-white' : 'bg-brand-500/10 text-brand-600'}`}>
-                    <FileCheck size={20} />
-                </div>
-                <div className="text-center">
-                    <h3 className={`font-black uppercase text-xs leading-tight ${!isSchoolActive ? 'text-rose-600' : 'text-slate-800 dark:text-white'}`}>Results</h3>
-                </div>
-            </div>
-       </div>
-
-       {/* Download History Card - Full Width */}
-       <div 
-            onClick={() => isSchoolActive ? setActiveModal('reports') : onShowLocked()} 
-            className={`glass-card p-4 rounded-[2rem] flex items-center justify-between cursor-pointer group active:scale-[0.98] transition-all shadow-sm ${!isSchoolActive ? 'bg-rose-50 dark:bg-rose-950/10 border-rose-100 dark:border-rose-900/20' : ''}`}
-        >
-            <div className="flex items-center gap-3 text-left">
-                <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-inner transition-all group-hover:scale-105 ${!isSchoolActive ? 'bg-rose-500 text-white' : 'bg-brand-500/10 text-brand-600'}`}>
-                    <FileText size={20} />
-                </div>
-                <div>
-                    <h3 className={`font-black uppercase text-sm leading-tight ${!isSchoolActive ? 'text-rose-600' : 'text-slate-800 dark:text-white'}`}>Downloads</h3>
-                    <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">Report Center</p>
-                </div>
-            </div>
-            {!isSchoolActive ? <Lock size={16} className="text-rose-400" /> : <ChevronRight size={18} className="text-slate-200 group-hover:text-brand-500 transition-colors" />}
-        </div>
-
-       {/* MAIN FEATURE CARDS */}
-       <div className="space-y-2">
-          {[
-              { key: 'attendance', icon: <UserCheck size={22} />, title: t('attendance'), sub: t('digital_register') },
-              { key: 'leave', icon: <CalendarRange size={22} />, title: t('staff_leave'), sub: t('apply_absence') },
-              { key: 'history', icon: <History size={22} />, title: "Previous History", sub: "Cloud Submission Log" },
-              { key: 'homework', icon: <BookOpen size={22} />, title: "Submit Homework", sub: `${data?.total_periods || 8} Daily Periods`, border: "border-l-4 border-brand-500" }
-          ].map((it, idx) => (
-              <div key={idx} onClick={(e) => handleCardClick(it.key, e)} className={`glass-card p-4 rounded-[2rem] flex items-center justify-between cursor-pointer active:scale-[0.98] transition-all shadow-sm ${it.border || ''} ${!isSchoolActive ? 'bg-rose-50 dark:bg-rose-950/10 border-rose-100 dark:border-rose-900/20' : ''}`}><div className="flex items-center gap-3"><div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-inner ${!isSchoolActive ? 'bg-rose-500 text-white' : 'bg-brand-500/10 text-brand-600'}`}>{it.icon}</div><div className="text-left"><h3 className={`font-black uppercase text-sm leading-tight ${!isSchoolActive ? 'text-rose-600' : 'text-slate-800 dark:text-white'}`}>{it.title}</h3><p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{it.sub}</p></div></div>{!isSchoolActive ? <Lock size={16} className="text-rose-400" /> : <ChevronRight size={18} className="text-slate-200" />}</div>
-          ))}
+            ))}
        </div>
 
        {/* MODALS */}

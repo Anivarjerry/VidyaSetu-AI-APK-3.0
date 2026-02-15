@@ -50,9 +50,9 @@ export const LoginCard: React.FC<LoginCardProps> = ({ onSubmit, isLoading, error
     <div className="w-full h-full min-h-screen flex flex-col bg-white dark:bg-dark-950 overflow-y-auto no-scrollbar relative">
       <div className="flex-1 flex flex-col items-center justify-start pt-16 sm:justify-center sm:pt-0 px-8 pb-10 z-10 relative max-w-md mx-auto w-full">
         
-        <div className="flex flex-col items-center mb-8">
-           <div className="w-20 h-20 bg-brand-500/10 rounded-[1.8rem] flex items-center justify-center text-brand-500 shadow-inner mb-5 animate-in zoom-in duration-500">
-              <Sparkles size={40} strokeWidth={2.5} />
+        <div className="flex flex-col items-center mb-10">
+           <div className="w-24 h-24 bg-brand-500/10 rounded-[2rem] flex items-center justify-center text-brand-500 shadow-inner mb-6 animate-in zoom-in duration-500 border border-brand-500/20">
+              <Sparkles size={48} strokeWidth={2} />
            </div>
            
            <h2 className="text-3xl font-black text-slate-900 dark:text-white tracking-tighter uppercase leading-none text-center">VidyaSetu AI</h2>
@@ -62,9 +62,9 @@ export const LoginCard: React.FC<LoginCardProps> = ({ onSubmit, isLoading, error
         </div>
 
         {/* --- FORM SECTION --- */}
-        <div className="w-full space-y-4">
+        <div className="w-full space-y-5">
           
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-5">
               <div className="relative group">
                   <Smartphone className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-brand-500 transition-colors" size={20} />
                   <input 
@@ -72,7 +72,7 @@ export const LoginCard: React.FC<LoginCardProps> = ({ onSubmit, isLoading, error
                     name="mobile" 
                     value={formData.mobile} 
                     onChange={handleChange} 
-                    className="w-full pl-12 pr-6 py-4 bg-slate-50 dark:bg-dark-900 border border-slate-100 dark:border-white/5 rounded-2xl text-sm font-black text-slate-800 dark:text-white focus:ring-2 focus:ring-brand-500/20 outline-none transition-all placeholder:text-slate-400 h-14 shadow-sm uppercase tracking-widest" 
+                    className="w-full pl-12 pr-6 h-14 bg-slate-50 dark:bg-dark-900 border border-slate-100 dark:border-white/5 rounded-2xl text-sm font-black text-slate-800 dark:text-white focus:ring-2 focus:ring-brand-500/20 outline-none transition-all placeholder:text-slate-400 shadow-sm uppercase tracking-widest" 
                     placeholder={t('mobile_placeholder')} 
                     inputMode="numeric" 
                     maxLength={10}
@@ -87,32 +87,33 @@ export const LoginCard: React.FC<LoginCardProps> = ({ onSubmit, isLoading, error
                     name="password" 
                     value={formData.password} 
                     onChange={handleChange} 
-                    className="w-full pl-12 pr-12 py-4 bg-slate-50 dark:bg-dark-900 border border-slate-100 dark:border-white/5 rounded-2xl text-sm font-black text-slate-800 dark:text-white focus:ring-2 focus:ring-brand-500/20 outline-none transition-all placeholder:text-slate-400 h-14 shadow-sm" 
+                    className="w-full pl-12 pr-12 h-14 bg-slate-50 dark:bg-dark-900 border border-slate-100 dark:border-white/5 rounded-2xl text-sm font-black text-slate-800 dark:text-white focus:ring-2 focus:ring-brand-500/20 outline-none transition-all placeholder:text-slate-400 shadow-sm" 
                     placeholder={t('password_placeholder')} 
                     disabled={isLoading}
                   />
                   <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-brand-500 transition-colors">
-                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                      {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                   </button>
               </div>
 
               {/* Forgot Password & Admin Hint */}
-              <div className="flex justify-between items-center px-1">
+              <div className="flex justify-between items-center px-2">
                   <button 
                     type="button" 
                     onClick={() => setIsForgotOpen(true)}
-                    className="text-[9px] font-black text-brand-500 uppercase tracking-widest hover:underline"
+                    className="text-[10px] font-black text-brand-500 uppercase tracking-widest hover:underline"
                   >
                     Forgot Password?
                   </button>
-                  <p className="text-[9px] font-bold text-slate-400">Admin? Use Secret Code.</p>
+                  <p className="text-[10px] font-bold text-slate-400">Admin? Use Secret Code.</p>
               </div>
 
+              {/* FIXED LOGIN BUTTON HEIGHT */}
               <Button 
                   type="submit" 
                   fullWidth 
                   disabled={isLoading || formData.mobile.length !== 10 || !formData.password} 
-                  className="py-6 rounded-2xl shadow-xl shadow-brand-500/20 h-auto text-xs font-black uppercase tracking-[0.2em] bg-brand-500 hover:bg-brand-600 text-white border-none active:scale-[0.97] transition-all"
+                  className="h-14 rounded-2xl shadow-xl shadow-brand-500/20 text-xs font-black uppercase tracking-[0.2em] bg-brand-500 hover:bg-brand-600 text-white border-none active:scale-[0.98] transition-all flex items-center justify-center gap-2"
               >
                   {isLoading ? <Loader2 className="animate-spin" /> : "SECURE LOGIN"}
               </Button>
@@ -129,7 +130,7 @@ export const LoginCard: React.FC<LoginCardProps> = ({ onSubmit, isLoading, error
           <button 
             type="button"
             onClick={() => setIsSignUpOpen(true)}
-            className="w-full py-4 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 hover:text-brand-500 transition-colors flex items-center justify-center gap-2 border border-dashed border-slate-200 dark:border-white/10 rounded-2xl mt-4 hover:border-brand-500/50"
+            className="w-full h-14 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 hover:text-brand-500 transition-colors flex items-center justify-center gap-2 border border-dashed border-slate-200 dark:border-white/10 rounded-2xl mt-4 hover:border-brand-500/50"
           >
               <UserPlus size={16} /> Create New Account
           </button>

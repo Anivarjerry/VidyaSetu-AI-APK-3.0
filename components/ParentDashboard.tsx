@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { DashboardData, LoginRequest, ParentHomework } from '../types';
-import { UserCheck, CalendarRange, Truck, BookOpen, Lock, ChevronRight, PieChart, Image as ImageIcon } from 'lucide-react';
+import { UserCheck, CalendarRange, Truck, BookOpen, Lock, PieChart, Image as ImageIcon } from 'lucide-react';
 import { useThemeLanguage } from '../contexts/ThemeLanguageContext';
 import { useModalBackHandler } from '../hooks/useModalBackHandler';
 import { AttendanceHistoryModal } from './AttendanceHistoryModal';
@@ -52,65 +52,39 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
   };
 
   if (!data.student_id) {
-      return <div className="p-8 text-center"><p>Student Profile Not Linked</p></div>;
+      return <div className="p-8 text-center text-slate-400 font-bold text-xs uppercase tracking-widest"><p>Student Profile Not Linked</p></div>;
   }
 
+  // Unified Item List
+  const dashboardItems = [
+      { key: 'daily_tasks', title: t('daily_tasks'), sub: "Assignments", icon: <BookOpen size={20} />, color: "text-brand-600", bg: "bg-brand-500/10" },
+      { key: 'attendance_history', title: t('attendance'), sub: data.today_attendance ? t(data.today_attendance) : t('waiting'), icon: <UserCheck size={20} />, color: data.today_attendance === 'present' ? "text-emerald-600" : data.today_attendance === 'absent' ? "text-rose-600" : "text-blue-600", bg: data.today_attendance === 'present' ? "bg-emerald-500/10" : data.today_attendance === 'absent' ? "bg-rose-500/10" : "bg-blue-500/10" },
+      { key: 'reports', title: "Results", sub: "Performance", icon: <PieChart size={20} />, color: "text-purple-600", bg: "bg-purple-500/10" },
+      { key: 'live_transport', title: t('live_transport'), sub: "Track Bus", icon: <Truck size={20} />, color: "text-orange-600", bg: "bg-orange-500/10" },
+      { key: 'apply_leave', title: t('apply_leave'), sub: "Request Off", icon: <CalendarRange size={20} />, color: "text-indigo-600", bg: "bg-indigo-500/10" },
+      { key: 'gallery', title: "Gallery", sub: "Memories", icon: <ImageIcon size={20} />, color: "text-sky-600", bg: "bg-sky-500/10" },
+  ];
+
   return (
-    <div className="space-y-3 pb-10">
-        
-        {/* SHARED CARDS GRID */}
-        <div className="grid grid-cols-2 gap-2">
-            {/* Gallery */}
-            <div 
-                onClick={() => handleCardClick('gallery')} 
-                className={`glass-card p-4 rounded-[1.8rem] flex flex-col items-center justify-center gap-2 cursor-pointer group active:scale-[0.98] transition-all shadow-sm ${isFeatureLocked ? 'bg-rose-50 dark:bg-rose-950/10 border-rose-100 dark:border-rose-900/20' : ''}`}
-            >
-                <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-inner transition-all group-hover:scale-105 ${isFeatureLocked ? 'bg-rose-500 text-white' : 'bg-brand-500/10 text-brand-600'}`}>
-                    <ImageIcon size={20} />
-                </div>
-                <div className="text-center">
-                    <h3 className={`font-black uppercase text-xs leading-tight ${isFeatureLocked ? 'text-rose-600' : 'text-slate-800 dark:text-white'}`}>Gallery</h3>
-                </div>
-            </div>
-
-            {/* Exam Result Analytics */}
-            <div 
-                onClick={() => handleCardClick('reports')} 
-                className={`glass-card p-4 rounded-[1.8rem] flex flex-col items-center justify-center gap-2 cursor-pointer group active:scale-[0.98] transition-all shadow-sm ${isFeatureLocked ? 'bg-rose-50 dark:bg-rose-950/10 border-rose-100 dark:border-rose-900/20' : ''}`}
-            >
-                <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-inner transition-all group-hover:scale-105 ${isFeatureLocked ? 'bg-rose-500 text-white' : 'bg-brand-500/10 text-brand-600'}`}>
-                    <PieChart size={20} />
-                </div>
-                <div className="text-center">
-                    <h3 className={`font-black uppercase text-xs leading-tight ${isFeatureLocked ? 'text-rose-600' : 'text-slate-800 dark:text-white'}`}>Results</h3>
-                </div>
-            </div>
-        </div>
-
-        {/* MAIN FEATURES */}
-        <div className="space-y-2">
-            {/* 3. Attendance Status */}
-            <div onClick={() => isSchoolActive ? setActiveModal('attendance_history') : onShowLocked('school')} className={`glass-card p-4 rounded-[2rem] flex items-center justify-between active:scale-[0.98] transition-all cursor-pointer shadow-sm ${!isSchoolActive ? 'bg-rose-50 dark:bg-rose-950/10 border-rose-100 dark:border-rose-900/20' : ''}`}>
-                <div className="flex items-center gap-3">
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-inner ${!isSchoolActive ? 'bg-rose-500 text-white' : 'bg-brand-500/10 text-brand-600'}`}><UserCheck size={22} /></div>
-                    <div><p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">{t('attendance_status')}</p><h4 className={`text-sm font-black uppercase leading-tight ${!isSchoolActive ? 'text-rose-600' : 'text-slate-800 dark:text-white'}`}>{t('current')}: <span className={data?.today_attendance === 'present' ? 'text-emerald-500' : data?.today_attendance === 'absent' ? 'text-rose-500' : 'text-brand-500'}>{data?.today_attendance ? t(data.today_attendance) : t('waiting')}</span></h4></div>
-                </div>
-                {!isSchoolActive ? <Lock size={16} className="text-rose-400" /> : <ChevronRight size={18} className="text-slate-300" />}
-            </div>
-
-            {/* 4, 5, 6 Cards */}
-            {[
-                { key: 'apply_leave', icon: <CalendarRange size={22} />, title: t('apply_leave'), sub: 'Absence Request' },
-                { key: 'live_transport', icon: <Truck size={22} />, title: t('live_transport'), sub: 'Real-time Route' },
-                { key: 'daily_tasks', icon: <BookOpen size={22} />, title: t('daily_tasks'), sub: 'Check Assignments' }
-            ].map((it, idx) => {
-                return (
-                    <div key={idx} onClick={() => handleCardClick(it.key)} className={`glass-card p-4 rounded-[2rem] flex items-center justify-between active:scale-[0.98] transition-all cursor-pointer shadow-sm ${isFeatureLocked ? 'bg-rose-50 dark:bg-rose-950/10 border-rose-100 dark:border-rose-900/20' : ''}`}>
-                        <div className="flex items-center gap-3"><div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-inner ${isFeatureLocked ? 'bg-rose-500 text-white' : 'bg-brand-500/10 text-brand-600'}`}>{it.icon}</div><div className="text-left"><h3 className={`font-black uppercase text-sm leading-tight ${isFeatureLocked ? 'text-rose-600' : 'text-slate-800 dark:text-white'}`}>{it.title}</h3><p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">{it.sub}</p></div></div>
-                        {isFeatureLocked ? <Lock size={16} className="text-rose-400" /> : <ChevronRight size={18} className="text-slate-300" />}
+    <div className="pb-24">
+        {/* UNIFIED GRID */}
+        <div className="grid grid-cols-2 gap-3 animate-in fade-in zoom-in-95 duration-300">
+            {dashboardItems.map((item) => (
+                <div 
+                    key={item.key}
+                    onClick={() => handleCardClick(item.key)}
+                    className={`glass-card p-4 rounded-[1.8rem] flex flex-col justify-center items-center text-center gap-2 cursor-pointer group active:scale-[0.98] transition-all shadow-sm relative overflow-hidden ${isFeatureLocked ? 'bg-rose-50 dark:bg-rose-950/10 border-rose-100 dark:border-rose-900/20 opacity-80' : 'bg-white dark:bg-dark-900'}`}
+                >
+                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-inner transition-transform group-hover:scale-110 ${isFeatureLocked ? 'bg-rose-500 text-white' : `${item.bg} ${item.color}`}`}>
+                        {item.icon}
                     </div>
-                );
-            })}
+                    <div>
+                        <h3 className={`font-black uppercase text-xs leading-tight ${isFeatureLocked ? 'text-rose-600' : 'text-slate-800 dark:text-white'}`}>{item.title}</h3>
+                        <p className={`text-[9px] font-bold uppercase tracking-widest mt-0.5 ${isFeatureLocked ? 'text-rose-400' : 'text-slate-400'}`}>{item.sub}</p>
+                    </div>
+                    {isFeatureLocked && <div className="absolute top-2 right-2"><Lock size={12} className="text-rose-400" /></div>}
+                </div>
+            ))}
         </div>
 
         {/* MODALS */}
@@ -119,7 +93,7 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
         <TransportTrackerModal isOpen={activeModal === 'live_transport'} onClose={() => setActiveModal(null)} schoolId={data.school_db_id || ''} />
         
         {/* HOMEWORK MODALS */}
-        <HomeworkListModal isOpen={activeModal === 'daily_tasks'} onClose={() => setActiveModal(null)} dashboardData={data} credentials={credentials} isSubscribed={isUserActive} onLockClick={() => onShowLocked('parent')} onViewHomework={(hw) => { setSelectedHomework(hw); setActiveModal('homework_details'); }} onRefresh={onRefresh} isRefreshing={isRefreshing} refreshTrigger={0} />
+        <HomeworkListModal isOpen={activeModal === 'daily_tasks'} onClose={() => setActiveModal(null)} dashboardData={data} credentials={credentials} isSubscribed={!isFeatureLocked} onLockClick={() => onShowLocked('parent')} onViewHomework={(hw) => { setSelectedHomework(hw); setActiveModal('homework_details'); }} onRefresh={onRefresh} isRefreshing={isRefreshing} refreshTrigger={0} />
         <ParentHomeworkModal isOpen={activeModal === 'homework_details'} onClose={() => setActiveModal('daily_tasks')} data={selectedHomework} onComplete={async () => { if(selectedHomework) await updateParentHomeworkStatus(credentials.school_id, data.class_name || '', data.section || '', data.student_id || '', credentials.mobile, selectedHomework.period, selectedHomework.subject, getISTDate()); setActiveModal('daily_tasks'); onRefresh(); }} isSubmitting={false} />
 
         {/* SHARED */}
