@@ -31,12 +31,23 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
 }) => {
   const { t } = useThemeLanguage();
   
-  // Local State for Modals (Replaces NavigationContext)
+  // Local State for Modals
   const [activeModal, setActiveModal] = useState<string | null>(null);
+  
+  // New State for "Portal" Modal Navigation
+  const [portalView, setPortalView] = useState<'grid' | 'edit'>('grid');
   const [selectedPeriod, setSelectedPeriod] = useState<number | null>(null);
 
   // Back Button Handler
-  useModalBackHandler(!!activeModal, () => setActiveModal(null));
+  useModalBackHandler(!!activeModal, () => {
+      // If we are in 'edit' view of homework, back should go to 'grid'
+      if (activeModal === 'homework' && portalView === 'edit') {
+          setPortalView('grid');
+          setSelectedPeriod(null);
+      } else {
+          setActiveModal(null);
+      }
+  });
 
   const handlePeriodSubmit = async (pData: PeriodData) => {
     const success = await submitPeriodData(credentials.school_id, credentials.mobile, pData, data.user_name, 'submit');
@@ -46,8 +57,9 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
             : "Saved Offline. Will sync when online.";
         alert(msg);
         
-        // Close Edit Period Modal, but Keep Homework Grid Open
-        setActiveModal('homework'); 
+        // Return to Grid View
+        setPortalView('grid');
+        setSelectedPeriod(null);
         onRefresh(); 
     } else alert("Submission Failed!");
   };
@@ -64,6 +76,11 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
           return;
       }
       setActiveModal(key);
+      // Reset portal state when opening
+      if (key === 'homework') {
+          setPortalView('grid');
+          setSelectedPeriod(null);
+      }
   };
 
   return (
@@ -139,41 +156,44 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
        <LeaveRequestModal isOpen={activeModal === 'leave'} onClose={() => setActiveModal(null)} userId={data.user_id || ''} schoolId={data.school_db_id || ''} />
        <TeacherHistoryModal isOpen={activeModal === 'history'} onClose={() => setActiveModal(null)} credentials={credentials} />
        
-       {/* HOMEWORK GRID MODAL */}
+       {/* UNIFIED HOMEWORK PORTAL MODAL */}
        <Modal isOpen={activeModal === 'homework'} onClose={() => setActiveModal(null)} title="TODAY'S PORTAL">
-           <div className="space-y-4 premium-subview-enter">
-               <div className="flex items-center gap-3 bg-brand-50 dark:bg-brand-500/10 p-5 rounded-[2.5rem] border border-brand-100 dark:border-brand-500/20">
-                   <div className="w-14 h-14 bg-white dark:bg-dark-900 rounded-2xl flex items-center justify-center text-brand-600 shadow-sm shrink-0"><Sparkles size={28} /></div>
-                   <div className="text-left"><h4 className="font-black text-slate-800 dark:text-white uppercase leading-tight">Quick Submission</h4><p className="text-[10px] font-black text-slate-400 dark:text-brand-500/60 uppercase tracking-widest">Update {data?.total_periods || 8} sessions</p></div>
-               </div>
-               
-               <div className="grid grid-cols-2 gap-3 pb-4">
-                   {getPeriodsArray().map((num) => { 
-                       const pData = data?.periods?.find(p => p.period_number === num); 
-                       const isSubmitted = pData?.status === 'submitted'; 
-                       return (
-                           <div key={num} onClick={(e) => { e.stopPropagation(); setSelectedPeriod(num); setActiveModal('edit_period'); }} className={`glass-card p-4 rounded-[2rem] transition-all h-36 flex flex-col justify-between cursor-pointer active:scale-95 ${isSubmitted ? 'border-brand-500/30 bg-brand-50 dark:bg-brand-500/5 shadow-inner' : ''}`}>
-                               <div className="flex justify-between items-start text-left"><span className="text-[9px] font-black uppercase text-slate-400 tracking-widest">P {num}</span>{isSubmitted && <div className="text-brand-500"><CheckCircle2 size={16} /></div>}</div>
-                               <div className="min-w-0 text-left"><p className="text-sm font-black truncate uppercase text-slate-800 dark:text-white leading-tight">{pData?.subject || 'Waiting'}</p><p className="text-[9px] font-bold text-slate-400 uppercase truncate">{pData?.class_name || 'Empty'}</p></div>
-                               <button className={`w-full py-2 rounded-2xl text-[8px] font-black uppercase tracking-widest ${isSubmitted ? 'bg-brand-500 text-white shadow-lg' : 'bg-slate-100 dark:bg-slate-700 text-slate-400'}`}>{isSubmitted ? 'EDIT' : 'SET'}</button>
-                           </div>
-                       ); 
-                   })}
-               </div>
-               
-               <button onClick={() => setActiveModal(null)} className="w-full py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest border-t border-slate-50 dark:border-white/5">Close Portal</button>
-           </div>
+           {portalView === 'grid' ? (
+                <div className="space-y-4 premium-subview-enter">
+                    <div className="flex items-center gap-3 bg-brand-50 dark:bg-brand-500/10 p-5 rounded-[2.5rem] border border-brand-100 dark:border-brand-500/20">
+                        <div className="w-14 h-14 bg-white dark:bg-dark-900 rounded-2xl flex items-center justify-center text-brand-600 shadow-sm shrink-0"><Sparkles size={28} /></div>
+                        <div className="text-left"><h4 className="font-black text-slate-800 dark:text-white uppercase leading-tight">Quick Submission</h4><p className="text-[10px] font-black text-slate-400 dark:text-brand-500/60 uppercase tracking-widest">Update {data?.total_periods || 8} sessions</p></div>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-3 pb-4">
+                        {getPeriodsArray().map((num) => { 
+                            const pData = data?.periods?.find(p => p.period_number === num); 
+                            const isSubmitted = pData?.status === 'submitted'; 
+                            return (
+                                <div key={num} onClick={(e) => { e.stopPropagation(); setSelectedPeriod(num); setPortalView('edit'); }} className={`glass-card p-4 rounded-[2rem] transition-all h-36 flex flex-col justify-between cursor-pointer active:scale-95 ${isSubmitted ? 'border-brand-500/30 bg-brand-50 dark:bg-brand-500/5 shadow-inner' : ''}`}>
+                                    <div className="flex justify-between items-start text-left"><span className="text-[9px] font-black uppercase text-slate-400 tracking-widest">P {num}</span>{isSubmitted && <div className="text-brand-500"><CheckCircle2 size={16} /></div>}</div>
+                                    <div className="min-w-0 text-left"><p className="text-sm font-black truncate uppercase text-slate-800 dark:text-white leading-tight">{pData?.subject || 'Waiting'}</p><p className="text-[9px] font-bold text-slate-400 uppercase truncate">{pData?.class_name || 'Empty'}</p></div>
+                                    <button className={`w-full py-2 rounded-2xl text-[8px] font-black uppercase tracking-widest ${isSubmitted ? 'bg-brand-500 text-white shadow-lg' : 'bg-slate-100 dark:bg-slate-700 text-slate-400'}`}>{isSubmitted ? 'EDIT' : 'SET'}</button>
+                                </div>
+                            ); 
+                        })}
+                    </div>
+                    
+                    <button onClick={() => setActiveModal(null)} className="w-full py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest border-t border-slate-50 dark:border-white/5">Close Portal</button>
+                </div>
+           ) : (
+                /* INLINE PERIOD EDITOR (SUB-VIEW) */
+                <PeriodModal 
+                    onBack={() => { setPortalView('grid'); setSelectedPeriod(null); }}
+                    periodNumber={selectedPeriod || 1} 
+                    onSubmit={handlePeriodSubmit} 
+                    initialData={data?.periods?.find(p => p.period_number === selectedPeriod)} 
+                    schoolDbId={data?.school_db_id}
+                    teacherId={data?.user_id} 
+                />
+           )}
        </Modal>
        
-       <PeriodModal 
-           isOpen={activeModal === 'edit_period'} 
-           onClose={() => setActiveModal('homework')} 
-           periodNumber={selectedPeriod || 1} 
-           onSubmit={handlePeriodSubmit} 
-           initialData={data?.periods?.find(p => p.period_number === selectedPeriod)} 
-           schoolDbId={data?.school_db_id} 
-       />
-
        {/* Extra Shared Modals */}
        <GalleryModal isOpen={activeModal === 'gallery'} onClose={() => setActiveModal(null)} schoolId={data.school_db_id || ''} userId={data.user_id || ''} canUpload={true} />
        <ExamModal isOpen={activeModal === 'exam_mgmt'} onClose={() => setActiveModal(null)} role='teacher' schoolId={data.school_db_id || ''} userId={data.user_id || ''} assignedSubject={data.assigned_subject} />

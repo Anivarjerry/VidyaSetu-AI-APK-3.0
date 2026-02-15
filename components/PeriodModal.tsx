@@ -1,27 +1,26 @@
 
 import React, { useState, useEffect } from 'react';
 import { PeriodData } from '../types';
-import { Button } from './Button';
-import { X, Save, Edit2, Loader2, Sparkles, BookOpen, GraduationCap, Layers, CheckCircle2, ChevronRight, Type, History, FileText, LayoutGrid, AlertCircle, ArrowLeft } from 'lucide-react';
-import { useModalBackHandler } from '../hooks/useModalBackHandler';
-import { fetchSchoolClasses, fetchClassSubjects, fetchSubjectLessons, fetchLessonHomework } from '../services/dashboardService';
+import { Loader2, Sparkles, BookOpen, GraduationCap, Layers, CheckCircle2, Type, History, FileText, LayoutGrid, AlertCircle, ArrowLeft } from 'lucide-react';
+import { fetchSchoolClasses, fetchClassSubjects, fetchSubjectLessons, fetchLessonHomework, fetchFullSchoolTimeTable } from '../services/dashboardService';
 
 interface PeriodModalProps {
-  isOpen: boolean;
-  onClose: () => void;
+  // Removed isOpen/onClose for modal control, replaced with onBack for subview control
+  onBack: () => void;
   onSubmit: (data: PeriodData) => Promise<void>;
   periodNumber: number;
   initialData?: PeriodData;
   schoolDbId?: string;
+  teacherId?: string; // Needed for auto-fill
 }
 
 export const PeriodModal: React.FC<PeriodModalProps> = ({ 
-  isOpen, 
-  onClose, 
+  onBack, 
   onSubmit, 
   periodNumber, 
   initialData,
-  schoolDbId
+  schoolDbId,
+  teacherId
 }) => {
   const [formData, setFormData] = useState<PeriodData>({
     period_number: periodNumber,
@@ -43,59 +42,74 @@ export const PeriodModal: React.FC<PeriodModalProps> = ({
   const [loadingLessons, setLoadingLessons] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
+  const [autoFillLoading, setAutoFillLoading] = useState(false);
 
-  // Homework Picker States
-  const [homeworkPickerStep, setHomeworkPickerStep] = useState<'none' | 'options' | 'manual' | 'test_topic' | 'assigned'>('none');
+  // Homework Picker States (Now a sub-view within this component)
+  const [view, setView] = useState<'form' | 'picker_options' | 'picker_manual' | 'picker_test' | 'picker_assigned'>('form');
   const [manualText, setManualText] = useState('');
   const [testTopic, setTestTopic] = useState('');
   const [loadingAssigned, setLoadingAssigned] = useState(false);
 
-  // Single back handler to avoid conflicts
-  useModalBackHandler(isOpen, () => {
-    if (homeworkPickerStep !== 'none') {
-        if (homeworkPickerStep === 'options') setHomeworkPickerStep('none');
-        else setHomeworkPickerStep('options');
-    } else {
-        onClose();
-    }
-  });
-
   useEffect(() => {
-    if (isOpen && schoolDbId) {
-      loadClasses();
+    if (schoolDbId) {
+      loadClassesAndAutoFill();
     }
-  }, [isOpen, schoolDbId]);
+  }, [schoolDbId, periodNumber]);
 
   useEffect(() => {
     if (initialData && initialData.status === 'submitted') {
       setFormData(initialData);
       setIsEditMode(true);
+      // If editing existing, we need to load dependencies
+      if (schoolDbId && initialData.class_name) {
+          // We trigger this inside loadClassesAndAutoFill if needed, but for edit mode:
+          // We handle it in the main load flow or user interaction
+      }
     } else {
-      setFormData({
-        period_number: periodNumber,
-        status: 'pending',
-        class_name: '',
-        subject: '',
-        lesson: '',
-        homework: '',
-        homework_type: 'Manual Input'
-      });
       setIsEditMode(false);
-      setSubjects([]);
-      setLessons([]);
     }
-    setHomeworkPickerStep('none');
-  }, [initialData, periodNumber, isOpen]);
+  }, [initialData]);
 
-  const loadClasses = async () => {
+  const loadClassesAndAutoFill = async () => {
     setLoadingClasses(true);
     try {
-        const data = await fetchSchoolClasses(schoolDbId!);
-        setClasses(data);
-        if (initialData?.class_name) {
-            const foundClass = data.find(c => c.class_name === initialData.class_name);
-            if (foundClass) loadSubjects(foundClass.id);
+        // 1. Load All Classes
+        const classData = await fetchSchoolClasses(schoolDbId!);
+        setClasses(classData);
+
+        // 2. If it's NEW entry (not edit), try to Auto-Fill from Time Table
+        if (!initialData || initialData.status !== 'submitted') {
+            if (teacherId) {
+                setAutoFillLoading(true);
+                const todayDay = new Date().toLocaleDateString('en-US', { weekday: 'long' });
+                // Fetch ALL allocations for today
+                const allAllocations = await fetchFullSchoolTimeTable(schoolDbId!, todayDay);
+                
+                // Find match for this teacher & period
+                const match = allAllocations.find((a: any) => a.period_number === periodNumber && a.teacher_id === teacherId);
+                
+                if (match) {
+                    console.log("Auto-fill match found:", match);
+                    setFormData(prev => ({ 
+                        ...prev, 
+                        class_name: match.class_name, 
+                        subject: match.subject 
+                    }));
+                    
+                    // Trigger subject load for this class so user can change it if needed
+                    const matchedClassObj = classData.find((c: any) => c.class_name === match.class_name);
+                    if (matchedClassObj) {
+                        loadSubjects(matchedClassObj.id); 
+                    }
+                }
+                setAutoFillLoading(false);
+            }
+        } else if (initialData && initialData.class_name) {
+            // If editing, load subjects for the existing class
+            const matchedClassObj = classData.find((c: any) => c.class_name === initialData.class_name);
+            if (matchedClassObj) loadSubjects(matchedClassObj.id);
         }
+
     } catch(e) {}
     setLoadingClasses(false);
   };
@@ -105,8 +119,10 @@ export const PeriodModal: React.FC<PeriodModalProps> = ({
       try {
           const data = await fetchClassSubjects(classId);
           setSubjects(data);
-          if (initialData?.subject) {
-              const foundSub = data.find(s => s.subject_name === initialData.subject);
+          // If editing and we have a subject, try to load lessons
+          if (formData.subject || initialData?.subject) {
+              const subName = formData.subject || initialData?.subject;
+              const foundSub = data.find((s: any) => s.subject_name === subName);
               if (foundSub) loadLessons(foundSub.id);
           }
       } catch(e) {}
@@ -129,7 +145,7 @@ export const PeriodModal: React.FC<PeriodModalProps> = ({
       try {
           const data = await fetchLessonHomework(selectedLessonObj.id);
           setAssignedHomeworks(data);
-          setHomeworkPickerStep('assigned');
+          setView('picker_assigned');
       } catch(e) {}
       setLoadingAssigned(false);
   };
@@ -150,7 +166,7 @@ export const PeriodModal: React.FC<PeriodModalProps> = ({
 
   const handleHomeworkSelect = (text: string, type: string) => {
       setFormData(prev => ({ ...prev, homework: text, homework_type: type }));
-      setHomeworkPickerStep('none');
+      setView('form');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -168,29 +184,102 @@ export const PeriodModal: React.FC<PeriodModalProps> = ({
     setIsSubmitting(false);
   };
 
-  if (!isOpen) return null;
+  // --- RENDER HELPERS ---
 
+  // 1. HOMEWORK PICKER SUB-VIEWS
+  if (view !== 'form') {
+      return (
+          <div className="flex flex-col h-full premium-subview-enter bg-slate-50 dark:bg-dark-900/50">
+              <div className="p-6 border-b border-slate-100 dark:border-white/5 flex justify-between items-center bg-white dark:bg-dark-900">
+                  <div className="flex items-center gap-3">
+                      <button onClick={() => {
+                          if (view === 'picker_options') setView('form');
+                          else setView('picker_options');
+                      }} className="p-2 bg-slate-100 dark:bg-white/5 rounded-xl shadow-sm"><ArrowLeft size={18} /></button>
+                      <h4 className="font-black text-slate-800 dark:text-white uppercase text-sm tracking-widest">
+                          {view === 'picker_options' ? 'Select Type' : view.replace('picker_', '').toUpperCase()}
+                      </h4>
+                  </div>
+              </div>
+
+              <div className="p-6 space-y-3 flex-1 overflow-y-auto no-scrollbar">
+                  {view === 'picker_options' && (
+                      <div className="grid gap-3 premium-subview-enter">
+                          <button onClick={() => { setManualText(formData.homework || ''); setView('picker_manual'); }} className="p-5 bg-white dark:bg-dark-900 rounded-3xl border border-slate-100 dark:border-white/5 flex items-center gap-4 active:scale-95 transition-all text-left group">
+                              <div className="w-12 h-12 rounded-2xl bg-blue-500/10 text-blue-500 flex items-center justify-center group-hover:bg-blue-500 group-hover:text-white transition-all"><Type size={24} /></div>
+                              <div><p className="font-black text-xs uppercase dark:text-white">Manual Input</p><p className="text-[10px] text-slate-400 font-bold uppercase">Type custom text</p></div>
+                          </button>
+                          <button onClick={() => handleHomeworkSelect("Complete yesterday's homework and submit tomorrow.", "Yesterday's Task")} className="p-5 bg-white dark:bg-dark-900 rounded-3xl border border-slate-100 dark:border-white/5 flex items-center gap-4 active:scale-95 transition-all text-left group">
+                              <div className="w-12 h-12 rounded-2xl bg-orange-500/10 text-orange-500 flex items-center justify-center group-hover:bg-orange-500 group-hover:text-white transition-all"><History size={24} /></div>
+                              <div><p className="font-black text-xs uppercase dark:text-white">Fixed: Yesterday's</p><p className="text-[10px] text-slate-400 font-bold uppercase">Set standard reminder</p></div>
+                          </button>
+                          <button onClick={() => { setTestTopic(''); setView('picker_test'); }} className="p-5 bg-white dark:bg-dark-900 rounded-3xl border border-slate-100 dark:border-white/5 flex items-center gap-4 active:scale-95 transition-all text-left group">
+                              <div className="w-12 h-12 rounded-2xl bg-rose-500/10 text-rose-500 flex items-center justify-center group-hover:bg-rose-500 group-hover:text-white transition-all"><FileText size={24} /></div>
+                              <div><p className="font-black text-xs uppercase dark:text-white">Fixed: Test Notice</p><p className="text-[10px] text-slate-400 font-bold uppercase">Announce upcoming test</p></div>
+                          </button>
+                          <button onClick={loadAssignedHomework} className="p-5 bg-emerald-500/5 dark:bg-emerald-500/10 rounded-3xl border border-emerald-100 dark:border-emerald-500/20 flex items-center gap-4 active:scale-95 transition-all text-left group">
+                              <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center group-hover:bg-emerald-500 group-hover:text-white transition-all"><BookOpen size={24} /></div>
+                              <div><p className="font-black text-xs uppercase dark:text-emerald-500">Assigned Templates</p><p className="text-[10px] text-emerald-600/60 font-bold uppercase tracking-tight">Admin pre-sets</p></div>
+                          </button>
+                      </div>
+                  )}
+
+                  {view === 'picker_manual' && (
+                      <div className="space-y-4 premium-subview-enter">
+                          <textarea value={manualText} onChange={e => setManualText(e.target.value)} placeholder="Type homework here..." rows={5} className="w-full p-6 bg-white dark:bg-dark-950 border border-slate-200 dark:border-white/10 rounded-[2rem] text-sm font-bold text-slate-800 dark:text-white focus:ring-2 focus:ring-emerald-500 outline-none resize-none shadow-inner" />
+                          <button onClick={() => handleHomeworkSelect(manualText, "Manual Input")} disabled={!manualText.trim()} className="w-full py-5 rounded-[1.8rem] bg-emerald-500 text-white font-black uppercase text-xs tracking-widest disabled:opacity-40 shadow-lg shadow-emerald-500/20">Apply Content</button>
+                      </div>
+                  )}
+
+                  {view === 'picker_test' && (
+                      <div className="space-y-4 premium-subview-enter">
+                          <div className="bg-rose-50 dark:bg-rose-500/10 p-5 rounded-3xl border border-rose-100 dark:border-rose-500/20 flex items-center gap-3">
+                              <AlertCircle size={20} className="text-rose-500" />
+                              <p className="text-[10px] font-black uppercase text-rose-600">Testing Protocol</p>
+                          </div>
+                          <div><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-2 block">Topic Name</label><input type="text" value={testTopic} onChange={e => setTestTopic(e.target.value)} placeholder="e.g. Chapter 5 Basics" className="w-full p-5 bg-white dark:bg-dark-900 border border-slate-200 dark:border-white/10 rounded-2xl text-sm font-bold dark:text-white outline-none focus:ring-2 focus:ring-rose-500 shadow-sm" /></div>
+                          <button onClick={() => handleHomeworkSelect(`Test Announcement: Preparation required for "${testTopic}" tomorrow.`, "Test Notice")} disabled={!testTopic.trim()} className="w-full py-5 rounded-[1.8rem] bg-rose-500 text-white font-black uppercase text-xs tracking-widest disabled:opacity-40 shadow-lg shadow-rose-500/20">Set Test Homework</button>
+                      </div>
+                  )}
+
+                  {view === 'picker_assigned' && (
+                      <div className="space-y-3 premium-subview-enter">
+                          {loadingAssigned ? (
+                              <div className="text-center py-10"><Loader2 className="animate-spin mx-auto text-emerald-500" /></div>
+                          ) : assignedHomeworks.length === 0 ? (
+                              <div className="text-center py-12 px-4 opacity-40 uppercase text-[9px] font-black tracking-[0.2em] italic">No assigned tasks found for this lesson in Admin Panel.</div>
+                          ) : (
+                              <div className="space-y-2">
+                                  {assignedHomeworks.map(h => (
+                                      <div key={h.id} onClick={() => handleHomeworkSelect(h.homework_template, "Assigned Template")} className="p-5 bg-emerald-50 dark:bg-emerald-500/5 rounded-3xl border border-emerald-100 dark:border-emerald-500/10 active:scale-95 transition-all text-sm font-black text-slate-700 dark:text-slate-300 cursor-pointer uppercase tracking-tight shadow-sm hover:border-emerald-400">{h.homework_template}</div>
+                                  ))}
+                              </div>
+                          )}
+                      </div>
+                  )}
+              </div>
+          </div>
+      );
+  }
+
+  // 2. MAIN FORM VIEW
   return (
-    <div className="fixed inset-0 z-[250] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-      <div 
-        className="bg-white dark:bg-dark-900 rounded-[3rem] shadow-2xl w-full max-w-md overflow-hidden premium-subview-enter transition-all flex flex-col max-h-[92vh] border border-white/10"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex justify-between items-center p-8 border-b border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-slate-800/40">
+    <div className="flex flex-col h-full premium-subview-enter">
+        <div className="flex justify-between items-center p-6 border-b border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-slate-800/40">
           <div>
-            <h3 className="text-xl font-black text-slate-800 dark:text-white uppercase tracking-tight">
-              {isEditMode ? `Edit Period ${periodNumber}` : `Submit Period ${periodNumber}`}
-            </h3>
-            <p className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mt-1 flex items-center gap-1">
-              <Sparkles size={10} /> Smart Portal Active
+            <div className="flex items-center gap-2">
+                <button onClick={onBack} className="p-2 bg-white dark:bg-white/5 rounded-xl shadow-sm"><ArrowLeft size={18} /></button>
+                <h3 className="text-lg font-black text-slate-800 dark:text-white uppercase tracking-tight">
+                  {isEditMode ? `Edit P-${periodNumber}` : `P-${periodNumber} Entry`}
+                </h3>
+            </div>
+            <p className="text-[9px] font-black text-emerald-500 uppercase tracking-widest mt-1 flex items-center gap-1 pl-11">
+              <Sparkles size={10} /> {autoFillLoading ? 'Checking TimeTable...' : 'Smart Portal'}
             </p>
           </div>
-          <button onClick={onClose} className="text-slate-400 p-2.5 rounded-2xl bg-white dark:bg-white/5 shadow-sm active:scale-90 transition-all">
-            <X size={24} strokeWidth={2.5} />
-          </button>
         </div>
         
-        <form onSubmit={handleSubmit} className="p-8 space-y-5 overflow-y-auto no-scrollbar">
+        <form onSubmit={handleSubmit} className="p-6 space-y-5 flex-1 overflow-y-auto no-scrollbar">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1">
               <label className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest ml-1 flex items-center gap-1"><GraduationCap size={12} /> Class</label>
@@ -221,7 +310,7 @@ export const PeriodModal: React.FC<PeriodModalProps> = ({
             <div 
                 onClick={(e) => { 
                     e.preventDefault();
-                    if(formData.lesson) setHomeworkPickerStep('options'); 
+                    if(formData.lesson) setView('picker_options'); 
                     else alert("Please select Class, Subject and Lesson first."); 
                 }}
                 className={`w-full p-6 rounded-[2rem] border-2 border-dashed transition-all flex flex-col items-center justify-center gap-2 min-h-[120px] cursor-pointer hover:scale-[1.02] active:scale-[0.98] ${formData.homework ? 'bg-emerald-50 dark:bg-emerald-900/10 border-emerald-300 dark:border-emerald-800' : 'bg-slate-50 dark:bg-dark-950 border-slate-200 dark:border-white/10'}`}
@@ -247,93 +336,18 @@ export const PeriodModal: React.FC<PeriodModalProps> = ({
           </div>
 
           <div className="pt-2">
-            <button type="submit" disabled={isSubmitting || !formData.homework} className="w-full py-6 rounded-[2.2rem] flex justify-center items-center gap-3 bg-emerald-500 text-white shadow-xl shadow-emerald-500/30 active:scale-[0.98] transition-all font-black text-xs tracking-[0.2em] uppercase border-none glossy-btn disabled:opacity-50">
+            <button type="submit" disabled={isSubmitting || !formData.homework} className="w-full py-5 rounded-[1.8rem] flex justify-center items-center gap-3 bg-emerald-500 text-white shadow-xl shadow-emerald-500/30 active:scale-[0.98] transition-all font-black text-xs tracking-[0.2em] uppercase border-none glossy-btn disabled:opacity-50">
               {isSubmitting ? <Loader2 className="animate-spin" /> : (isEditMode ? 'Update Session' : 'Save Session')}
             </button>
           </div>
         </form>
-      </div>
-
-      {/* HOMEWORK PICKER MODAL */}
-      {homeworkPickerStep !== 'none' && (
-          <div className="fixed inset-0 z-[400] flex items-center justify-center bg-slate-950/80 backdrop-blur-xl p-6 animate-in zoom-in-95 duration-300">
-              <div className="w-full max-w-sm bg-white dark:bg-dark-900 rounded-[3rem] overflow-hidden flex flex-col shadow-2xl border border-white/5">
-                  <div className="p-6 border-b border-slate-50 dark:border-white/5 flex justify-between items-center bg-slate-50/50 dark:bg-white/5">
-                      <div className="flex items-center gap-3">
-                          {(homeworkPickerStep !== 'options') && (
-                              <button onClick={() => setHomeworkPickerStep('options')} className="p-2 bg-white dark:bg-white/5 rounded-xl shadow-sm"><ArrowLeft size={18} /></button>
-                          )}
-                          <h4 className="font-black text-slate-800 dark:text-white uppercase text-sm tracking-widest">{homeworkPickerStep === 'options' ? 'Pick Type' : homeworkPickerStep.toUpperCase()}</h4>
-                      </div>
-                      <button onClick={() => setHomeworkPickerStep('none')} className="p-2 bg-slate-100 dark:bg-white/5 rounded-xl text-slate-400"><X size={18} /></button>
-                  </div>
-
-                  <div className="p-6 space-y-3">
-                      {homeworkPickerStep === 'options' && (
-                          <div className="grid gap-3 premium-subview-enter">
-                              <button onClick={() => { setManualText(formData.homework || ''); setHomeworkPickerStep('manual'); }} className="p-5 bg-slate-50 dark:bg-dark-950 rounded-3xl border border-slate-100 dark:border-white/5 flex items-center gap-4 active:scale-95 transition-all text-left group">
-                                  <div className="w-12 h-12 rounded-2xl bg-blue-500/10 text-blue-500 flex items-center justify-center group-hover:bg-blue-500 group-hover:text-white transition-all"><Type size={24} /></div>
-                                  <div><p className="font-black text-xs uppercase dark:text-white">Manual Input</p><p className="text-[10px] text-slate-400 font-bold uppercase">Type custom text</p></div>
-                              </button>
-                              <button onClick={() => handleHomeworkSelect("Complete yesterday's homework and submit tomorrow.", "Yesterday's Task")} className="p-5 bg-slate-50 dark:bg-dark-950 rounded-3xl border border-slate-100 dark:border-white/5 flex items-center gap-4 active:scale-95 transition-all text-left group">
-                                  <div className="w-12 h-12 rounded-2xl bg-orange-500/10 text-orange-500 flex items-center justify-center group-hover:bg-orange-500 group-hover:text-white transition-all"><History size={24} /></div>
-                                  <div><p className="font-black text-xs uppercase dark:text-white">Fixed: Yesterday's</p><p className="text-[10px] text-slate-400 font-bold uppercase">Set standard reminder</p></div>
-                              </button>
-                              <button onClick={() => { setTestTopic(''); setHomeworkPickerStep('test_topic'); }} className="p-5 bg-slate-50 dark:bg-dark-950 rounded-3xl border border-slate-100 dark:border-white/5 flex items-center gap-4 active:scale-95 transition-all text-left group">
-                                  <div className="w-12 h-12 rounded-2xl bg-rose-500/10 text-rose-500 flex items-center justify-center group-hover:bg-rose-500 group-hover:text-white transition-all"><FileText size={24} /></div>
-                                  <div><p className="font-black text-xs uppercase dark:text-white">Fixed: Test Notice</p><p className="text-[10px] text-slate-400 font-bold uppercase">Announce upcoming test</p></div>
-                              </button>
-                              <button onClick={loadAssignedHomework} className="p-5 bg-emerald-500/5 dark:bg-emerald-500/10 rounded-3xl border border-emerald-100 dark:border-emerald-500/20 flex items-center gap-4 active:scale-95 transition-all text-left group">
-                                  <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center group-hover:bg-emerald-500 group-hover:text-white transition-all"><BookOpen size={24} /></div>
-                                  <div><p className="font-black text-xs uppercase dark:text-emerald-500">Assigned Templates</p><p className="text-[10px] text-emerald-600/60 font-bold uppercase tracking-tight">Admin pre-sets</p></div>
-                              </button>
-                          </div>
-                      )}
-
-                      {homeworkPickerStep === 'manual' && (
-                          <div className="space-y-4 premium-subview-enter">
-                              <textarea value={manualText} onChange={e => setManualText(e.target.value)} placeholder="Type homework here..." rows={5} className="w-full p-6 bg-slate-50 dark:bg-dark-950 border border-slate-200 dark:border-white/10 rounded-[2rem] text-sm font-bold text-slate-800 dark:text-white focus:ring-2 focus:ring-emerald-500 outline-none resize-none shadow-inner" />
-                              <button onClick={() => handleHomeworkSelect(manualText, "Manual Input")} disabled={!manualText.trim()} className="w-full py-5 rounded-[1.8rem] bg-emerald-500 text-white font-black uppercase text-xs tracking-widest disabled:opacity-40 shadow-lg shadow-emerald-500/20">Apply Content</button>
-                          </div>
-                      )}
-
-                      {homeworkPickerStep === 'test_topic' && (
-                          <div className="space-y-4 premium-subview-enter">
-                              <div className="bg-rose-50 dark:bg-rose-500/10 p-5 rounded-3xl border border-rose-100 dark:border-rose-500/20 flex items-center gap-3">
-                                  <AlertCircle size={20} className="text-rose-500" />
-                                  <p className="text-[10px] font-black uppercase text-rose-600">Testing Protocol</p>
-                              </div>
-                              <div><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-2 block">Topic Name</label><input type="text" value={testTopic} onChange={e => setTestTopic(e.target.value)} placeholder="e.g. Chapter 5 Basics" className="w-full p-5 bg-white dark:bg-dark-900 border border-slate-200 dark:border-white/10 rounded-2xl text-sm font-bold dark:text-white outline-none focus:ring-2 focus:ring-rose-500 shadow-sm" /></div>
-                              <button onClick={() => handleHomeworkSelect(`Test Announcement: Preparation required for "${testTopic}" tomorrow.`, "Test Notice")} disabled={!testTopic.trim()} className="w-full py-5 rounded-[1.8rem] bg-rose-500 text-white font-black uppercase text-xs tracking-widest disabled:opacity-40 shadow-lg shadow-rose-500/20">Set Test Homework</button>
-                          </div>
-                      )}
-
-                      {homeworkPickerStep === 'assigned' && (
-                          <div className="space-y-3 premium-subview-enter">
-                              {loadingAssigned ? (
-                                  <div className="text-center py-10"><Loader2 className="animate-spin mx-auto text-emerald-500" /></div>
-                              ) : assignedHomeworks.length === 0 ? (
-                                  <div className="text-center py-12 px-4 opacity-40 uppercase text-[9px] font-black tracking-[0.2em] italic">No assigned tasks found for this lesson in Admin Panel.</div>
-                              ) : (
-                                  <div className="space-y-2 max-h-[45vh] overflow-y-auto no-scrollbar pr-1 pb-4">
-                                      {assignedHomeworks.map(h => (
-                                          <div key={h.id} onClick={() => handleHomeworkSelect(h.homework_template, "Assigned Template")} className="p-5 bg-emerald-50 dark:bg-emerald-500/5 rounded-3xl border border-emerald-100 dark:border-emerald-500/10 active:scale-95 transition-all text-sm font-black text-slate-700 dark:text-slate-300 cursor-pointer uppercase tracking-tight shadow-sm hover:border-emerald-400">{h.homework_template}</div>
-                                      ))}
-                                  </div>
-                              )}
-                          </div>
-                      )}
-                  </div>
-              </div>
-          </div>
-      )}
-
-      <style>{`
+        
+        <style>{`
         .glossy-btn {
             background-image: linear-gradient(rgba(255,255,255,0.2), transparent);
             border-top: 1px solid rgba(255,255,255,0.4) !important;
         }
-      `}</style>
+        `}</style>
     </div>
   );
 };
