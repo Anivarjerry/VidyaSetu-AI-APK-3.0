@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Calendar, Search, BookOpen, CheckCircle2, Clock, AlertCircle, RefreshCw } from 'lucide-react';
 import { useThemeLanguage } from '../contexts/ThemeLanguageContext';
 import { HomeworkAnalyticsData } from '../types';
@@ -21,6 +22,12 @@ export const HomeworkAnalyticsModal: React.FC<HomeworkAnalyticsModalProps> = ({ 
   const [data, setData] = useState<HomeworkAnalyticsData | null>(null);
   const [loading, setLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+    return () => setMounted(false);
+  }, []);
 
   useEffect(() => {
     if (isOpen) {
@@ -28,7 +35,11 @@ export const HomeworkAnalyticsModal: React.FC<HomeworkAnalyticsModalProps> = ({ 
         const istOffset = 5.5 * 60 * 60 * 1000;
         const today = new Date(now.getTime() + istOffset).toISOString().split('T')[0];
         setSelectedDate(today);
+        document.body.style.overflow = 'hidden';
+    } else {
+        document.body.style.overflow = '';
     }
+    return () => { document.body.style.overflow = ''; };
   }, [isOpen]);
 
   useEffect(() => {
@@ -60,12 +71,14 @@ export const HomeworkAnalyticsModal: React.FC<HomeworkAnalyticsModalProps> = ({ 
       }
   };
 
-  if (!isOpen) return null;
+  if (!isOpen || !mounted) return null;
 
-  return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/40 backdrop-blur-md p-4 animate-in fade-in duration-200">
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm premium-modal-backdrop" onClick={onClose} />
+      
       <div 
-        className="glass-card rounded-[2.5rem] shadow-2xl w-full max-w-md h-[85vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200 transition-all border border-white/20"
+        className="glass-card rounded-[2.5rem] shadow-2xl w-full max-w-md h-[85vh] flex flex-col overflow-hidden premium-modal-content relative z-10 border border-white/20"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -172,6 +185,7 @@ export const HomeworkAnalyticsModal: React.FC<HomeworkAnalyticsModalProps> = ({ 
            )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Send, Bot, RefreshCw, Volume2, VolumeX, Square, Sparkles } from 'lucide-react';
 import { useModalBackHandler } from '../hooks/useModalBackHandler';
 import { getGeminiChatResponse, ChatMessage } from '../services/aiService';
@@ -28,9 +29,15 @@ export const AIChatModal: React.FC<AIChatModalProps> = ({ isOpen, onClose, userN
   
   const [viewportHeight, setViewportHeight] = useState('100%');
   const [viewportTop, setViewportTop] = useState(0);
+  const [mounted, setMounted] = useState(false);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const typingIntervalRef = useRef<any>(null); 
+
+  useEffect(() => {
+    setMounted(true);
+    return () => setMounted(false);
+  }, []);
 
   useEffect(() => {
     if (messagesEndRef.current) {
@@ -61,12 +68,15 @@ export const AIChatModal: React.FC<AIChatModalProps> = ({ isOpen, onClose, userN
         setMessages([]);
         setInputText('');
         setSpeakingIndex(null);
+        document.body.style.overflow = '';
     } else {
+        document.body.style.overflow = 'hidden';
         const greeting = language === 'hi' 
           ? `नमस्ते ${userName}! मैं विद्यासेतु AI हूँ। मैं आपकी स्कूल और पढ़ाई से जुड़ी चीज़ों में कैसे मदद कर सकता हूँ?` 
           : `Hello ${userName}! I am VidyaSetu AI. How can I assist you with your school portal and studies today?`;
         setMessages([{ role: 'assistant', content: greeting }]);
     }
+    return () => { document.body.style.overflow = ''; };
   }, [isOpen]);
 
   const handleSpeech = (text: string, index: number) => {
@@ -141,16 +151,19 @@ export const AIChatModal: React.FC<AIChatModalProps> = ({ isOpen, onClose, userN
     }
   };
 
-  if (!isOpen) return null;
+  if (!isOpen || !mounted) return null;
 
-  return (
+  return createPortal(
     <div 
-        className="fixed left-0 w-full z-[300] flex flex-col justify-end items-center pointer-events-none"
+        className="fixed left-0 w-full z-[9999] flex flex-col justify-end items-center pointer-events-none"
         style={{ height: viewportHeight, top: viewportTop }}
     >
-      <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm pointer-events-auto transition-opacity duration-300" onClick={onClose} />
+      <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm pointer-events-auto transition-opacity duration-300 premium-modal-backdrop" onClick={onClose} />
       
-      <div className="bg-white dark:bg-dark-900 w-full sm:w-[28rem] h-[calc(100%-1.5rem)] sm:h-[90%] rounded-t-[2.5rem] rounded-b-none sm:rounded-[2.5rem] sm:mb-4 shadow-2xl flex flex-col pointer-events-auto relative border border-white/20 overflow-hidden premium-modal-content">
+      <div 
+        className="bg-white dark:bg-dark-900 w-full sm:w-[28rem] h-[calc(100%-1.5rem)] sm:h-[90%] rounded-t-[2.5rem] rounded-b-none sm:rounded-[2.5rem] sm:mb-4 shadow-2xl flex flex-col pointer-events-auto relative border border-white/20 overflow-hidden premium-modal-content z-20"
+        onClick={(e) => e.stopPropagation()}
+      >
         
         {/* Header */}
         <div className="px-5 py-4 bg-white/95 dark:bg-dark-900/95 backdrop-blur-xl border-b border-slate-100 dark:border-white/5 flex justify-between items-center z-10">
@@ -179,7 +192,7 @@ export const AIChatModal: React.FC<AIChatModalProps> = ({ isOpen, onClose, userN
                  <button onClick={() => setLanguage('en')} className={`px-3 py-1 rounded-full text-[9px] font-black uppercase transition-all ${language === 'en' ? 'bg-white dark:bg-dark-800 text-emerald-600 shadow-sm' : 'text-slate-400'}`}>Eng</button>
               </div>
 
-              <button onClick={onClose} className="w-9 h-9 bg-slate-50 dark:bg-white/5 rounded-full flex items-center justify-center text-slate-400 hover:bg-rose-50 hover:text-rose-500 transition-all"><X size={18} /></button>
+              <button onClick={onClose} className="w-9 h-9 bg-slate-50 dark:bg-white/5 rounded-full flex items-center justify-center text-slate-400 hover:bg-rose-50 hover:text-rose-500 transition-all active:scale-90"><X size={18} /></button>
            </div>
         </div>
 
@@ -213,7 +226,7 @@ export const AIChatModal: React.FC<AIChatModalProps> = ({ isOpen, onClose, userN
                 value={inputText} 
                 onChange={e => setInputText(e.target.value)} 
                 placeholder={language === 'hi' ? "यहाँ पूछें..." : "Ask me anything..."} 
-                className="flex-1 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-[1.5rem] px-5 py-4 h-14 max-h-32 focus:ring-2 focus:ring-emerald-500/20 outline-none text-sm font-bold resize-none transition-all placeholder:text-slate-400" 
+                className="flex-1 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-[1.5rem] px-5 py-4 h-14 max-h-32 focus:ring-2 focus:ring-emerald-500/20 outline-none text-sm font-bold resize-none transition-all placeholder:text-slate-400 dark:text-white" 
                 rows={1} 
                 onKeyDown={e => { if(e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }}} 
               />
@@ -227,6 +240,7 @@ export const AIChatModal: React.FC<AIChatModalProps> = ({ isOpen, onClose, userN
            </form>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

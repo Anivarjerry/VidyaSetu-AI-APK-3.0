@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { AttendanceHistoryItem } from '../types';
-import { Modal } from './Modal';
 import { Calendar, History, Loader2, CheckCircle2, XCircle, Clock, X } from 'lucide-react';
 import { useThemeLanguage } from '../contexts/ThemeLanguageContext';
 import { fetchAttendanceHistory } from '../services/dashboardService';
@@ -20,11 +20,21 @@ export const AttendanceHistoryModal: React.FC<AttendanceHistoryModalProps> = ({ 
   const { t } = useThemeLanguage();
   const [history, setHistory] = useState<AttendanceHistoryItem[]>([]);
   const [loading, setLoading] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    if (isOpen && studentId) {
-      loadHistory();
+    setMounted(true);
+    return () => setMounted(false);
+  }, []);
+
+  useEffect(() => {
+    if (isOpen) {
+      if (studentId) loadHistory();
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
     }
+    return () => { document.body.style.overflow = ''; };
   }, [isOpen, studentId]);
 
   const loadHistory = async () => {
@@ -34,23 +44,24 @@ export const AttendanceHistoryModal: React.FC<AttendanceHistoryModalProps> = ({ 
     setLoading(false);
   };
 
-  // Guard clause to prevent rendering when not open
-  if (!isOpen) return null;
+  if (!isOpen || !mounted) return null;
 
-  return (
-    <div className="fixed inset-0 z-[250] flex items-center justify-center bg-black/60 backdrop-blur-md p-4 animate-in fade-in duration-200">
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm premium-modal-backdrop" onClick={onClose} />
+      
       <div 
-        className="bg-white dark:bg-gray-800 rounded-[3rem] shadow-2xl w-full max-w-md overflow-hidden premium-subview-enter transition-all flex flex-col max-h-[90vh] border border-white/5"
+        className="bg-white dark:bg-gray-800 rounded-[3rem] shadow-2xl w-full max-w-md overflow-hidden premium-modal-content transition-all flex flex-col max-h-[90vh] border border-white/20 relative z-10"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex justify-between items-center p-8 border-b border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/50">
+        <div className="flex justify-between items-center p-8 border-b border-gray-100 dark:border-white/5 bg-white dark:bg-dark-900">
            <h3 className="text-xl font-black text-gray-800 dark:text-white uppercase tracking-tight leading-none">ATTENDANCE RECORD</h3>
-           <button onClick={onClose} className="text-gray-400 p-2.5 rounded-2xl bg-gray-200/50 dark:bg-gray-600/50 active:scale-90 transition-all">
+           <button onClick={onClose} className="text-gray-400 p-2.5 rounded-2xl bg-gray-100 dark:bg-white/5 hover:bg-rose-50 hover:text-rose-500 active:scale-90 transition-all">
              <X size={24} strokeWidth={2.5} />
            </button>
         </div>
 
-        <div className="p-8 space-y-6 overflow-y-auto no-scrollbar">
+        <div className="p-8 space-y-6 overflow-y-auto no-scrollbar bg-white dark:bg-dark-900 flex-1">
           <div className="p-6 bg-brand-500 rounded-[2.5rem] text-white shadow-xl shadow-brand-500/20 dark:shadow-none overflow-hidden relative">
              <div className="absolute top-[-20%] right-[-10%] w-32 h-32 bg-white/10 rounded-full blur-2xl"></div>
              <div className="relative z-10">
@@ -76,7 +87,7 @@ export const AttendanceHistoryModal: React.FC<AttendanceHistoryModalProps> = ({ 
                 <div className="text-center py-16 opacity-40 uppercase text-[10px] font-black tracking-widest dark:text-gray-500">No history found</div>
              ) : (
                 history.map(h => (
-                  <div key={h.id} className="p-4 bg-white dark:bg-gray-800 rounded-[2rem] border border-gray-100 dark:border-gray-700 shadow-sm flex items-center justify-between group transition-all">
+                  <div key={h.id} className="p-4 bg-white dark:bg-dark-950 rounded-[2rem] border border-gray-100 dark:border-white/5 shadow-sm flex items-center justify-between group transition-all">
                      <div className="flex items-center gap-4">
                         <div className={`w-11 h-11 rounded-2xl flex items-center justify-center shadow-inner ${h.status === 'present' ? 'bg-green-50 dark:bg-green-900/20 text-green-500' : h.status === 'absent' ? 'bg-red-50 dark:bg-red-900/20 text-red-500' : 'bg-orange-50 dark:bg-orange-900/20 text-orange-500'}`}>
                            {h.status === 'present' ? <CheckCircle2 size={20} /> : h.status === 'absent' ? <XCircle size={20} /> : <Clock size={20} />}
@@ -96,10 +107,11 @@ export const AttendanceHistoryModal: React.FC<AttendanceHistoryModalProps> = ({ 
           </div>
         </div>
 
-        <div className="p-8 border-t border-gray-100 dark:border-gray-700">
-           <button onClick={onClose} className="w-full py-5 rounded-[2rem] bg-gray-100 dark:bg-gray-700 text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-[0.2em] transition-all active:scale-95 shadow-sm">Close Record</button>
+        <div className="p-8 border-t border-gray-100 dark:border-white/5 bg-white dark:bg-dark-900">
+           <button onClick={onClose} className="w-full py-5 rounded-[2rem] bg-gray-100 dark:bg-white/5 text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-[0.2em] transition-all active:scale-95 shadow-sm">Close Record</button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Button } from './Button';
 import { X, Send, Calendar, Users, Type, MessageSquare, Megaphone, Sparkles, Trash2, History, PenTool, RefreshCw, Loader2, AlertCircle } from 'lucide-react';
 import { useThemeLanguage } from '../contexts/ThemeLanguageContext';
@@ -29,6 +30,12 @@ export const NoticeModal: React.FC<NoticeModalProps> = ({ isOpen, onClose, crede
   // History State
   const [historyList, setHistoryList] = useState<NoticeItem[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+    return () => setMounted(false);
+  }, []);
 
   useEffect(() => {
     if (isOpen) {
@@ -37,7 +44,11 @@ export const NoticeModal: React.FC<NoticeModalProps> = ({ isOpen, onClose, crede
       setDate(tomorrow.toISOString().split('T')[0]);
       setTemplate(''); setTitle(''); setMessage(''); setTarget('all');
       setActiveTab('compose');
+      document.body.style.overflow = 'hidden';
+    } else {
+        document.body.style.overflow = '';
     }
+    return () => { document.body.style.overflow = ''; };
   }, [isOpen]);
 
   const handleTemplateChange = (val: string) => {
@@ -124,11 +135,11 @@ export const NoticeModal: React.FC<NoticeModalProps> = ({ isOpen, onClose, crede
       if (tab === 'history') loadHistory();
   };
 
-  if (!isOpen) return null;
+  if (!isOpen || !mounted) return null;
 
-  return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-slate-900/40 premium-modal-backdrop" onClick={onClose} />
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm premium-modal-backdrop" onClick={onClose} />
       
       <div 
         className="relative bg-white dark:bg-dark-900 rounded-[3rem] shadow-2xl w-full max-w-md h-[82vh] flex flex-col overflow-hidden premium-modal-content z-10 border border-slate-100 dark:border-white/5"
@@ -251,6 +262,7 @@ export const NoticeModal: React.FC<NoticeModalProps> = ({ isOpen, onClose, crede
             </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

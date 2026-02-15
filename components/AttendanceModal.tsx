@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Student, AttendanceStatus, AttendanceHistoryItem } from '../types';
 import { Modal } from './Modal';
 import { Button } from './Button';
@@ -27,6 +28,12 @@ export const AttendanceModal: React.FC<AttendanceModalProps> = ({ isOpen, onClos
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+    return () => setMounted(false);
+  }, []);
 
   useModalBackHandler(isOpen && tab !== 'class', () => {
     if (tab === 'history') setTab('mark');
@@ -36,12 +43,15 @@ export const AttendanceModal: React.FC<AttendanceModalProps> = ({ isOpen, onClos
   useEffect(() => {
     if (isOpen) {
       loadInitialData();
+      document.body.style.overflow = 'hidden';
     } else {
       setTab('class');
       setSelectedClass('');
       setAttendance({});
       setHistoryData([]);
+      document.body.style.overflow = '';
     }
+    return () => { document.body.style.overflow = ''; };
   }, [isOpen, schoolId]);
 
   const loadInitialData = async () => {
@@ -129,11 +139,11 @@ export const AttendanceModal: React.FC<AttendanceModalProps> = ({ isOpen, onClos
     setSubmitting(false);
   };
 
-  if (!isOpen) return null;
+  if (!isOpen || !mounted) return null;
 
-  return (
-    <div className="fixed inset-0 z-[250] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-slate-900/40 premium-modal-backdrop" onClick={onClose} />
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm premium-modal-backdrop" onClick={onClose} />
       <div className="bg-white dark:bg-dark-900 rounded-[3rem] shadow-2xl w-full max-w-md h-[80vh] flex flex-col overflow-hidden premium-modal-content relative z-10 border border-white/20">
         
         <div className="flex justify-between items-center p-8 border-b border-slate-100 dark:border-white/5 bg-white dark:bg-dark-900">
@@ -290,6 +300,7 @@ export const AttendanceModal: React.FC<AttendanceModalProps> = ({ isOpen, onClos
             )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
