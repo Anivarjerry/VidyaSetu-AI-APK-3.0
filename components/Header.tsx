@@ -54,71 +54,85 @@ export const Header: React.FC<HeaderProps> = ({ onOpenSettings, onOpenAbout, onO
 
   return (
     <>
-      {/* Centered Header with Proper Flexbox */}
-      <header className="fixed top-0 left-0 right-0 glass-header z-50 px-6 flex items-center justify-between border-b border-slate-100/20 dark:border-white/5 safe-padding-top h-[calc(4.5rem+env(safe-area-inset-top,0px))] pt-[env(safe-area-inset-top,0px)] transition-all duration-300">
+      {/* 
+          COMPACT HEADER
+          Height: 3.5rem (56px) + Safe Area Top
+          Style: Glassmorphism with subtle border
+      */}
+      <header className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-4 pt-[env(safe-area-inset-top,0px)] h-[calc(3.5rem+env(safe-area-inset-top,0px))] bg-white/80 dark:bg-[#0f172a]/80 backdrop-blur-md border-b border-slate-200/50 dark:border-white/5 transition-all duration-300">
         
-        {/* Brand */}
-        <div className="flex items-center gap-3">
-          <div className="text-brand-500 neon-glow-subtle">
-            <GraduationCap size={28} strokeWidth={2.5} />
+        {/* Left: Brand Identity */}
+        <div className="flex items-center gap-2.5">
+          <div className="flex items-center justify-center w-8 h-8 rounded-xl bg-brand-500/10 text-brand-600 dark:text-brand-400">
+            <GraduationCap size={20} strokeWidth={2.5} />
           </div>
-          <span className="font-black text-slate-800 dark:text-white text-lg tracking-tight uppercase leading-none mt-0.5">VidyaSetu</span>
+          <span className="font-bold text-slate-800 dark:text-white text-lg tracking-tight">VidyaSetu</span>
         </div>
 
-        {/* DESKTOP NAVIGATION (Visible only on md+) */}
+        {/* Center: Desktop Navigation (Hidden on Mobile) */}
         {onChangeView && (
-            <div className="hidden md:flex items-center gap-2 absolute left-1/2 -translate-x-1/2 top-[calc(50%+env(safe-area-inset-top,0px)/2)] -translate-y-1/2 bg-slate-100 dark:bg-white/5 p-1 rounded-2xl border border-slate-200 dark:border-white/10">
+            <div className="hidden md:flex items-center absolute left-1/2 -translate-x-1/2 top-[calc(50%+env(safe-area-inset-top,0px)/2)] -translate-y-1/2 bg-slate-100 dark:bg-white/5 p-1 rounded-full border border-slate-200 dark:border-white/10">
                 <button 
                     onClick={() => onChangeView('home')}
-                    className={`flex items-center gap-2 px-6 py-2 rounded-xl text-xs font-black uppercase transition-all ${currentView === 'home' ? 'bg-white dark:bg-dark-900 text-brand-600 shadow-sm' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}
+                    className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-[11px] font-bold uppercase transition-all ${currentView === 'home' ? 'bg-white dark:bg-dark-900 text-brand-600 shadow-sm' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}
                 >
-                    <LayoutDashboard size={16} /> Dashboard
+                    <LayoutDashboard size={14} /> Dashboard
                 </button>
                 <button 
                     onClick={() => onChangeView('profile')}
-                    className={`flex items-center gap-2 px-6 py-2 rounded-xl text-xs font-black uppercase transition-all ${currentView === 'profile' ? 'bg-white dark:bg-dark-900 text-brand-600 shadow-sm' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}
+                    className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-[11px] font-bold uppercase transition-all ${currentView === 'profile' ? 'bg-white dark:bg-dark-900 text-brand-600 shadow-sm' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}
                 >
-                    <User size={16} /> Profile
+                    <User size={14} /> Profile
                 </button>
             </div>
         )}
 
-        {/* Actions */}
-        <div className="flex items-center gap-1.5">
-          {/* SYNC INDICATOR */}
-          <div className="mr-1 flex items-center justify-center w-8 h-8 rounded-full bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/5 shadow-sm">
-             {syncStatus === 'offline' && <CloudOff className="text-rose-500" size={16} />}
-             {syncStatus === 'syncing' && <RefreshCw className="text-amber-500 animate-spin" size={16} />}
-             {syncStatus === 'online' && <Cloud className="text-emerald-500" size={16} />}
+        {/* Right: Actions */}
+        <div className="flex items-center gap-1">
+          
+          {/* Sync Status Indicator */}
+          <div className="flex items-center justify-center w-8 h-8" title={syncStatus === 'online' ? 'Online' : 'Offline'}>
+             {syncStatus === 'offline' && <CloudOff className="text-rose-500 opacity-80" size={18} />}
+             {syncStatus === 'syncing' && <RefreshCw className="text-amber-500 animate-spin" size={18} />}
+             {syncStatus === 'online' && (
+               <div className="relative">
+                 <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
+                 <div className="absolute inset-0 w-2 h-2 rounded-full bg-emerald-500 animate-ping opacity-20"></div>
+               </div>
+             )}
           </div>
 
+          {/* Notifications */}
           {onOpenNotices && (
-              <button onClick={onOpenNotices} className="p-2.5 text-slate-400 hover:text-brand-500 dark:text-slate-500 dark:hover:text-brand-400 transition-all active:scale-90">
-                  <Bell size={22} strokeWidth={2} />
+              <button onClick={onOpenNotices} className="w-9 h-9 flex items-center justify-center rounded-full text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/10 active:scale-90 transition-all">
+                  <Bell size={20} strokeWidth={2} />
               </button>
           )}
-          <button onClick={() => setIsMenuOpen(!isMenuOpen)} className={`p-2.5 transition-all rounded-full active:scale-90 ${isMenuOpen ? 'text-brand-500 bg-brand-500/10' : 'text-slate-400 dark:text-slate-500'}`}>
-            <MoreVertical size={22} strokeWidth={2.5} />
+
+          {/* Menu */}
+          <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="w-9 h-9 flex items-center justify-center rounded-full text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/10 active:scale-90 transition-all">
+            <MoreVertical size={20} strokeWidth={2} />
           </button>
         </div>
       </header>
 
+      {/* Menu Dropdown / Modal */}
       {isMenuOpen && (
         <>
-            <div className="fixed inset-0 bg-slate-900/5 backdrop-blur-[1px] z-[60]" onClick={() => setIsMenuOpen(false)} />
-            <div className="fixed top-[calc(5rem+env(safe-area-inset-top,0px))] right-6 w-52 glass-card rounded-[1.8rem] border border-slate-100 dark:border-white/20 overflow-hidden z-[70] shadow-xl animate-in fade-in zoom-in-95 duration-200">
-               <div className="py-1">
+            <div className="fixed inset-0 bg-transparent z-[60]" onClick={() => setIsMenuOpen(false)} />
+            <div className="fixed top-[calc(3rem+env(safe-area-inset-top,0px))] right-4 w-48 bg-white dark:bg-[#1e293b] rounded-2xl shadow-xl border border-slate-100 dark:border-white/10 overflow-hidden z-[70] animate-in fade-in zoom-in-95 duration-200 origin-top-right">
+               <div className="py-1.5">
                  {[
                    { icon: <Settings size={16} />, label: "Settings", action: onOpenSettings },
                    { icon: <Info size={16} />, label: "About", action: onOpenAbout },
                    { icon: <HelpCircle size={16} />, label: "Help", action: onOpenHelp }
                  ].map((item, i) => (
-                   <button key={i} onClick={() => handleMenuItemClick(item.action)} className="w-full text-left px-5 py-3.5 text-[11px] font-black text-slate-600 dark:text-slate-300 hover:bg-brand-500/5 flex items-center gap-3 transition-colors uppercase tracking-tight">
+                   <button key={i} onClick={() => handleMenuItemClick(item.action)} className="w-full text-left px-4 py-3 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 flex items-center gap-3 transition-colors active:bg-slate-100">
                       {item.icon} {item.label}
                    </button>
                  ))}
-                 <div className="h-px bg-slate-100/40 dark:bg-white/5 my-1 mx-4"></div>
-                 <button onClick={() => handleMenuItemClick(onLogout)} className="w-full text-left px-5 py-3.5 text-[11px] font-black text-rose-500 hover:bg-rose-500/5 flex items-center gap-3 transition-colors uppercase tracking-tight">
+                 <div className="h-px bg-slate-100 dark:bg-white/5 my-1 mx-3"></div>
+                 <button onClick={() => handleMenuItemClick(onLogout)} className="w-full text-left px-4 py-3 text-xs font-bold text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 flex items-center gap-3 transition-colors active:bg-rose-50">
                     <LogOut size={16} /> Logout
                  </button>
                </div>

@@ -112,7 +112,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ credentials, role, userNam
   };
 
   return (
-    <div className="fixed inset-0 h-screen w-screen bg-[#F8FAFC] dark:bg-dark-950 flex flex-col overflow-hidden transition-colors">
+    <div className="fixed inset-0 h-full w-full bg-[#F8FAFC] dark:bg-dark-950 transition-colors">
+      
+      {/* 1. Header (Fixed Top) */}
       <Header 
         onRefresh={handleManualRefresh} 
         onOpenSettings={() => setActiveMenuModal('settings')} 
@@ -124,17 +126,19 @@ export const Dashboard: React.FC<DashboardProps> = ({ credentials, role, userNam
         onChangeView={(v) => setCurrentView(v as any)} 
       />
 
-      {/* Main Container */}
-      <main className="flex-1 w-full flex flex-col overflow-hidden relative" style={{ marginTop: 'calc(5.5rem + env(safe-area-inset-top, 0px))', marginBottom: window.innerWidth < 768 ? 'calc(5.5rem + env(safe-area-inset-bottom, 0px))' : '0' }}>
+      {/* 2. Main Scroll Container (Edge-to-Edge) */}
+      <main className="fixed inset-0 w-full h-full overflow-y-auto no-scrollbar scroll-smooth z-0">
         
-        {(currentView === 'home' || currentView === 'action' || currentView === 'manage') ? (
-            <>
-                {currentView === 'home' && (
-                    <div className="w-full px-4 pt-3 pb-0.5 z-[40] flex-shrink-0 animate-in fade-in zoom-in-95 duration-300">
-                        <div className="max-w-4xl md:max-w-7xl mx-auto w-full">
+        {/* Spacer for Header + Safe Area */}
+        <div className="pt-[calc(4.5rem+env(safe-area-inset-top,0px))] pb-[calc(7rem+env(safe-area-inset-bottom,0px))] px-4 w-full max-w-4xl md:max-w-7xl mx-auto">
+            
+            {(currentView === 'home' || currentView === 'action' || currentView === 'manage') ? (
+                <div className={`transition-opacity duration-300 ${isRefreshing ? 'opacity-50' : 'opacity-100'}`}>
+                    {currentView === 'home' && (
+                        <div className="mb-4 animate-in fade-in zoom-in-95 duration-300">
                             {initialLoading && !data ? <SkeletonSchoolCard /> : <SchoolInfoCard schoolName={data?.school_name || ''} schoolCode={data?.school_code || ''} onClick={handleSchoolCardClick} />}
                             
-                            <div className="flex items-center justify-between mt-1 mb-2.5 px-1.5">
+                            <div className="flex items-center justify-between mt-2 px-1.5">
                                 <h3 className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em]">
                                     {role === 'parent' || role === 'student' ? t('student_hub') : role === 'teacher' ? t('todays_schedule') : role === 'driver' ? t('bus_route_tracker') : t('principal_portal')}
                                 </h3>
@@ -150,31 +154,22 @@ export const Dashboard: React.FC<DashboardProps> = ({ credentials, role, userNam
                                 </div>
                             </div>
                         </div>
-                    </div>
-                )}
+                    )}
 
-                <div className="flex-1 overflow-y-auto w-full px-4 pb-4 no-scrollbar">
-                    <div className="max-w-4xl md:max-w-7xl mx-auto w-full h-full">
-                         <div className={`w-full h-full transition-opacity duration-300 pb-10 ${isRefreshing ? 'opacity-40' : 'opacity-100'}`}>
-                            
-                            {data && role === 'principal' && <PrincipalDashboard data={data} credentials={credentials} isSchoolActive={isSchoolActive} onShowPayModal={() => setShowPayModal(true)} onRefresh={handleManualRefresh} viewMode={currentView} />}
-                            {data && role === 'teacher' && <TeacherDashboard data={data} credentials={credentials} isSchoolActive={isSchoolActive} onShowLocked={() => showLockedFeature('school')} onRefresh={handleManualRefresh} />}
-                            {data && (role === 'parent' || role === 'student') && <ParentDashboard data={data} credentials={credentials} role={role} isSchoolActive={isSchoolActive} isUserActive={isUserActive} onShowLocked={showLockedFeature} onRefresh={handleManualRefresh} isRefreshing={isRefreshing} />}
-                            {data && role === 'driver' && <DriverDashboard data={data} isSchoolActive={isSchoolActive} onShowLocked={() => showLockedFeature('school')} />}
-
-                         </div>
-                    </div>
+                    {data && role === 'principal' && <PrincipalDashboard data={data} credentials={credentials} isSchoolActive={isSchoolActive} onShowPayModal={() => setShowPayModal(true)} onRefresh={handleManualRefresh} viewMode={currentView} />}
+                    {data && role === 'teacher' && <TeacherDashboard data={data} credentials={credentials} isSchoolActive={isSchoolActive} onShowLocked={() => showLockedFeature('school')} onRefresh={handleManualRefresh} />}
+                    {data && (role === 'parent' || role === 'student') && <ParentDashboard data={data} credentials={credentials} role={role} isSchoolActive={isSchoolActive} isUserActive={isUserActive} onShowLocked={showLockedFeature} onRefresh={handleManualRefresh} isRefreshing={isRefreshing} />}
+                    {data && role === 'driver' && <DriverDashboard data={data} isSchoolActive={isSchoolActive} onShowLocked={() => showLockedFeature('school')} />}
                 </div>
-            </>
-        ) : (
-            <div className="flex-1 overflow-y-auto px-4 w-full no-scrollbar">
-                <div className="max-w-4xl md:max-w-7xl mx-auto w-full pt-4">
+            ) : (
+                <div className="pt-2">
                     <ProfileView data={data} isLoading={initialLoading} onLogout={onLogout} credentials={credentials} onOpenSubscription={() => { if ((role === 'parent' || role === 'student') && !isSchoolActive) setShowLockPopup(t('upgrade_school_first')); else setShowPayModal(true); }} onOpenHelp={() => setActiveMenuModal('help')} onOpenAbout={() => setActiveMenuModal('about')} />
                 </div>
-            </div>
-        )}
+            )}
+        </div>
       </main>
 
+      {/* 3. Floating Bottom Nav (Fixed Bottom) */}
       <BottomNav currentView={currentView} onChangeView={setCurrentView} showAction={role === 'principal'} />
       
       {currentView !== 'profile' && isSchoolActive && (

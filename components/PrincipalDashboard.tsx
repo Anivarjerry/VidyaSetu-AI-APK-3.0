@@ -3,7 +3,6 @@ import React, { useState, useEffect } from 'react';
 import { DashboardData, LoginRequest, SearchPerson, FullHistory } from '../types';
 import { Megaphone, MapPin, BarChart2, BookOpen, CalendarRange, UserCheck, Award, Image as ImageIcon, Download, Lock, ChevronRight, Users, ShieldCheck, Search, Filter, FileText, Loader2, User, Check, UserX, Phone, CheckCircle2, RefreshCw, Calendar, ListFilter } from 'lucide-react';
 import { useModalBackHandler } from '../hooks/useModalBackHandler';
-import { useNavigation } from '../contexts/NavigationContext'; // REMOVED THIS USAGE
 import { Modal } from './Modal';
 import { NoticeModal } from './NoticeModal';
 import { TransportTrackerModal } from './TransportTrackerModal';
@@ -179,17 +178,17 @@ export const PrincipalDashboard: React.FC<PrincipalDashboardProps> = ({
   }, [activeModal, visitorFilter]);
 
   const cards = [
-    { key: "approvals", title: "Identity Approvals", subtitle: "Verify New Signups", icon: <Users size={24} /> },
-    { key: "visitor_logs", title: t('gate_security'), subtitle: t('view_visitors'), icon: <ShieldCheck size={24} /> },
-    { key: "notice", title: t('publish_notice'), subtitle: 'Global Academic Broadcast', icon: <Megaphone size={24} /> },
-    { key: "transport", title: t('transport_tracking'), subtitle: 'Live Vehicle Map Engine', icon: <MapPin size={24} /> },
-    { key: "teacher_analytics", title: t('teacher_report'), subtitle: 'Staff Efficiency Monitor', icon: <BarChart2 size={24} /> },
-    { key: "parents_analytics", title: t('homework_status'), subtitle: 'Student Task Compliance', icon: <BookOpen size={24} /> },
-    { key: "leave_management", title: t('leave_portal'), subtitle: 'Administrative Leave Hub', icon: <CalendarRange size={24} /> },
-    { key: "attendance", title: t('global_attendance'), subtitle: 'Central Attendance Registry', icon: <UserCheck size={24} /> },
-    { key: "exam", title: "Result Center", subtitle: "Marks & Report Cards", icon: <Award size={24} /> },
-    { key: "gallery", title: "School Gallery", subtitle: "Event & Activity Photos", icon: <ImageIcon size={24} /> },
-    { key: "report", title: "Download Center", subtitle: "Export PDF/Excel Data", icon: <Download size={24} /> },
+    { key: "approvals", title: "Approvals", subtitle: "Verify Users", icon: <Users size={22} /> },
+    { key: "visitor_logs", title: "Security", subtitle: "Visitors", icon: <ShieldCheck size={22} /> },
+    { key: "notice", title: "Notices", subtitle: 'Broadcast', icon: <Megaphone size={22} /> },
+    { key: "transport", title: "Transport", subtitle: 'Live Map', icon: <MapPin size={22} /> },
+    { key: "teacher_analytics", title: "Staff", subtitle: 'Performance', icon: <BarChart2 size={22} /> },
+    { key: "parents_analytics", title: "Homework", subtitle: 'Compliance', icon: <BookOpen size={22} /> },
+    { key: "leave_management", title: "Leaves", subtitle: 'Portal', icon: <CalendarRange size={22} /> },
+    { key: "attendance", title: "Attendance", subtitle: 'Global Log', icon: <UserCheck size={22} /> },
+    { key: "exam", title: "Results", subtitle: "Marks", icon: <Award size={22} /> },
+    { key: "gallery", title: "Gallery", subtitle: "Photos", icon: <ImageIcon size={22} /> },
+    { key: "report", title: "Reports", subtitle: "Download", icon: <Download size={22} /> },
   ];
 
   return (
@@ -197,7 +196,7 @@ export const PrincipalDashboard: React.FC<PrincipalDashboardProps> = ({
       
       {/* 1. HOME VIEW */}
       {viewMode === 'home' && (
-          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4 w-full animate-in fade-in zoom-in-95 duration-300">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 w-full animate-in fade-in zoom-in-95 duration-300">
             {cards.map((item, index) => (
               <div 
                 key={index} 
@@ -208,16 +207,14 @@ export const PrincipalDashboard: React.FC<PrincipalDashboardProps> = ({
                     }
                     setActiveModal(item.key);
                 }} 
-                className={`glass-card p-5 rounded-[2.5rem] flex items-center justify-between cursor-pointer group active:scale-[0.98] transition-all shadow-sm ${!isSchoolActive ? 'bg-rose-50 dark:bg-rose-950/10 border-rose-100 dark:border-rose-900/20' : ''}`}
+                className={`glass-card p-4 rounded-[1.8rem] flex flex-col justify-center items-center gap-1 cursor-pointer group active:scale-[0.98] transition-all shadow-sm h-32 text-center relative overflow-hidden ${!isSchoolActive ? 'bg-rose-50 dark:bg-rose-950/10 border-rose-100 dark:border-rose-900/20' : ''}`}
               >
-                  <div className="flex items-center gap-4 text-left">
-                      <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-inner transition-all group-hover:scale-105 ${!isSchoolActive ? 'bg-rose-500 text-white' : 'bg-brand-500/10 text-brand-600'}`}>{item.icon}</div>
-                      <div>
-                          <h3 className={`font-black uppercase text-base leading-tight ${!isSchoolActive ? 'text-rose-600' : 'text-slate-800 dark:text-white'}`}>{item.title}</h3>
-                          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{item.subtitle}</p>
-                      </div>
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-inner transition-all group-hover:scale-105 mb-1 ${!isSchoolActive ? 'bg-rose-500 text-white' : 'bg-brand-500/10 text-brand-600'}`}>{item.icon}</div>
+                  <div>
+                      <h3 className={`font-black uppercase text-xs leading-tight ${!isSchoolActive ? 'text-rose-600' : 'text-slate-800 dark:text-white'}`}>{item.title}</h3>
+                      <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">{item.subtitle}</p>
                   </div>
-                  {!isSchoolActive ? <Lock size={20} className="text-rose-400" /> : <ChevronRight size={22} className="text-slate-200 group-hover:text-brand-500 transition-colors" />}
+                  {!isSchoolActive && <div className="absolute top-2 right-2"><Lock size={14} className="text-rose-400" /></div>}
               </div>
             ))}
           </div>
@@ -360,17 +357,17 @@ export const PrincipalDashboard: React.FC<PrincipalDashboardProps> = ({
               ) : (
                   <div className="space-y-3 overflow-y-auto no-scrollbar flex-1 pb-4">
                       {pendingApprovals.map(u => (
-                          <div key={u.id} className="bg-white dark:bg-dark-900 p-5 rounded-[2rem] border border-slate-100 dark:border-white/5 shadow-sm premium-subview-enter">
+                          <div key={u.id} className="bg-white dark:bg-dark-900 p-4 rounded-[2rem] border border-slate-100 dark:border-white/5 shadow-sm premium-subview-enter">
                               <div className="flex items-center gap-4 mb-3">
                                   <div className="w-12 h-12 bg-indigo-500/10 text-indigo-500 rounded-2xl flex items-center justify-center font-black text-lg shadow-inner">{u.name.charAt(0)}</div>
                                   <div>
-                                      <h4 className="font-black text-slate-800 dark:text-white uppercase">{u.name}</h4>
+                                      <h4 className="font-black text-slate-800 dark:text-white uppercase text-sm">{u.name}</h4>
                                       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{u.role} • {u.mobile}</p>
                                   </div>
                               </div>
                               <div className="grid grid-cols-2 gap-3">
-                                  <button onClick={() => handleApproveAction(u.id, 'rejected')} className="py-3 rounded-xl bg-rose-50 dark:bg-rose-500/10 text-rose-500 font-black text-[10px] uppercase flex items-center justify-center gap-2 hover:bg-rose-100"><UserX size={14} /> Reject</button>
-                                  <button onClick={() => handleApproveAction(u.id, 'approved')} className="py-3 rounded-xl bg-emerald-500 text-white font-black text-[10px] uppercase flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 active:scale-95 transition-all"><Check size={14} strokeWidth={3} /> Approve</button>
+                                  <button onClick={() => handleApproveAction(u.id, 'rejected')} className="py-2.5 rounded-xl bg-rose-50 dark:bg-rose-500/10 text-rose-500 font-black text-[9px] uppercase flex items-center justify-center gap-2 hover:bg-rose-100"><UserX size={14} /> Reject</button>
+                                  <button onClick={() => handleApproveAction(u.id, 'approved')} className="py-2.5 rounded-xl bg-emerald-500 text-white font-black text-[9px] uppercase flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 active:scale-95 transition-all"><Check size={14} strokeWidth={3} /> Approve</button>
                               </div>
                           </div>
                       ))}
@@ -428,7 +425,7 @@ interface PersonCardProps {
 
 // Reusable Person Card
 const PersonCard: React.FC<PersonCardProps> = ({ person, onAction, loading }) => (
-    <div className="p-5 bg-white dark:bg-dark-900 rounded-[2.5rem] border border-slate-100 dark:border-white/5 shadow-sm flex items-center justify-between group active:scale-[0.98] transition-all">
+    <div className="p-4 bg-white dark:bg-dark-900 rounded-[2.2rem] border border-slate-100 dark:border-white/5 shadow-sm flex items-center justify-between group active:scale-[0.98] transition-all">
         <div className="flex items-center gap-4">
             <div className="w-12 h-12 bg-slate-50 dark:bg-white/5 rounded-2xl flex items-center justify-center text-slate-400 font-black text-lg">
                 {person.name.charAt(0)}
@@ -442,9 +439,9 @@ const PersonCard: React.FC<PersonCardProps> = ({ person, onAction, loading }) =>
         <button 
             onClick={() => onAction(person)}
             disabled={loading}
-            className="p-3 bg-brand-50 dark:bg-brand-500/10 text-brand-600 dark:text-brand-400 rounded-2xl active:scale-90 transition-all hover:bg-brand-100 dark:hover:bg-brand-500/20"
+            className="p-2.5 bg-brand-50 dark:bg-brand-500/10 text-brand-600 dark:text-brand-400 rounded-2xl active:scale-90 transition-all hover:bg-brand-100 dark:hover:bg-brand-500/20"
         >
-            {loading ? <Loader2 className="animate-spin" size={20} /> : <FileText size={20} />}
+            {loading ? <Loader2 className="animate-spin" size={18} /> : <FileText size={18} />}
         </button>
     </div>
 );

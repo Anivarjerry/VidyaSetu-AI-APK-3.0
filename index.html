@@ -4,12 +4,18 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=overlays-content" />
-    <title>VidyaSetu AI - Premium</title>
-    <meta name="description" content="School Management System" />
+    <title>VidyaSetu AI</title>
+    <meta name="description" content="Premium School Management System" />
     <meta name="google-site-verification" content="7trvpsGQ27VmYnR6enGkTPfDKqpeT2Hv7sEQMOYsU5s" />
     
-    <!-- Initial Theme Color (Green to match new splash) -->
-    <meta name="theme-color" content="#10b981">
+    <!-- PWA & Mobile Web App Capable -->
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="VidyaSetu">
+
+    <!-- Initial Theme Color (Will be updated by JS) -->
+    <meta name="theme-color" content="#ffffff" id="theme-color-meta">
     
     <!-- Favicon & Icons -->
     <link rel="icon" type="image/png" sizes="192x192" href="/android/android-launchericon-192-192.png">
@@ -22,10 +28,17 @@
       (function() {
         const savedTheme = localStorage.getItem('vidyasetu_theme');
         const theme = savedTheme || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        
+        const metaThemeColor = document.getElementById('theme-color-meta');
+        
         if (theme === 'dark') {
           document.documentElement.classList.add('dark');
+          // Match the Dark Mode Background (Slate 950)
+          if (metaThemeColor) metaThemeColor.setAttribute('content', '#020617'); 
         } else {
           document.documentElement.classList.remove('dark');
+          // Match the Light Mode Background (White/Gray)
+          if (metaThemeColor) metaThemeColor.setAttribute('content', '#ffffff'); 
         }
       })();
     </script>
@@ -84,13 +97,13 @@
             padding: 0;
             height: 100%;
             width: 100%;
-            overflow: hidden;
+            overflow: hidden; /* Prevent body scroll, handle in app */
             overscroll-behavior: none;
             -webkit-tap-highlight-color: transparent;
-            background-color: #F8FAFC;
+            background-color: #F8FAFC; /* Light Mode BG */
         }
         html.dark body {
-            background-color: #020617;
+            background-color: #020617; /* Dark Mode BG */
         }
 
         /* --- SPLASH SCREEN STYLES --- */
@@ -241,16 +254,20 @@
         /* --- APP CSS --- */
         .glass-card { background: #FFFFFF; border: 1px solid rgba(0, 0, 0, 0.05); }
         html.dark .glass-card { background: #0f172a; border: 1px solid rgba(255, 255, 255, 0.05); }
-        .glass-header { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); }
-        html.dark .glass-header { background: rgba(2, 6, 23, 0.95); }
-        .glass-nav { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); }
-        html.dark .glass-nav { background: rgba(2, 6, 23, 0.95); }
+        .glass-header { background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); }
+        html.dark .glass-header { background: rgba(2, 6, 23, 0.85); }
+        
+        /* New Floating Nav Styles will be applied in Step 3, preparing global classes */
+        .glass-nav { background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); }
+        html.dark .glass-nav { background: rgba(2, 6, 23, 0.85); }
+        
         .premium-modal-backdrop { animation: backdrop-fade 0.45s cubic-bezier(0.32, 0.72, 0, 1) both; }
         @keyframes backdrop-fade { from { opacity: 0; backdrop-filter: blur(0px); } to { opacity: 1; backdrop-filter: blur(12px); } }
         .premium-modal-content { animation: premium-pop 0.55s cubic-bezier(0.32, 0.72, 0, 1) both; will-change: transform, opacity; transform-origin: center center; -webkit-backface-visibility: hidden; backface-visibility: hidden; }
-        @keyframes premium-pop { 0% { opacity: 0; transform: scale(0.85) translateY(60px); } 100% { opacity: 1; transform: scale(1) translateY(0); } }
+        @keyframes premium-pop { 0% { opacity: 0; transform: scale(0.95) translateY(40px); } 100% { opacity: 1; transform: scale(1) translateY(0); } }
         .premium-subview-enter { animation: premium-slide-in 0.45s cubic-bezier(0.32, 0.72, 0, 1) both; will-change: transform, opacity; }
-        @keyframes premium-slide-in { 0% { opacity: 0; transform: scale(0.96) translateX(30px); } 100% { opacity: 1; transform: scale(1) translateX(0); } }
+        @keyframes premium-slide-in { 0% { opacity: 0; transform: scale(0.98) translateX(20px); } 100% { opacity: 1; transform: scale(1) translateX(0); } }
+        
         .safe-padding-top { padding-top: var(--safe-top); }
         .safe-padding-bottom { padding-bottom: var(--safe-bottom); }
         .safe-margin-top { margin-top: var(--safe-top); }

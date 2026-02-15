@@ -56,66 +56,58 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
   }
 
   return (
-    <div className="space-y-4 pb-10">
+    <div className="space-y-3 pb-10">
         
-        {/* SHARED CARDS */}
-        <div className="space-y-3">
+        {/* SHARED CARDS GRID */}
+        <div className="grid grid-cols-2 gap-2">
             {/* Gallery */}
             <div 
                 onClick={() => handleCardClick('gallery')} 
-                className={`glass-card p-5 rounded-[2.5rem] flex items-center justify-between cursor-pointer group active:scale-[0.98] transition-all shadow-sm ${isFeatureLocked ? 'bg-rose-50 dark:bg-rose-950/10 border-rose-100 dark:border-rose-900/20' : ''}`}
+                className={`glass-card p-4 rounded-[1.8rem] flex flex-col items-center justify-center gap-2 cursor-pointer group active:scale-[0.98] transition-all shadow-sm ${isFeatureLocked ? 'bg-rose-50 dark:bg-rose-950/10 border-rose-100 dark:border-rose-900/20' : ''}`}
             >
-                <div className="flex items-center gap-4 text-left">
-                    <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-inner transition-all group-hover:scale-105 ${isFeatureLocked ? 'bg-rose-500 text-white' : 'bg-brand-500/10 text-brand-600'}`}>
-                        <ImageIcon size={24} />
-                    </div>
-                    <div>
-                        <h3 className={`font-black uppercase text-base leading-tight ${isFeatureLocked ? 'text-rose-600' : 'text-slate-800 dark:text-white'}`}>Photo Gallery</h3>
-                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Events & Memories</p>
-                    </div>
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-inner transition-all group-hover:scale-105 ${isFeatureLocked ? 'bg-rose-500 text-white' : 'bg-brand-500/10 text-brand-600'}`}>
+                    <ImageIcon size={20} />
                 </div>
-                {isFeatureLocked ? <Lock size={20} className="text-rose-400" /> : <ChevronRight size={22} className="text-slate-200 group-hover:text-brand-500 transition-colors" />}
+                <div className="text-center">
+                    <h3 className={`font-black uppercase text-xs leading-tight ${isFeatureLocked ? 'text-rose-600' : 'text-slate-800 dark:text-white'}`}>Gallery</h3>
+                </div>
             </div>
 
             {/* Exam Result Analytics */}
             <div 
                 onClick={() => handleCardClick('reports')} 
-                className={`glass-card p-5 rounded-[2.5rem] flex items-center justify-between cursor-pointer group active:scale-[0.98] transition-all shadow-sm ${isFeatureLocked ? 'bg-rose-50 dark:bg-rose-950/10 border-rose-100 dark:border-rose-900/20' : ''}`}
+                className={`glass-card p-4 rounded-[1.8rem] flex flex-col items-center justify-center gap-2 cursor-pointer group active:scale-[0.98] transition-all shadow-sm ${isFeatureLocked ? 'bg-rose-50 dark:bg-rose-950/10 border-rose-100 dark:border-rose-900/20' : ''}`}
             >
-                <div className="flex items-center gap-4 text-left">
-                    <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-inner transition-all group-hover:scale-105 ${isFeatureLocked ? 'bg-rose-500 text-white' : 'bg-brand-500/10 text-brand-600'}`}>
-                        <PieChart size={24} />
-                    </div>
-                    <div>
-                        <h3 className={`font-black uppercase text-base leading-tight ${isFeatureLocked ? 'text-rose-600' : 'text-slate-800 dark:text-white'}`}>Result Analytics</h3>
-                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Download Report Cards</p>
-                    </div>
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-inner transition-all group-hover:scale-105 ${isFeatureLocked ? 'bg-rose-500 text-white' : 'bg-brand-500/10 text-brand-600'}`}>
+                    <PieChart size={20} />
                 </div>
-                {isFeatureLocked ? <Lock size={20} className="text-rose-400" /> : <ChevronRight size={22} className="text-slate-200 group-hover:text-brand-500 transition-colors" />}
+                <div className="text-center">
+                    <h3 className={`font-black uppercase text-xs leading-tight ${isFeatureLocked ? 'text-rose-600' : 'text-slate-800 dark:text-white'}`}>Results</h3>
+                </div>
             </div>
         </div>
 
         {/* MAIN FEATURES */}
-        <div className="space-y-3">
+        <div className="space-y-2">
             {/* 3. Attendance Status */}
-            <div onClick={() => isSchoolActive ? setActiveModal('attendance_history') : onShowLocked('school')} className={`glass-card p-5 rounded-[2.5rem] flex items-center justify-between active:scale-[0.98] transition-all cursor-pointer shadow-sm ${!isSchoolActive ? 'bg-rose-50 dark:bg-rose-950/10 border-rose-100 dark:border-rose-900/20' : ''}`}>
-                <div className="flex items-center gap-4">
-                    <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-inner ${!isSchoolActive ? 'bg-rose-500 text-white' : 'bg-brand-500/10 text-brand-600'}`}><UserCheck size={28} /></div>
-                    <div><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5">{t('attendance_status')}</p><h4 className={`text-base font-black uppercase leading-tight ${!isSchoolActive ? 'text-rose-600' : 'text-slate-800 dark:text-white'}`}>{t('current')}: <span className={data?.today_attendance === 'present' ? 'text-emerald-500' : data?.today_attendance === 'absent' ? 'text-rose-500' : 'text-brand-500'}>{data?.today_attendance ? t(data.today_attendance) : t('waiting')}</span></h4></div>
+            <div onClick={() => isSchoolActive ? setActiveModal('attendance_history') : onShowLocked('school')} className={`glass-card p-4 rounded-[2rem] flex items-center justify-between active:scale-[0.98] transition-all cursor-pointer shadow-sm ${!isSchoolActive ? 'bg-rose-50 dark:bg-rose-950/10 border-rose-100 dark:border-rose-900/20' : ''}`}>
+                <div className="flex items-center gap-3">
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-inner ${!isSchoolActive ? 'bg-rose-500 text-white' : 'bg-brand-500/10 text-brand-600'}`}><UserCheck size={22} /></div>
+                    <div><p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">{t('attendance_status')}</p><h4 className={`text-sm font-black uppercase leading-tight ${!isSchoolActive ? 'text-rose-600' : 'text-slate-800 dark:text-white'}`}>{t('current')}: <span className={data?.today_attendance === 'present' ? 'text-emerald-500' : data?.today_attendance === 'absent' ? 'text-rose-500' : 'text-brand-500'}>{data?.today_attendance ? t(data.today_attendance) : t('waiting')}</span></h4></div>
                 </div>
-                {!isSchoolActive ? <Lock size={18} className="text-rose-400" /> : <ChevronRight size={20} className="text-slate-300" />}
+                {!isSchoolActive ? <Lock size={16} className="text-rose-400" /> : <ChevronRight size={18} className="text-slate-300" />}
             </div>
 
             {/* 4, 5, 6 Cards */}
             {[
-                { key: 'apply_leave', icon: <CalendarRange size={28} />, title: t('apply_leave'), sub: 'Absence Request Portal' },
-                { key: 'live_transport', icon: <Truck size={28} />, title: t('live_transport'), sub: 'Real-time Route Monitor' },
-                { key: 'daily_tasks', icon: <BookOpen size={28} />, title: t('daily_tasks'), sub: 'Check Current Assignments' }
+                { key: 'apply_leave', icon: <CalendarRange size={22} />, title: t('apply_leave'), sub: 'Absence Request' },
+                { key: 'live_transport', icon: <Truck size={22} />, title: t('live_transport'), sub: 'Real-time Route' },
+                { key: 'daily_tasks', icon: <BookOpen size={22} />, title: t('daily_tasks'), sub: 'Check Assignments' }
             ].map((it, idx) => {
                 return (
-                    <div key={idx} onClick={() => handleCardClick(it.key)} className={`glass-card p-5 rounded-[2.5rem] flex items-center justify-between active:scale-[0.98] transition-all cursor-pointer shadow-sm ${isFeatureLocked ? 'bg-rose-50 dark:bg-rose-950/10 border-rose-100 dark:border-rose-900/20' : ''}`}>
-                        <div className="flex items-center gap-4"><div className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-inner ${isFeatureLocked ? 'bg-rose-500 text-white' : 'bg-brand-500/10 text-brand-600'}`}>{it.icon}</div><div className="text-left"><h3 className={`font-black uppercase text-base leading-tight ${isFeatureLocked ? 'text-rose-600' : 'text-slate-800 dark:text-white'}`}>{it.title}</h3><p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{it.sub}</p></div></div>
-                        {isFeatureLocked ? <Lock size={18} className="text-rose-400" /> : <ChevronRight size={20} className="text-slate-300" />}
+                    <div key={idx} onClick={() => handleCardClick(it.key)} className={`glass-card p-4 rounded-[2rem] flex items-center justify-between active:scale-[0.98] transition-all cursor-pointer shadow-sm ${isFeatureLocked ? 'bg-rose-50 dark:bg-rose-950/10 border-rose-100 dark:border-rose-900/20' : ''}`}>
+                        <div className="flex items-center gap-3"><div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-inner ${isFeatureLocked ? 'bg-rose-500 text-white' : 'bg-brand-500/10 text-brand-600'}`}>{it.icon}</div><div className="text-left"><h3 className={`font-black uppercase text-sm leading-tight ${isFeatureLocked ? 'text-rose-600' : 'text-slate-800 dark:text-white'}`}>{it.title}</h3><p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">{it.sub}</p></div></div>
+                        {isFeatureLocked ? <Lock size={16} className="text-rose-400" /> : <ChevronRight size={18} className="text-slate-300" />}
                     </div>
                 );
             })}

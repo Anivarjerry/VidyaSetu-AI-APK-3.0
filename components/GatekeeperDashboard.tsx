@@ -192,12 +192,14 @@ export const GatekeeperDashboard: React.FC<GatekeeperDashboardProps> = ({ onLogo
   };
 
   return (
-    <div className="fixed inset-0 bg-[#F8FAFC] dark:bg-dark-950 flex flex-col h-full w-full transition-colors">
+    <div className="fixed inset-0 h-full w-full bg-[#F8FAFC] dark:bg-dark-950 transition-colors">
+        {/* 1. Header (Fixed) */}
         <Header onRefresh={handleRefresh} onOpenSettings={() => setActiveMenuModal('settings')} onOpenAbout={() => setActiveMenuModal('about')} onOpenHelp={() => setActiveMenuModal('help')} onLogout={onLogout} currentView={currentView} onChangeView={handleViewChange} />
 
-        <main className="flex-1 w-full flex flex-col overflow-hidden relative" style={{ marginTop: 'calc(5.5rem + env(safe-area-inset-top, 0px))', marginBottom: 'calc(5.5rem + env(safe-area-inset-bottom, 0px))' }}>
-            {currentView === 'home' ? (
-                <div className="flex-1 overflow-y-auto px-4 pb-4 no-scrollbar">
+        {/* 2. Main Scroll Container */}
+        <main className="fixed inset-0 w-full h-full overflow-y-auto no-scrollbar pt-[calc(5.5rem+env(safe-area-inset-top,0px))] pb-[calc(7rem+env(safe-area-inset-bottom,0px))]">
+            <div className="px-4 w-full">
+                {currentView === 'home' ? (
                     <div className="max-w-4xl mx-auto w-full pt-3">
                         <SchoolInfoCard schoolName={dashboardData?.school_name || 'My School'} schoolCode={dashboardData?.school_code || '---'} onClick={handleSchoolClick} />
                         <div className="flex items-center justify-between mb-4 px-1"><h3 className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em]">Gate Operations</h3><div className="px-2 py-1 bg-emerald-50 dark:bg-emerald-500/10 rounded-lg text-[9px] font-black text-emerald-600 uppercase flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> Active</div></div>
@@ -207,10 +209,10 @@ export const GatekeeperDashboard: React.FC<GatekeeperDashboardProps> = ({ onLogo
                             <div onClick={() => setModalStack(prev => [...prev, 'history'])} className="glass-card p-5 rounded-[2.5rem] flex items-center justify-between active:scale-[0.98] transition-all cursor-pointer shadow-sm border-slate-100 dark:border-white/5 group"><div className="flex items-center gap-4"><div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-inner bg-slate-100 dark:bg-white/5 text-slate-500"><History size={28} /></div><div className="text-left"><h3 className="font-black uppercase text-base leading-tight text-slate-800 dark:text-white">Visitor Logs</h3><p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">View Past Records</p></div></div><ChevronRight size={22} className="text-slate-200 group-hover:text-emerald-500 transition-colors" /></div>
                         </div>
                     </div>
-                </div>
-            ) : (
-                <div className="flex-1 overflow-y-auto px-4 w-full no-scrollbar"><div className="max-w-4xl mx-auto w-full pt-4"><ProfileView data={dashboardData} isLoading={!dashboardData} onLogout={onLogout} onOpenHelp={() => setActiveMenuModal('help')} onOpenAbout={() => setActiveMenuModal('about')} /></div></div>
-            )}
+                ) : (
+                    <div className="max-w-4xl mx-auto w-full pt-4"><ProfileView data={dashboardData} isLoading={!dashboardData} onLogout={onLogout} onOpenHelp={() => setActiveMenuModal('help')} onOpenAbout={() => setActiveMenuModal('about')} /></div>
+                )}
+            </div>
         </main>
 
         <BottomNav currentView={currentView} onChangeView={handleViewChange} />

@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Home, User, Zap, LayoutGrid } from 'lucide-react';
+import { Home, User, Zap, LayoutGrid, Sparkles } from 'lucide-react';
 
 interface BottomNavProps {
   currentView: 'home' | 'profile' | 'action' | 'manage' | any;
@@ -10,84 +10,55 @@ interface BottomNavProps {
 
 export const BottomNav: React.FC<BottomNavProps> = ({ currentView, onChangeView, showAction = false }) => {
   
-  // Logic to hide nav when keyboard is open is handled by 'interactive-widget=resizes-content' in meta tag
-  // However, we ensure safe padding and z-index
+  const navItems = [
+    { id: 'home', icon: Home, label: 'Home' },
+    ...(showAction ? [
+      { id: 'action', icon: Zap, label: 'Action' },
+      { id: 'manage', icon: LayoutGrid, label: 'Manage' }
+    ] : []),
+    { id: 'profile', icon: User, label: 'Profile' }
+  ];
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 glass-nav border-t border-slate-200/60 dark:border-white/5 flex flex-col items-center justify-center z-50 safe-padding-bottom h-[calc(5.5rem+env(safe-area-inset-bottom,0px))] transition-all duration-300 shadow-[0_-10px_30px_-10px_rgba(0,0,0,0.02)] md:hidden">
+    <div className="fixed bottom-0 left-0 right-0 z-50 flex justify-center pointer-events-none pb-[calc(1rem+env(safe-area-inset-bottom,20px))] transition-all duration-300">
       
-      {/* Wrapper to keep content at exactly 5.5rem height */}
-      <div className={`w-full flex ${showAction ? 'justify-around px-2' : 'justify-center gap-20 px-8'} items-center h-[5.5rem] relative`}>
+      {/* Floating Pill Container */}
+      <nav className="pointer-events-auto bg-white/80 dark:bg-[#0f172a]/80 backdrop-blur-xl border border-white/20 dark:border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.12)] rounded-[2.5rem] p-2 flex items-center gap-2 transform transition-all hover:scale-[1.02]">
         
-        {/* Home Button */}
-        <button
-          onClick={() => onChangeView('home')}
-          className={`flex flex-col items-center justify-center transition-all duration-300 active:scale-90 w-16 group ${
-            currentView === 'home' 
-            ? 'text-emerald-600 dark:text-emerald-400' 
-            : 'text-slate-400 dark:text-slate-600 hover:text-slate-600 dark:hover:text-slate-400'
-          }`}
-        >
-          <div className="relative">
-             <Home size={26} strokeWidth={currentView === 'home' ? 2.5 : 2} className="transition-all duration-300 drop-shadow-sm" />
-             {currentView === 'home' && <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-1 h-1 bg-emerald-500 rounded-full animate-in fade-in zoom-in"></span>}
-          </div>
-          {showAction && <span className="text-[9px] font-black uppercase mt-1 opacity-80">Home</span>}
-        </button>
+        {navItems.map((item) => {
+          const isActive = currentView === item.id;
+          const Icon = item.icon;
 
-        {/* Action Button (Principal Only) */}
-        {showAction && (
+          return (
             <button
-              onClick={() => onChangeView('action')}
-              className={`flex flex-col items-center justify-center transition-all duration-300 active:scale-90 w-16 group ${
-                currentView === 'action' 
-                ? 'text-emerald-600 dark:text-emerald-400' 
-                : 'text-slate-400 dark:text-slate-600 hover:text-slate-600 dark:hover:text-slate-400'
-              }`}
+              key={item.id}
+              onClick={() => onChangeView(item.id)}
+              className={`
+                relative flex items-center justify-center w-14 h-14 rounded-[1.8rem] transition-all duration-300 ease-out
+                ${isActive 
+                  ? 'bg-brand-500 text-white shadow-lg shadow-brand-500/30 scale-105' 
+                  : 'text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-white/5 hover:text-slate-600 dark:hover:text-slate-300 active:scale-90'
+                }
+              `}
             >
-              <div className="relative">
-                 <Zap size={28} strokeWidth={currentView === 'action' ? 2.5 : 2} className="transition-all duration-300 drop-shadow-sm" />
-                 {currentView === 'action' && <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-1 h-1 bg-emerald-500 rounded-full animate-in fade-in zoom-in"></span>}
-              </div>
-              <span className="text-[9px] font-black uppercase mt-1 opacity-80">Action</span>
+              {/* Icon */}
+              <Icon 
+                size={24} 
+                strokeWidth={isActive ? 2.5 : 2} 
+                className={`transition-all duration-300 ${isActive ? 'animate-in zoom-in-50' : ''}`} 
+              />
+
+              {/* Active Indicator Dot (Optional Flair) */}
+              {isActive && (
+                <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 bg-white/50 rounded-full"></span>
+              )}
+              
+              {/* Tooltip Label (Visible only on very specific active interactions if needed, kept hidden for cleaner look usually) */}
             </button>
-        )}
+          );
+        })}
 
-        {/* Manage Button (Principal Only) - NEW */}
-        {showAction && (
-            <button
-              onClick={() => onChangeView('manage')}
-              className={`flex flex-col items-center justify-center transition-all duration-300 active:scale-90 w-16 group ${
-                currentView === 'manage' 
-                ? 'text-emerald-600 dark:text-emerald-400' 
-                : 'text-slate-400 dark:text-slate-600 hover:text-slate-600 dark:hover:text-slate-400'
-              }`}
-            >
-              <div className="relative">
-                 <LayoutGrid size={26} strokeWidth={currentView === 'manage' ? 2.5 : 2} className="transition-all duration-300 drop-shadow-sm" />
-                 {currentView === 'manage' && <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-1 h-1 bg-emerald-500 rounded-full animate-in fade-in zoom-in"></span>}
-              </div>
-              <span className="text-[9px] font-black uppercase mt-1 opacity-80">Manage</span>
-            </button>
-        )}
-
-        {/* Profile Button */}
-        <button
-          onClick={() => onChangeView('profile')}
-          className={`flex flex-col items-center justify-center transition-all duration-300 active:scale-90 w-16 group ${
-            currentView === 'profile' 
-            ? 'text-emerald-600 dark:text-emerald-400' 
-            : 'text-slate-400 dark:text-slate-600 hover:text-slate-600 dark:hover:text-slate-400'
-          }`}
-        >
-          <div className="relative">
-             <User size={26} strokeWidth={currentView === 'profile' ? 2.5 : 2} className="transition-all duration-300 drop-shadow-sm" />
-             {currentView === 'profile' && <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-1 h-1 bg-emerald-500 rounded-full animate-in fade-in zoom-in"></span>}
-          </div>
-          {showAction && <span className="text-[9px] font-black uppercase mt-1 opacity-80">Profile</span>}
-        </button>
-
-      </div>
-    </nav>
+      </nav>
+    </div>
   );
 };
