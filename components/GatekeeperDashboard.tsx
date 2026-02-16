@@ -11,6 +11,7 @@ import { ProfileView } from './ProfileView';
 import { LeaveRequestModal } from './LeaveModals';
 import { SettingsModal, AboutModal, HelpModal } from './MenuModals';
 import { useThemeLanguage } from '../contexts/ThemeLanguageContext';
+import { useModalBackHandler } from '../hooks/useModalBackHandler';
 
 interface GatekeeperDashboardProps {
   onLogout: () => void;
@@ -23,7 +24,8 @@ export const GatekeeperDashboard: React.FC<GatekeeperDashboardProps> = ({ onLogo
   
   // Navigation State
   const [currentView, setCurrentView] = useState<'home' | 'profile'>('home');
-  const [modalStack, setModalStack] = useState<string[]>([]); // 'entry', 'history', 'leave'
+  // REFACTOR: Replaced array stack with simple string state for compatibility with Global Navigation
+  const [activeModal, setActiveModal] = useState<string | null>(null);
 
   // Data State
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
@@ -57,8 +59,11 @@ export const GatekeeperDashboard: React.FC<GatekeeperDashboardProps> = ({ onLogo
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // NOTE: We removed the local useModalBackHandler here because the <Modal> components
-  // now handle history registration internally. Double registration causes bugs.
+  // GLOBAL BACK HANDLER INTEGRATION
+  // This registers the modal state with the global context.
+  useModalBackHandler(!!activeModal, () => setActiveModal(null));
+  useModalBackHandler(!!selectedVisitor, () => setSelectedVisitor(null));
+  useModalBackHandler(showSchoolDetails, () => setShowSchoolDetails(false));
 
   useEffect(() => {
       loadInitialData();
@@ -102,10 +107,10 @@ export const GatekeeperDashboard: React.FC<GatekeeperDashboardProps> = ({ onLogo
   };
 
   useEffect(() => {
-      if (modalStack.includes('history')) {
+      if (activeModal === 'history') {
           loadVisitors();
       }
-  }, [historyFilter, customDate, modalStack]);
+  }, [historyFilter, customDate, activeModal]);
 
   const handleRefresh = () => {
       loadInitialData();
@@ -113,7 +118,7 @@ export const GatekeeperDashboard: React.FC<GatekeeperDashboardProps> = ({ onLogo
 
   const handleViewChange = (view: 'home' | 'profile') => {
       if (view === currentView) return;
-      setModalStack([]);
+      setActiveModal(null);
       setCurrentView(view);
   };
 
@@ -177,7 +182,7 @@ export const GatekeeperDashboard: React.FC<GatekeeperDashboardProps> = ({ onLogo
           
           setFormData({ visitor_name: '', mobile: '', village: '', visitor_count: 1, visiting_purpose: 'Principal/Enquiry', meet_person: 'Principal' });
           setPhotoData('');
-          setModalStack([]);
+          setActiveModal(null);
       } else { alert("Failed to log entry. Please check internet or contact admin."); }
       setSubmitting(false);
   };
@@ -195,9 +200,9 @@ export const GatekeeperDashboard: React.FC<GatekeeperDashboardProps> = ({ onLogo
                         <SchoolInfoCard schoolName={dashboardData?.school_name || 'My School'} schoolCode={dashboardData?.school_code || '---'} onClick={handleSchoolClick} />
                         <div className="flex items-center justify-between mb-4 px-1"><h3 className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em]">Gate Operations</h3><div className="px-2 py-1 bg-emerald-50 dark:bg-emerald-500/10 rounded-lg text-[9px] font-black text-emerald-600 uppercase flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> Active</div></div>
                         <div className="space-y-4 pb-10">
-                            <div onClick={() => setModalStack(prev => [...prev, 'leave'])} className="glass-card p-5 rounded-[2.5rem] flex items-center justify-between active:scale-[0.98] transition-all cursor-pointer shadow-sm border-slate-100 dark:border-white/5 group"><div className="flex items-center gap-4"><div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-inner bg-brand-500/10 text-brand-600"><CalendarRange size={28} /></div><div className="text-left"><h3 className="font-black uppercase text-base leading-tight text-slate-800 dark:text-white">Apply Leave</h3><p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Staff Request Portal</p></div></div><ChevronRight size={22} className="text-slate-200 group-hover:text-emerald-500 transition-colors" /></div>
-                            <div onClick={() => setModalStack(prev => [...prev, 'entry'])} className="w-full bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-[2.5rem] p-6 text-white shadow-xl shadow-emerald-500/30 flex items-center justify-between cursor-pointer active:scale-95 transition-all relative overflow-hidden group"><div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-3xl pointer-events-none group-hover:scale-150 transition-transform duration-700"></div><div className="flex items-center gap-5 relative z-10"><div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center backdrop-blur-md shadow-inner border border-white/10"><Plus size={32} strokeWidth={3} /></div><div><h2 className="text-xl font-black uppercase leading-tight">New Visitor</h2><p className="text-emerald-100 text-[10px] font-bold uppercase tracking-widest mt-1 opacity-90 flex items-center gap-1"><Sparkles size={10} /> Log Entry</p></div></div></div>
-                            <div onClick={() => setModalStack(prev => [...prev, 'history'])} className="glass-card p-5 rounded-[2.5rem] flex items-center justify-between active:scale-[0.98] transition-all cursor-pointer shadow-sm border-slate-100 dark:border-white/5 group"><div className="flex items-center gap-4"><div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-inner bg-slate-100 dark:bg-white/5 text-slate-500"><History size={28} /></div><div className="text-left"><h3 className="font-black uppercase text-base leading-tight text-slate-800 dark:text-white">Visitor Logs</h3><p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">View Past Records</p></div></div><ChevronRight size={22} className="text-slate-200 group-hover:text-emerald-500 transition-colors" /></div>
+                            <div onClick={() => setActiveModal('leave')} className="glass-card p-5 rounded-[2.5rem] flex items-center justify-between active:scale-[0.98] transition-all cursor-pointer shadow-sm border-slate-100 dark:border-white/5 group"><div className="flex items-center gap-4"><div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-inner bg-brand-500/10 text-brand-600"><CalendarRange size={28} /></div><div className="text-left"><h3 className="font-black uppercase text-base leading-tight text-slate-800 dark:text-white">Apply Leave</h3><p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Staff Request Portal</p></div></div><ChevronRight size={22} className="text-slate-200 group-hover:text-emerald-500 transition-colors" /></div>
+                            <div onClick={() => setActiveModal('entry')} className="w-full bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-[2.5rem] p-6 text-white shadow-xl shadow-emerald-500/30 flex items-center justify-between cursor-pointer active:scale-95 transition-all relative overflow-hidden group"><div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-3xl pointer-events-none group-hover:scale-150 transition-transform duration-700"></div><div className="flex items-center gap-5 relative z-10"><div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center backdrop-blur-md shadow-inner border border-white/10"><Plus size={32} strokeWidth={3} /></div><div><h2 className="text-xl font-black uppercase leading-tight">New Visitor</h2><p className="text-emerald-100 text-[10px] font-bold uppercase tracking-widest mt-1 opacity-90 flex items-center gap-1"><Sparkles size={10} /> Log Entry</p></div></div></div>
+                            <div onClick={() => setActiveModal('history')} className="glass-card p-5 rounded-[2.5rem] flex items-center justify-between active:scale-[0.98] transition-all cursor-pointer shadow-sm border-slate-100 dark:border-white/5 group"><div className="flex items-center gap-4"><div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-inner bg-slate-100 dark:bg-white/5 text-slate-500"><History size={28} /></div><div className="text-left"><h3 className="font-black uppercase text-base leading-tight text-slate-800 dark:text-white">Visitor Logs</h3><p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">View Past Records</p></div></div><ChevronRight size={22} className="text-slate-200 group-hover:text-emerald-500 transition-colors" /></div>
                         </div>
                     </div>
                 ) : (
@@ -209,7 +214,7 @@ export const GatekeeperDashboard: React.FC<GatekeeperDashboardProps> = ({ onLogo
         <BottomNav currentView={currentView} onChangeView={handleViewChange} />
 
         {/* MODALS */}
-        <Modal isOpen={modalStack[modalStack.length-1] === 'entry'} onClose={() => setModalStack(prev => prev.slice(0, -1))} title="VISITOR ENTRY">
+        <Modal isOpen={activeModal === 'entry'} onClose={() => setActiveModal(null)} title="VISITOR ENTRY">
             <form onSubmit={handleSubmit} className="flex flex-col h-[75vh]">
                 <div className="flex-1 overflow-y-auto no-scrollbar space-y-4 pb-4">
                     <div className="flex justify-center mb-2"><div onClick={() => fileInputRef.current?.click()} className={`w-36 h-36 rounded-[2rem] border-2 border-dashed flex flex-col items-center justify-center cursor-pointer overflow-hidden relative shadow-sm transition-all active:scale-95 group ${photoData ? 'border-emerald-500' : 'border-slate-300 dark:border-white/10 bg-slate-50 dark:bg-white/5 hover:bg-slate-100 dark:hover:bg-white/10'}`}>{photoData ? (<img src={photoData} alt="Preview" className="w-full h-full object-cover" />) : (<><Camera size={32} className="text-slate-400 mb-2 group-hover:text-emerald-500 transition-colors" /><span className="text-[9px] font-black uppercase text-slate-400 tracking-widest">Take Photo</span></>)}<input type="file" ref={fileInputRef} accept="image/*" capture="user" onChange={handlePhotoCapture} className="hidden" /></div></div>
@@ -223,7 +228,7 @@ export const GatekeeperDashboard: React.FC<GatekeeperDashboardProps> = ({ onLogo
         </Modal>
 
         {/* 2. HISTORY MODAL */}
-        <Modal isOpen={modalStack[modalStack.length-1] === 'history'} onClose={() => setModalStack(prev => prev.slice(0, -1))} title="VISITOR HISTORY">
+        <Modal isOpen={activeModal === 'history'} onClose={() => setActiveModal(null)} title="VISITOR HISTORY">
             <div className="flex flex-col h-[75vh]">
                 <div className="flex items-center gap-2 mb-4 bg-slate-50 dark:bg-white/5 p-2 rounded-2xl overflow-x-auto no-scrollbar"><button onClick={() => setHistoryFilter('today')} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase whitespace-nowrap transition-all ${historyFilter === 'today' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'text-slate-400 bg-white dark:bg-dark-900 border border-slate-100 dark:border-white/5'}`}>Today</button><button onClick={() => setHistoryFilter('yesterday')} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase whitespace-nowrap transition-all ${historyFilter === 'yesterday' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'text-slate-400 bg-white dark:bg-dark-900 border border-slate-100 dark:border-white/5'}`}>Yesterday</button><button onClick={() => setHistoryFilter('week')} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase whitespace-nowrap transition-all ${historyFilter === 'week' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'text-slate-400 bg-white dark:bg-dark-900 border border-slate-100 dark:border-white/5'}`}>Last 7 Days</button><div className="relative"><input type="date" value={customDate} onChange={(e) => { setCustomDate(e.target.value); setHistoryFilter('custom'); }} className={`w-10 h-9 p-0 border-none outline-none rounded-xl bg-transparent text-transparent cursor-pointer absolute top-0 left-0 z-10 opacity-0`} /><button className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all ${historyFilter === 'custom' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'bg-white dark:bg-dark-900 text-slate-400 border border-slate-100 dark:border-white/5'}`}><Calendar size={16} /></button></div></div>
                 {loading ? <div className="flex items-center justify-center h-full"><Loader2 className="animate-spin text-emerald-500" size={32} /></div> : visitors.length === 0 ? <div className="flex flex-col items-center justify-center h-full opacity-40"><ShieldCheck size={48} className="text-slate-300 mb-2" /><p className="text-[10px] font-black uppercase tracking-widest">No entries found</p></div> : (
@@ -240,7 +245,7 @@ export const GatekeeperDashboard: React.FC<GatekeeperDashboardProps> = ({ onLogo
         </Modal>
 
         {/* 3. LEAVE MODAL */}
-        <LeaveRequestModal isOpen={modalStack[modalStack.length-1] === 'leave'} onClose={() => setModalStack(prev => prev.slice(0, -1))} userId={userId} schoolId={schoolId} />
+        <LeaveRequestModal isOpen={activeModal === 'leave'} onClose={() => setActiveModal(null)} userId={userId} schoolId={schoolId} />
 
         {/* 4. SCHOOL DETAIL MODAL (New) */}
         <Modal isOpen={showSchoolDetails} onClose={() => setShowSchoolDetails(false)} title="INSTITUTION PROFILE">

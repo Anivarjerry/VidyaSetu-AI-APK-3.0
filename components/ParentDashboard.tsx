@@ -51,6 +51,25 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
       }
   };
 
+  const handleHomeworkComplete = async () => {
+      if(selectedHomework) {
+          await updateParentHomeworkStatus(
+              credentials.school_id, 
+              data.class_name || '', 
+              data.section || '', 
+              data.student_id || '', 
+              credentials.mobile, 
+              selectedHomework.period, 
+              selectedHomework.subject, 
+              getISTDate()
+          );
+          // Instead of closing "details" and re-opening "list" which causes history jump,
+          // We just close details. Since "list" remains mounted, it's smooth.
+          setActiveModal('daily_tasks');
+          onRefresh();
+      }
+  };
+
   if (!data.student_id) {
       return <div className="p-8 text-center text-slate-400 font-bold text-xs uppercase tracking-widest"><p>Student Profile Not Linked</p></div>;
   }
@@ -92,9 +111,29 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
         <StudentLeaveRequestModal isOpen={activeModal === 'apply_leave'} onClose={() => setActiveModal(null)} parentId={role === 'student' ? (data.linked_parent_id || data.user_id || '') : (data.user_id || '')} studentId={data.student_id || ''} schoolId={data.school_db_id || ''} />
         <TransportTrackerModal isOpen={activeModal === 'live_transport'} onClose={() => setActiveModal(null)} schoolId={data.school_db_id || ''} />
         
-        {/* HOMEWORK MODALS */}
-        <HomeworkListModal isOpen={activeModal === 'daily_tasks'} onClose={() => setActiveModal(null)} dashboardData={data} credentials={credentials} isSubscribed={!isFeatureLocked} onLockClick={() => onShowLocked('parent')} onViewHomework={(hw) => { setSelectedHomework(hw); setActiveModal('homework_details'); }} onRefresh={onRefresh} isRefreshing={isRefreshing} refreshTrigger={0} />
-        <ParentHomeworkModal isOpen={activeModal === 'homework_details'} onClose={() => setActiveModal('daily_tasks')} data={selectedHomework} onComplete={async () => { if(selectedHomework) await updateParentHomeworkStatus(credentials.school_id, data.class_name || '', data.section || '', data.student_id || '', credentials.mobile, selectedHomework.period, selectedHomework.subject, getISTDate()); setActiveModal('daily_tasks'); onRefresh(); }} isSubmitting={false} />
+        {/* HOMEWORK MODALS - IMPROVED STACKING */}
+        {/* Keep List open even when Details are open to prevent unmount/remount flicker */}
+        <HomeworkListModal 
+            isOpen={activeModal === 'daily_tasks' || activeModal === 'homework_details'} 
+            onClose={() => setActiveModal(null)} 
+            dashboardData={data} 
+            credentials={credentials} 
+            isSubscribed={!isFeatureLocked} 
+            onLockClick={() => onShowLocked('parent')} 
+            onViewHomework={(hw) => { setSelectedHomework(hw); setActiveModal('homework_details'); }} 
+            onRefresh={onRefresh} 
+            isRefreshing={isRefreshing} 
+            refreshTrigger={0} 
+        />
+        
+        {/* Detail View overlays the List */}
+        <ParentHomeworkModal 
+            isOpen={activeModal === 'homework_details'} 
+            onClose={() => setActiveModal('daily_tasks')} 
+            data={selectedHomework} 
+            onComplete={handleHomeworkComplete} 
+            isSubmitting={false} 
+        />
 
         {/* SHARED */}
         <GalleryModal isOpen={activeModal === 'gallery'} onClose={() => setActiveModal(null)} schoolId={data.school_db_id || ''} userId={data.user_id || ''} canUpload={false} />

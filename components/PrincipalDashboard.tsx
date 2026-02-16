@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { DashboardData, LoginRequest, SearchPerson, FullHistory } from '../types';
-import { Megaphone, MapPin, BarChart2, BookOpen, CalendarRange, UserCheck, Award, Image as ImageIcon, Download, Lock, Users, ShieldCheck, Search, Filter, FileText, Loader2, ListFilter, UserCog, RefreshCw } from 'lucide-react';
+import { Megaphone, MapPin, BarChart2, BookOpen, CalendarRange, UserCheck, Award, Image as ImageIcon, Download, Lock, Users, ShieldCheck, Search, Filter, FileText, Loader2, ListFilter, UserCog, RefreshCw, CheckCircle2, UserX, Check, Phone } from 'lucide-react';
 import { useModalBackHandler } from '../hooks/useModalBackHandler';
 import { Modal } from './Modal';
 import { NoticeModal } from './NoticeModal';

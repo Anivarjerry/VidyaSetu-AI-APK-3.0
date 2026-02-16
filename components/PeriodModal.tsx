@@ -3,10 +3,8 @@ import React, { useState, useEffect } from 'react';
 import { PeriodData } from '../types';
 import { Loader2, Sparkles, BookOpen, GraduationCap, Layers, CheckCircle2, Type, History, FileText, LayoutGrid, AlertCircle, ArrowLeft } from 'lucide-react';
 import { fetchSchoolClasses, fetchClassSubjects, fetchSubjectLessons, fetchLessonHomework, fetchFullSchoolTimeTable } from '../services/dashboardService';
-import { useModalBackHandler } from '../hooks/useModalBackHandler';
 
 interface PeriodModalProps {
-  // Removed isOpen/onClose for modal control, replaced with onBack for subview control
   onBack: () => void;
   onSubmit: (data: PeriodData) => Promise<void>;
   periodNumber: number;
@@ -23,11 +21,9 @@ export const PeriodModal: React.FC<PeriodModalProps> = ({
   schoolDbId,
   teacherId
 }) => {
-  // --- SUB-VIEW NAVIGATION HANDLER ---
-  // Since PeriodModal renders INSIDE a main Modal, we use this hook to 
-  // allow the hardware Back button to pop this view and return to the Grid 
-  // instead of closing the whole modal.
-  useModalBackHandler(true, onBack, `period_editor_${periodNumber}`);
+  // NOTE: Removed useModalBackHandler here. 
+  // The parent component (TeacherDashboard) wraps this in a Modal which already handles the back button.
+  // Double registration was causing a race condition on submit.
 
   const [formData, setFormData] = useState<PeriodData>({
     period_number: periodNumber,
@@ -91,7 +87,6 @@ export const PeriodModal: React.FC<PeriodModalProps> = ({
                 const match = allAllocations.find((a: any) => a.period_number === periodNumber && a.teacher_id === teacherId);
                 
                 if (match) {
-                    // console.log("Auto-fill match found:", match);
                     setFormData(prev => ({ 
                         ...prev, 
                         class_name: match.class_name, 
