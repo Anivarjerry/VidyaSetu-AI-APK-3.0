@@ -1,5 +1,5 @@
 
-import { DashboardData, PeriodData, Role, ParentHomework, NoticeItem, NoticeRequest, AnalyticsSummary, TeacherProgress, HomeworkAnalyticsData, StudentHomeworkStatus, Student, AttendanceStatus, Vehicle, StaffLeave, AttendanceHistoryItem, StudentLeave, SchoolSummary, SchoolUser, SiblingInfo, GalleryItem, ExamRecord, ExamMark, VisitorEntry, SearchPerson, FullHistory, TimeTableEntry } from '../types';
+import { DashboardData, PeriodData, Role, ParentHomework, NoticeItem, NoticeRequest, AnalyticsSummary, TeacherProgress, HomeworkAnalyticsData, StudentHomeworkStatus, Student, AttendanceStatus, Vehicle, StaffLeave, AttendanceHistoryItem, StudentLeave, SchoolSummary, SchoolUser, SiblingInfo, GalleryItem, ExamRecord, ExamMark, VisitorEntry, SearchPerson, FullHistory, TimeTableEntry, TeacherProfile } from '../types';
 import { supabase } from './supabaseClient';
 import { offlineStore } from './offlineStore';
 
@@ -156,7 +156,7 @@ export const deleteNotice = async (id: string): Promise<{success: boolean, error
   } catch (e: any) { return { success: false, error: e.message }; }
 };
 
-// --- TIME TABLE SERVICES ---
+// --- TIME TABLE & TEACHER PROFILE SERVICES ---
 export const fetchTimeTable = async (schoolId: string, className: string, day: string): Promise<TimeTableEntry[]> => {
     const result = await fetchWithCache(`tt_${schoolId}_${className}_${day}`, async () => {
         const { data, error } = await supabase.from('time_tables').select('*, users!teacher_id(name)').eq('school_id', schoolId).eq('class_name', className).eq('day_of_week', day);
@@ -207,6 +207,48 @@ export const fetchTeachersForTimeTable = async (schoolId: string) => {
         return data || [];
     });
     return result || [];
+};
+
+// NEW: Teacher Profile Management
+export const fetchTeacherProfiles = async (schoolId: string): Promise<TeacherProfile[]> => {
+    try {
+        const { data: usersData } = await supabase.from('users').select('id, name, mobile').eq('school_id', schoolId).eq('role', 'teacher');
+        const { data: profiles } = await supabase.from('teacher_profiles').select('*').eq('school_id', schoolId);
+        
+        // Merge users with profiles
+        return (usersData || []).map((u: any) => {
+            const prof = profiles?.find((p: any) => p.user_id === u.id);
+            return {
+                user_id: u.id,
+                school_id: schoolId,
+                name: u.name,
+                mobile: u.mobile,
+                teacher_tier: prof?.teacher_tier || 'Associate',
+                primary_subjects: prof?.primary_subjects || [],
+                secondary_subjects: prof?.secondary_subjects || [],
+                max_periods_per_day: prof?.max_periods_per_day || 8,
+                is_floater: prof?.is_floater || false,
+                id: prof?.id // Profile ID if exists
+            };
+        });
+    } catch(e) { return []; }
+};
+
+export const upsertTeacherProfile = async (profile: TeacherProfile): Promise<boolean> => {
+    if(!navigator.onLine) return false;
+    try {
+        const payload = {
+            user_id: profile.user_id,
+            school_id: profile.school_id,
+            teacher_tier: profile.teacher_tier,
+            primary_subjects: profile.primary_subjects,
+            secondary_subjects: profile.secondary_subjects,
+            max_periods_per_day: profile.max_periods_per_day,
+            is_floater: profile.is_floater
+        };
+        const { error } = await supabase.from('teacher_profiles').upsert(payload, { onConflict: 'user_id' });
+        return !error;
+    } catch(e) { return false; }
 };
 
 // --- ANALYTICS ---

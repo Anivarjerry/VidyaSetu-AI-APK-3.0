@@ -22,8 +22,10 @@ const getISTDate = () => {
   return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
 };
 
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+
 /**
- * Generates a response using Google Gemini API.
+ * Generates a response using Google Gemini API for Chat.
  */
 export const getGeminiChatResponse = async (
   messages: ChatMessage[],
@@ -59,8 +61,6 @@ export const getGeminiChatResponse = async (
     ${liveData || "No data updated for current session yet."}
     `;
 
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    
     // Prepare history: exclude the last message (current prompt)
     const historyMessages = messages.slice(0, -1);
     const history: Content[] = historyMessages.map(m => ({
@@ -82,7 +82,6 @@ export const getGeminiChatResponse = async (
     const fullText = result.text || "";
 
     // Logic to split response into multiple parts for a more dynamic "multi-message" feel
-    // Split by double newlines
     const messageParts = fullText
       .split(/\n\n/)
       .map((p: string) => p.trim())
@@ -98,4 +97,43 @@ export const getGeminiChatResponse = async (
       messages: [language === 'hi' ? "कनेक्शन एरर। कृपया पुनः प्रयास करें।" : "Connection error. Please try again."] 
     };
   }
+};
+
+/**
+ * Generates a structured JSON schedule using Gemini
+ */
+export const generateClassSchedule = async (
+    className: string,
+    subjects: string[],
+    teachers: { name: string, tier: string, skills: string[] }[]
+): Promise<{ day: string, period: number, subject: string, teacher_name: string }[]> => {
+    try {
+        const prompt = `
+        Create a weekly time table (Mon-Sat, 8 periods) for Class: ${className}.
+        Subjects to cover: ${subjects.join(', ')}.
+        Available Teachers: ${JSON.stringify(teachers)}.
+        
+        Rules:
+        1. Assign subjects evenly across the week.
+        2. Assign the best matching teacher for each subject based on their skills (primary/secondary).
+        3. Prioritize 'Expert' tier teachers for difficult subjects (Maths, Science).
+        4. If no exact match, assign a 'Floater' or leave blank.
+        5. Return ONLY a valid JSON array of objects with keys: day (Monday-Saturday), period (1-8), subject, teacher_name.
+        6. Do not include any explanation text, just the JSON.
+        `;
+
+        const response = await ai.models.generateContent({
+            model: "gemini-3-flash-preview",
+            contents: prompt,
+            config: {
+                responseMimeType: "application/json"
+            }
+        });
+
+        const text = response.text || "[]";
+        return JSON.parse(text);
+    } catch (e) {
+        console.error("AI Schedule Error", e);
+        return [];
+    }
 };

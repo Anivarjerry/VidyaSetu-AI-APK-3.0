@@ -301,3 +301,17 @@ export interface TimeTableEntry {
     teacher_id?: string;
     teacher_name?: string; // Joined
 }
+
+// --- TEACHER PROFILE (SMART ALLOCATION) ---
+export interface TeacherProfile {
+  id?: string;
+  user_id: string;
+  school_id: string;
+  teacher_tier: 'Expert' | 'Senior' | 'Associate';
+  primary_subjects: string[];
+  secondary_subjects: string[];
+  max_periods_per_day: number;
+  is_floater: boolean;
+  name?: string; // Joined for UI
+  mobile?: string; // Joined for UI
+}

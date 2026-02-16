@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { DashboardData, LoginRequest, SearchPerson, FullHistory } from '../types';
-import { Megaphone, MapPin, BarChart2, BookOpen, CalendarRange, UserCheck, Award, Image as ImageIcon, Download, Lock, ChevronRight, Users, ShieldCheck, Search, Filter, FileText, Loader2, User, Check, UserX, Phone, CheckCircle2, RefreshCw, Calendar, ListFilter } from 'lucide-react';
+import { Megaphone, MapPin, BarChart2, BookOpen, CalendarRange, UserCheck, Award, Image as ImageIcon, Download, Lock, ChevronRight, Users, ShieldCheck, Search, Filter, FileText, Loader2, User, Check, UserX, Phone, CheckCircle2, RefreshCw, Calendar, ListFilter, UserCog } from 'lucide-react';
 import { useModalBackHandler } from '../hooks/useModalBackHandler';
 import { Modal } from './Modal';
 import { NoticeModal } from './NoticeModal';
@@ -13,6 +13,7 @@ import { AttendanceModal } from './AttendanceModal';
 import { ExamModal } from './ExamModal';
 import { GalleryModal } from './GalleryModal';
 import { ReportModal } from './ReportModal';
+import { StaffConfigModal } from './StaffConfigModal';
 import { fetchPendingApprovals, updateUserApprovalStatus } from '../services/authService';
 import { fetchVisitorEntries, searchPeople, fetchRecentPeople, fetchStudentFullHistory, fetchStaffFullHistory, fetchSchoolClasses } from '../services/dashboardService';
 import { generate360Report } from '../services/reportService';
@@ -188,6 +189,7 @@ export const PrincipalDashboard: React.FC<PrincipalDashboardProps> = ({
     { key: "attendance", title: "Attendance", subtitle: 'Global Log', icon: <UserCheck size={22} /> },
     { key: "exam", title: "Results", subtitle: "Marks", icon: <Award size={22} /> },
     { key: "gallery", title: "Gallery", subtitle: "Photos", icon: <ImageIcon size={22} /> },
+    { key: "staff_config", title: "Staff Config", subtitle: "Skills & Tier", icon: <UserCog size={22} /> },
     { key: "report", title: "Reports", subtitle: "Download", icon: <Download size={22} /> },
   ];
 
@@ -340,9 +342,11 @@ export const PrincipalDashboard: React.FC<PrincipalDashboardProps> = ({
       <AttendanceModal isOpen={activeModal === 'attendance'} onClose={() => setActiveModal(null)} schoolId={data.school_db_id || ''} teacherId={data.user_id || ''} />
       
       {data && (<GalleryModal isOpen={activeModal === 'gallery'} onClose={() => setActiveModal(null)} schoolId={data.school_db_id || ''} userId={data.user_id || ''} canUpload={true} />)}
-      {/* Updated ReportModal to include classOptions from schoolClasses state */}
       {data && (<ReportModal isOpen={activeModal === 'report'} onClose={() => setActiveModal(null)} role='principal' schoolId={data.school_db_id} userId={data.user_id} schoolName={data.school_name} principalName={data.user_name} classOptions={schoolClasses.map(c => c.class_name)} />)}
       {data && (<ExamModal isOpen={activeModal === 'exam'} onClose={() => setActiveModal(null)} role='principal' schoolId={data.school_db_id || ''} userId={data.user_id || ''} />)}
+      
+      {/* NEW: STAFF CONFIG MODAL */}
+      {data && (<StaffConfigModal isOpen={activeModal === 'staff_config'} onClose={() => setActiveModal(null)} schoolId={data.school_db_id || ''} />)}
 
       {/* APPROVAL MODAL */}
       <Modal isOpen={activeModal === 'approvals'} onClose={() => setActiveModal(null)} title="PENDING APPROVALS">
