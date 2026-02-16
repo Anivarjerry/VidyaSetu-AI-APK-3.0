@@ -19,6 +19,7 @@ import { ParentDashboard } from './ParentDashboard';
 import { DriverDashboard } from './DriverDashboard';
 import { AIChatModal } from './AIChatModal'; 
 import { useModalBackHandler } from '../hooks/useModalBackHandler';
+import { useNavigation } from '../contexts/NavigationContext';
 
 interface DashboardProps {
   credentials: LoginRequest;
@@ -29,16 +30,14 @@ interface DashboardProps {
 
 export const Dashboard: React.FC<DashboardProps> = ({ credentials, role, userName, onLogout }) => {
   const { t } = useThemeLanguage();
+  const { currentTab, switchTab } = useNavigation(); // Use Global Navigation
   
-  // Local Navigation State (Restored Stable Pattern)
-  const [currentView, setCurrentView] = useState<'home' | 'profile' | 'action' | 'manage'>('home');
+  // Local Modal State
   const [activeModal, setActiveModal] = useState<string | null>(null);
 
-  // Use Back Handler for Top Level Modals
-  useModalBackHandler(!!activeModal || currentView !== 'home', () => {
-      if (activeModal) setActiveModal(null);
-      else if (currentView !== 'home') setCurrentView('home');
-  });
+  // Use Back Handler ONLY for local modals. 
+  // Tab switching (Back to Home) is handled globally by NavigationContext's handlePhysicalBack.
+  useModalBackHandler(!!activeModal, () => setActiveModal(null));
 
   const [data, setData] = useState<DashboardData | null>(null);
   const [isSchoolActive, setIsSchoolActive] = useState(true);
@@ -122,8 +121,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ credentials, role, userNam
         onOpenHelp={() => setActiveMenuModal('help')} 
         onOpenNotices={() => setActiveModal('notices')} 
         onLogout={onLogout} 
-        currentView={currentView === 'profile' ? 'profile' : 'home'} 
-        onChangeView={(v) => setCurrentView(v as any)} 
+        currentView={currentTab === 'profile' ? 'profile' : 'home'} 
+        onChangeView={(v) => switchTab(v as any)} 
       />
 
       {/* 2. Main Scroll Container (Edge-to-Edge) */}
@@ -132,9 +131,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ credentials, role, userNam
         {/* Spacer for Header + Safe Area */}
         <div className="pt-[calc(4.5rem+env(safe-area-inset-top,0px))] pb-[calc(7rem+env(safe-area-inset-bottom,0px))] px-4 w-full max-w-4xl md:max-w-7xl mx-auto">
             
-            {(currentView === 'home' || currentView === 'action' || currentView === 'manage') ? (
+            {(currentTab === 'home' || currentTab === 'action' || currentTab === 'manage') ? (
                 <div className={`transition-opacity duration-300 ${isRefreshing ? 'opacity-50' : 'opacity-100'}`}>
-                    {currentView === 'home' && (
+                    {currentTab === 'home' && (
                         <div className="mb-4 animate-in fade-in zoom-in-95 duration-300">
                             {initialLoading && !data ? <SkeletonSchoolCard /> : <SchoolInfoCard schoolName={data?.school_name || ''} schoolCode={data?.school_code || ''} onClick={handleSchoolCardClick} />}
                             
@@ -156,7 +155,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ credentials, role, userNam
                         </div>
                     )}
 
-                    {data && role === 'principal' && <PrincipalDashboard data={data} credentials={credentials} isSchoolActive={isSchoolActive} onShowPayModal={() => setShowPayModal(true)} onRefresh={handleManualRefresh} viewMode={currentView} />}
+                    {data && role === 'principal' && <PrincipalDashboard data={data} credentials={credentials} isSchoolActive={isSchoolActive} onShowPayModal={() => setShowPayModal(true)} onRefresh={handleManualRefresh} viewMode={currentTab} />}
                     {data && role === 'teacher' && <TeacherDashboard data={data} credentials={credentials} isSchoolActive={isSchoolActive} onShowLocked={() => showLockedFeature('school')} onRefresh={handleManualRefresh} />}
                     {data && (role === 'parent' || role === 'student') && <ParentDashboard data={data} credentials={credentials} role={role} isSchoolActive={isSchoolActive} isUserActive={isUserActive} onShowLocked={showLockedFeature} onRefresh={handleManualRefresh} isRefreshing={isRefreshing} />}
                     {data && role === 'driver' && <DriverDashboard data={data} isSchoolActive={isSchoolActive} onShowLocked={() => showLockedFeature('school')} />}
@@ -170,9 +169,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ credentials, role, userNam
       </main>
 
       {/* 3. Floating Bottom Nav (Fixed Bottom) */}
-      <BottomNav currentView={currentView} onChangeView={setCurrentView} showAction={role === 'principal'} />
+      <BottomNav currentView={currentTab} onChangeView={(v) => switchTab(v as any)} showAction={role === 'principal'} />
       
-      {currentView !== 'profile' && isSchoolActive && (
+      {currentTab !== 'profile' && isSchoolActive && (
           <button 
             onClick={() => setActiveModal('ai_chat')}
             className="fixed bottom-[calc(6rem+env(safe-area-inset-bottom,0px))] right-6 z-40 w-14 h-14 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full shadow-2xl shadow-indigo-500/40 flex items-center justify-center text-white active:scale-90 transition-all hover:scale-105 border-2 border-white/20 animate-in zoom-in duration-300"

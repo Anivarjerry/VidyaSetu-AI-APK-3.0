@@ -3,7 +3,6 @@ import React, { useState } from 'react';
 import { DashboardData, LoginRequest, ParentHomework } from '../types';
 import { UserCheck, CalendarRange, Truck, BookOpen, Lock, PieChart, Image as ImageIcon } from 'lucide-react';
 import { useThemeLanguage } from '../contexts/ThemeLanguageContext';
-import { useModalBackHandler } from '../hooks/useModalBackHandler';
 import { AttendanceHistoryModal } from './AttendanceHistoryModal';
 import { StudentLeaveRequestModal } from './LeaveModals';
 import { TransportTrackerModal } from './TransportTrackerModal';
@@ -38,7 +37,8 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
   const [activeModal, setActiveModal] = useState<string | null>(null);
   const [selectedHomework, setSelectedHomework] = useState<ParentHomework | null>(null);
 
-  useModalBackHandler(!!activeModal, () => setActiveModal(null));
+  // NOTE: We removed the local useModalBackHandler here because the <Modal> components
+  // now handle history registration internally. Double registration causes bugs.
 
   const isFeatureLocked = !isSchoolActive || !isUserActive;
 

@@ -1,9 +1,8 @@
 
 import React, { useState } from 'react';
 import { DashboardData, LoginRequest, PeriodData } from '../types';
-import { UserCheck, CalendarRange, History, BookOpen, Lock, ChevronRight, CheckCircle2, Sparkles, Image as ImageIcon, FileText, FileCheck } from 'lucide-react';
+import { UserCheck, CalendarRange, History, BookOpen, Lock, CheckCircle2, Sparkles, Image as ImageIcon, FileText, FileCheck } from 'lucide-react';
 import { useThemeLanguage } from '../contexts/ThemeLanguageContext';
-import { useModalBackHandler } from '../hooks/useModalBackHandler';
 import { AttendanceModal } from './AttendanceModal';
 import { LeaveRequestModal } from './LeaveModals';
 import { TeacherHistoryModal } from './TeacherHistoryModal';
@@ -38,16 +37,8 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
   const [portalView, setPortalView] = useState<'grid' | 'edit'>('grid');
   const [selectedPeriod, setSelectedPeriod] = useState<number | null>(null);
 
-  // Back Button Handler
-  useModalBackHandler(!!activeModal, () => {
-      // If we are in 'edit' view of homework, back should go to 'grid'
-      if (activeModal === 'homework' && portalView === 'edit') {
-          setPortalView('grid');
-          setSelectedPeriod(null);
-      } else {
-          setActiveModal(null);
-      }
-  });
+  // NOTE: We removed the local useModalBackHandler here because the <Modal> components
+  // now handle history registration internally. Double registration causes bugs.
 
   const handlePeriodSubmit = async (pData: PeriodData) => {
     const success = await submitPeriodData(credentials.school_id, credentials.mobile, pData, data.user_name, 'submit');
@@ -121,7 +112,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
        <TeacherHistoryModal isOpen={activeModal === 'history'} onClose={() => setActiveModal(null)} credentials={credentials} />
        
        {/* UNIFIED HOMEWORK PORTAL MODAL */}
-       <Modal isOpen={activeModal === 'homework'} onClose={() => setActiveModal(null)} title="TODAY'S PORTAL">
+       <Modal isOpen={activeModal === 'homework'} onClose={() => { if(portalView === 'edit') setPortalView('grid'); else setActiveModal(null); }} title="TODAY'S PORTAL">
            {portalView === 'grid' ? (
                 <div className="space-y-4 premium-subview-enter">
                     <div className="flex items-center gap-3 bg-brand-50 dark:bg-brand-500/10 p-4 rounded-[2rem] border border-brand-100 dark:border-brand-500/20">

@@ -3,7 +3,7 @@ import React from 'react';
 import { Home, User, Zap, LayoutGrid, Sparkles } from 'lucide-react';
 
 interface BottomNavProps {
-  currentView: 'home' | 'profile' | 'action' | 'manage' | any;
+  currentView: 'home' | 'profile' | 'action' | 'manage';
   onChangeView: (view: 'home' | 'profile' | 'action' | 'manage') => void;
   showAction?: boolean; // Prop to conditionally show Principal Specific buttons
 }
@@ -32,7 +32,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({ currentView, onChangeView,
           return (
             <button
               key={item.id}
-              onClick={() => onChangeView(item.id)}
+              onClick={() => onChangeView(item.id as any)}
               className={`
                 relative flex items-center justify-center w-14 h-14 rounded-[1.8rem] transition-all duration-300 ease-out
                 ${isActive 

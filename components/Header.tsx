@@ -11,7 +11,7 @@ interface HeaderProps {
   onOpenHelp: () => void;
   onOpenNotices?: () => void;
   onLogout: () => void;
-  currentView?: 'home' | 'profile';
+  currentView?: 'home' | 'profile' | 'action' | 'manage';
   onChangeView?: (view: 'home' | 'profile') => void;
 }
 
@@ -22,6 +22,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenSettings, onOpenAbout, onO
   // Sync Status State
   const [syncStatus, setSyncStatus] = useState<'online' | 'offline' | 'syncing'>('online');
 
+  // Local handler for Menu
   useModalBackHandler(isMenuOpen, () => setIsMenuOpen(false));
 
   useEffect(() => {

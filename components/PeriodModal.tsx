@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { PeriodData } from '../types';
 import { Loader2, Sparkles, BookOpen, GraduationCap, Layers, CheckCircle2, Type, History, FileText, LayoutGrid, AlertCircle, ArrowLeft } from 'lucide-react';
 import { fetchSchoolClasses, fetchClassSubjects, fetchSubjectLessons, fetchLessonHomework, fetchFullSchoolTimeTable } from '../services/dashboardService';
+import { useModalBackHandler } from '../hooks/useModalBackHandler';
 
 interface PeriodModalProps {
   // Removed isOpen/onClose for modal control, replaced with onBack for subview control
@@ -22,6 +23,12 @@ export const PeriodModal: React.FC<PeriodModalProps> = ({
   schoolDbId,
   teacherId
 }) => {
+  // --- SUB-VIEW NAVIGATION HANDLER ---
+  // Since PeriodModal renders INSIDE a main Modal, we use this hook to 
+  // allow the hardware Back button to pop this view and return to the Grid 
+  // instead of closing the whole modal.
+  useModalBackHandler(true, onBack, `period_editor_${periodNumber}`);
+
   const [formData, setFormData] = useState<PeriodData>({
     period_number: periodNumber,
     status: 'pending',
@@ -60,11 +67,6 @@ export const PeriodModal: React.FC<PeriodModalProps> = ({
     if (initialData && initialData.status === 'submitted') {
       setFormData(initialData);
       setIsEditMode(true);
-      // If editing existing, we need to load dependencies
-      if (schoolDbId && initialData.class_name) {
-          // We trigger this inside loadClassesAndAutoFill if needed, but for edit mode:
-          // We handle it in the main load flow or user interaction
-      }
     } else {
       setIsEditMode(false);
     }
@@ -89,7 +91,7 @@ export const PeriodModal: React.FC<PeriodModalProps> = ({
                 const match = allAllocations.find((a: any) => a.period_number === periodNumber && a.teacher_id === teacherId);
                 
                 if (match) {
-                    console.log("Auto-fill match found:", match);
+                    // console.log("Auto-fill match found:", match);
                     setFormData(prev => ({ 
                         ...prev, 
                         class_name: match.class_name, 
@@ -341,13 +343,6 @@ export const PeriodModal: React.FC<PeriodModalProps> = ({
             </button>
           </div>
         </form>
-        
-        <style>{`
-        .glossy-btn {
-            background-image: linear-gradient(rgba(255,255,255,0.2), transparent);
-            border-top: 1px solid rgba(255,255,255,0.4) !important;
-        }
-        `}</style>
     </div>
   );
 };

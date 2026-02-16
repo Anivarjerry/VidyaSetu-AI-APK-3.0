@@ -1,7 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Shield, Plus, History, Camera, User, Phone, MapPin, Users, Target, Save, X, Loader2, ShieldCheck, Sparkles, School, CalendarRange, ChevronRight, Calendar, Clock } from 'lucide-react';
-import { useModalBackHandler } from '../hooks/useModalBackHandler';
 import { fetchVisitorEntries, addVisitorEntry, getISTDate, fetchDashboardData, fetchSchoolSummary } from '../services/dashboardService';
 import { VisitorEntry, DashboardData, SchoolSummary } from '../types';
 import { Modal } from './Modal';
@@ -58,16 +57,8 @@ export const GatekeeperDashboard: React.FC<GatekeeperDashboardProps> = ({ onLogo
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Back Handler
-  useModalBackHandler(
-      modalStack.length > 0 || !!activeMenuModal || !!selectedVisitor || showSchoolDetails, 
-      () => {
-          if (selectedVisitor) setSelectedVisitor(null);
-          else if (showSchoolDetails) setShowSchoolDetails(false);
-          else if (activeMenuModal) setActiveMenuModal(null);
-          else setModalStack(prev => prev.slice(0, -1));
-      }
-  );
+  // NOTE: We removed the local useModalBackHandler here because the <Modal> components
+  // now handle history registration internally. Double registration causes bugs.
 
   useEffect(() => {
       loadInitialData();
@@ -274,7 +265,7 @@ export const GatekeeperDashboard: React.FC<GatekeeperDashboardProps> = ({ onLogo
                         {selectedVisitor.photo_data ? (
                             <img src={selectedVisitor.photo_data} alt="Full Visitor" className="w-full h-full object-cover" />
                         ) : (
-                            <div className="w-full h-full flex items-center justify-center text-slate-300"><User size={64} /></div>
+                            <div className="w-full h-full flex items-center justify-center text-slate-300"><Users size={64} /></div>
                         )}
                         <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-6 pt-12">
                             <h2 className="text-2xl font-black text-white uppercase leading-none">{selectedVisitor.visitor_name}</h2>

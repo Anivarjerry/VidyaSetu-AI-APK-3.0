@@ -7,10 +7,25 @@ import { GatekeeperDashboard } from './components/GatekeeperDashboard';
 import { loginUser, updateUserToken } from './services/authService';
 import { LoginRequest, Role } from './types';
 import { ThemeLanguageProvider } from './contexts/ThemeLanguageContext';
+import { NavigationProvider, useNavigation } from './contexts/NavigationContext'; // NEW IMPORT
 import { requestForToken, onMessageListener } from './services/firebase';
 import { SyncManager } from './services/syncManager';
 
+// Inner component to access Context hooks
 const AppContent: React.FC = () => {
+  const { handlePhysicalBack } = useNavigation(); // Get the master handler
+
+  // --- MASTER HISTORY LISTENER ---
+  useEffect(() => {
+      const onPopState = (event: PopStateEvent) => {
+          // Pass control to the Navigation Context
+          handlePhysicalBack();
+      };
+
+      window.addEventListener('popstate', onPopState);
+      return () => window.removeEventListener('popstate', onPopState);
+  }, [handlePhysicalBack]);
+
   const [authData, setAuthData] = useState<{
     view: 'login' | 'dashboard' | 'admin';
     credentials: LoginRequest | null;
@@ -179,9 +194,11 @@ const AppContent: React.FC = () => {
 
 const App: React.FC = () => (
   <ThemeLanguageProvider>
-    <div className="fixed inset-0 h-full w-full bg-white dark:bg-dark-950 flex flex-col">
-      <AppContent />
-    </div>
+    <NavigationProvider>
+        <div className="fixed inset-0 h-full w-full bg-white dark:bg-dark-950 flex flex-col">
+          <AppContent />
+        </div>
+    </NavigationProvider>
   </ThemeLanguageProvider>
 );
 
