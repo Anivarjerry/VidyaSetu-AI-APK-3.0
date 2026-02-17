@@ -132,8 +132,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, userNa
         else if (isSchoolModalOpen) setIsSchoolModalOpen(false);
         else if (isUserModalOpen) setIsUserModalOpen(false);
         else if (isVehicleModalOpen) setIsVehicleModalOpen(false);
-        else if (isSubModalOpen) setIsSubModalOpen(false);
-        else if (isUserSubModalOpen) setIsUserSubModalOpen(false);
         else if (deleteModalStep !== 'none') setDeleteModalStep('none');
         else if (isCurriculumModalOpen) {
             if (currStep === 'select_school') setIsCurriculumModalOpen(false);
@@ -144,8 +142,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, userNa
         }
     }
   );
-
-  // ... (Existing UseEffects and Handlers remain same until handleAddUser) ... 
 
   // --- PARENT & STUDENT FETCHING FOR DROPDOWNS ---
   useEffect(() => {
