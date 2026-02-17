@@ -15,108 +15,108 @@ interface NavigationContextType {
 const NavigationContext = createContext<NavigationContextType | undefined>(undefined);
 
 export const NavigationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [currentTab, setCurrentTab] = useState<ViewType>('home');
+  // 1. VIEW STACK: Tracks the history of Tabs (e.g., ['home', 'profile'])
+  // We initialize with 'home' as the base.
+  const [viewStack, setViewStack] = useState<ViewType[]>(['home']);
   
-  // The Stack: Stores objects { id: 'modalName', onClose: func }
-  // We use a Ref for the stack to ensure instant access in event listeners without stale closures
+  // 2. MODAL STACK: Tracks open modals
   const modalStackRef = useRef<{ id: string; onClose: () => void }[]>([]);
-  // We keep a state version just to trigger re-renders if needed (e.g. for UI checks), 
-  // but logic relies on ref
-  const [stackLength, setStackLength] = useState(0);
+  const [modalCount, setModalCount] = useState(0); // Trigger re-render when modals change
 
-  // Flag to ignore popstate events that we triggered programmatically (via history.back())
-  const ignoreNextPop = useRef(false);
+  // Flag to prevent double-handling when we programmatically change history
+  const isProgrammaticNav = useRef(false);
 
-  const switchTab = useCallback((tab: ViewType) => {
-    if (tab === currentTab && modalStackRef.current.length > 0) {
-        // Tapping the active tab button clears all modals (Native behavior)
-        closeAllModals();
-    } else {
-        setCurrentTab(tab);
-        // Switching tabs implies starting fresh on that tab (usually)
-        closeAllModals(); 
-    }
-  }, [currentTab]);
+  // --- SMART TAB SWITCHING (Loop Detection) ---
+  const switchTab = useCallback((newTab: ViewType) => {
+    setViewStack((prevStack) => {
+      // A. Check if the tab is already in the history (LOOP DETECTION)
+      const existingIndex = prevStack.indexOf(newTab);
 
-  const closeAllModals = () => {
-      // Recursively close or just clear? 
-      // Better to clear safely. 
-      // Note: This forces close without animation or history sync for every single one, 
-      // so typically we just reset the stack logic. 
-      // For a web app, we might just want to let the components unmount.
-      // But purely for state:
-      while(modalStackRef.current.length > 0) {
-          const top = modalStackRef.current.pop();
-          if (top) top.onClose();
+      if (existingIndex !== -1) {
+        // CASE: LOOP DETECTED (e.g. Home -> Profile -> Home)
+        // We need to "Unwind" the history back to that previous instance.
+        
+        // Calculate how many steps to go back
+        const stepsBack = prevStack.length - 1 - existingIndex;
+        
+        if (stepsBack > 0) {
+          isProgrammaticNav.current = true;
+          // Clean browser history by going back 'n' times
+          window.history.go(-stepsBack);
+          
+          // Return the sliced stack (removing everything after the found tab)
+          return prevStack.slice(0, existingIndex + 1);
+        }
+        return prevStack; // Already on this tab
+      } else {
+        // CASE: NEW STEP (e.g. Home -> Profile)
+        // Push to browser history
+        window.history.pushState({ view: newTab }, '', window.location.href);
+        // Add to our internal stack
+        return [...prevStack, newTab];
       }
-      setStackLength(0);
-  };
+    });
+  }, []);
 
+  // --- MODAL REGISTRATION ---
   const registerModal = useCallback((id: string, onClose: () => void) => {
-    // 1. Push a dummy state to history so the back button is "armed"
+    // Push a history state for the modal
     window.history.pushState({ modal: id }, '', window.location.href);
-    
-    // 2. Add to our logical stack
     modalStackRef.current.push({ id, onClose });
-    setStackLength(modalStackRef.current.length);
-    // console.log(`[Nav] Registered: ${id}. Stack: ${modalStackRef.current.length}`);
+    setModalCount(prev => prev + 1);
   }, []);
 
   const unregisterModal = useCallback((id: string) => {
-    // Find if this modal is in the stack
+    // Find the modal
     const index = modalStackRef.current.findIndex(m => m.id === id);
     if (index !== -1) {
-        // Remove from stack
-        modalStackRef.current.splice(index, 1);
-        setStackLength(modalStackRef.current.length);
-        
-        // CRITICAL: Since we closed it programmatically (e.g. X button), 
-        // we must sync browser history by going back one step.
-        // BUT, this will trigger a 'popstate' event. We must tell our listener to ignore it.
-        ignoreNextPop.current = true;
-        window.history.back();
-        // console.log(`[Nav] Unregistered: ${id}. Syncing History.`);
+      // Remove from stack logic
+      modalStackRef.current.splice(index, 1);
+      setModalCount(prev => prev - 1);
+      
+      // Sync Browser History: Go back 1 step (remove the modal state)
+      isProgrammaticNav.current = true;
+      window.history.back();
     }
   }, []);
 
-  // The Master Handler for the Physical Back Button
+  // --- PHYSICAL BACK BUTTON HANDLER (Called by App.tsx on 'popstate') ---
   const handlePhysicalBack = useCallback(() => {
-      if (ignoreNextPop.current) {
-          // console.log("[Nav] Ignoring Programmatic Pop");
-          ignoreNextPop.current = false;
-          return;
-      }
+    // 1. If we triggered this pop (e.g. unregisterModal calling history.back), ignore logic
+    if (isProgrammaticNav.current) {
+      isProgrammaticNav.current = false;
+      return;
+    }
 
-      // Priority 1: Close Top Modal
-      if (modalStackRef.current.length > 0) {
-          const top = modalStackRef.current.pop();
-          setStackLength(modalStackRef.current.length);
-          if (top) {
-              // console.log(`[Nav] Pop Modal: ${top.id}`);
-              top.onClose(); // This updates the UI state (isOpen = false)
-          }
-          // We consumed the event, so we don't need to do anything else.
-          // The browser history is already -1 because the user pressed Back.
-          return;
+    // 2. Priority: Close Modals First
+    if (modalStackRef.current.length > 0) {
+      const topModal = modalStackRef.current.pop();
+      setModalCount(prev => prev - 1);
+      if (topModal) {
+        // Just call the close callback. 
+        // The browser history is already popped by the user action.
+        // We DON'T call unregisterModal here to avoid double-pop.
+        topModal.onClose(); 
       }
+      return;
+    }
 
-      // Priority 2: Navigate Tabs (Sub-tab -> Home)
-      if (currentTab !== 'home') {
-          // console.log("[Nav] Tab -> Home");
-          setCurrentTab('home');
-          // Since the user pressed back, the browser is already at previous state.
-          // But if we didn't have a history state for the tab switch, we might have exited.
-          // To be safe, usually we don't push state for tabs unless deep linking.
-          // If we want "Back to Home" to work, we need to ensure we are "forward" enough.
-          // For now, let's assume we handle tab switching internally.
-          // If the browser actually went back, we just update state.
-          return;
+    // 3. Handle View Stack (Tabs)
+    setViewStack((prevStack) => {
+      if (prevStack.length > 1) {
+        // User pressed back, so browser history is already -1.
+        // We just need to sync our internal array.
+        return prevStack.slice(0, -1);
+      } else {
+        // Stack is empty (at Home). 
+        // Default browser behavior (Exit App) happens automatically if we don't pushState.
+        return prevStack;
       }
+    });
+  }, []);
 
-      // Priority 3: Exit App
-      // If we are here, we let the default browser behavior happen (which has already happened).
-      // console.log("[Nav] Default Exit");
-  }, [currentTab]);
+  // Helper to get current active tab
+  const currentTab = viewStack[viewStack.length - 1];
 
   return (
     <NavigationContext.Provider value={{ 

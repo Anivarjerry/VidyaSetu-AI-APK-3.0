@@ -27,6 +27,7 @@ export const AIChatModal: React.FC<AIChatModalProps> = ({ isOpen, onClose, userN
   const [isTyping, setIsTyping] = useState(false);
   const [speakingIndex, setSpeakingIndex] = useState<number | null>(null);
   
+  // Default to 100% height
   const [viewportHeight, setViewportHeight] = useState('100%');
   const [viewportTop, setViewportTop] = useState(0);
   const [mounted, setMounted] = useState(false);
@@ -45,16 +46,29 @@ export const AIChatModal: React.FC<AIChatModalProps> = ({ isOpen, onClose, userN
     }
   }, [messages, isTyping, speakingIndex]);
 
+  // SAFE VIEWPORT HANDLER
   useEffect(() => {
+    // Only attach if visualViewport exists and is supported
     if (!window.visualViewport) return;
+
     const handleResize = () => {
-       setViewportHeight(`${window.visualViewport!.height}px`);
-       setViewportTop(window.visualViewport!.offsetTop);
+       // Safety check: ensure height is valid number
+       const height = window.visualViewport?.height;
+       const offsetTop = window.visualViewport?.offsetTop;
+       
+       if (height && height > 0) {
+           setViewportHeight(`${height}px`);
+           setViewportTop(offsetTop || 0);
+       }
        setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'auto' }), 50);
     };
+
     window.visualViewport.addEventListener('resize', handleResize);
     window.visualViewport.addEventListener('scroll', handleResize);
+    
+    // Initial call
     handleResize();
+
     return () => {
         window.visualViewport?.removeEventListener('resize', handleResize);
         window.visualViewport?.removeEventListener('scroll', handleResize);

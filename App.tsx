@@ -18,11 +18,14 @@ const AppContent: React.FC = () => {
   // --- MASTER HISTORY LISTENER ---
   useEffect(() => {
       const onPopState = (event: PopStateEvent) => {
-          // Pass control to the Navigation Context
+          // Pass control to the Navigation Context to decide logic (Close Modal or Switch Tab)
           handlePhysicalBack();
       };
 
+      // Push initial state so we have something to pop
+      window.history.replaceState({ view: 'home' }, '', window.location.href);
       window.addEventListener('popstate', onPopState);
+      
       return () => window.removeEventListener('popstate', onPopState);
   }, [handlePhysicalBack]);
 
@@ -172,7 +175,8 @@ const AppContent: React.FC = () => {
     localStorage.clear();
     setAuthData({ view: 'login', credentials: null, userRole: null, userName: '' });
     try {
-      window.history.pushState(null, '', window.location.href);
+      // Clean history on logout
+      window.history.replaceState(null, '', window.location.href);
     } catch (e) {}
   };
 

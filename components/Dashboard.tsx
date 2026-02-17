@@ -18,7 +18,7 @@ import { TeacherDashboard } from './TeacherDashboard';
 import { ParentDashboard } from './ParentDashboard';
 import { DriverDashboard } from './DriverDashboard';
 import { AIChatModal } from './AIChatModal'; 
-import { useModalBackHandler } from '../hooks/useModalBackHandler';
+// REMOVED: useModalBackHandler import to prevent conflict
 import { useNavigation } from '../contexts/NavigationContext';
 
 interface DashboardProps {
@@ -35,9 +35,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ credentials, role, userNam
   // Local Modal State
   const [activeModal, setActiveModal] = useState<string | null>(null);
 
-  // Use Back Handler ONLY for local modals. 
-  // Tab switching (Back to Home) is handled globally by NavigationContext's handlePhysicalBack.
-  useModalBackHandler(!!activeModal, () => setActiveModal(null));
+  // FIX: Removed useModalBackHandler(!!activeModal...) 
+  // Modals like AIChatModal and NoticeListModal now handle their own back registration via the <Modal> component or internal hooks.
+  // This prevents the "Double Back Handler" race condition.
 
   const [data, setData] = useState<DashboardData | null>(null);
   const [isSchoolActive, setIsSchoolActive] = useState(true);
