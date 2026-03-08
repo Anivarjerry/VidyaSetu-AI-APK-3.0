@@ -102,7 +102,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, userNa
     vehicle_type: 'bus' | 'van' | 'auto';
     school_id: string;
     driver_id: string;
-  }>({ vehicle_number: '', vehicle_type: 'bus', school_id: '', driver_id: '' });
+    tracking_mode: 'phone' | 'device';
+    device_id: string;
+  }>({ vehicle_number: '', vehicle_type: 'bus', school_id: '', driver_id: '', tracking_mode: 'phone', device_id: '' });
   
   // ROLE CHECKS
   const [hasPrincipal, setHasPrincipal] = useState(false);
@@ -469,7 +471,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, userNa
   const handleAddVehicle = async (e: React.FormEvent) => {
     e.preventDefault();
     const success = await upsertVehicle(newVehicle as any);
-    if (success) { setIsVehicleModalOpen(false); setNewVehicle({ vehicle_number: '', vehicle_type: 'bus', school_id: '', driver_id: '' }); fetchData(); } 
+    if (success) { 
+        setIsVehicleModalOpen(false); 
+        setNewVehicle({ 
+            vehicle_number: '', 
+            vehicle_type: 'bus', 
+            school_id: '', 
+            driver_id: '', 
+            tracking_mode: 'phone', 
+            device_id: '' 
+        }); 
+        fetchData(); 
+    } 
     else alert("Failed");
   };
 
@@ -825,6 +838,38 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, userNa
                   <option value="">Select School</option>
                   {schools.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
               </select>
+              
+              <div className="p-4 bg-slate-50 dark:bg-white/5 rounded-2xl border border-slate-100 dark:border-white/10 space-y-3">
+                  <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Tracking Configuration</p>
+                  <div className="flex gap-2">
+                      <button 
+                        type="button" 
+                        onClick={() => setNewVehicle({...newVehicle, tracking_mode: 'phone'})}
+                        className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase transition-all ${newVehicle.tracking_mode === 'phone' ? 'bg-emerald-500 text-white shadow-lg' : 'bg-white dark:bg-dark-900 text-slate-400 border border-slate-100 dark:border-white/5'}`}
+                      >
+                        Phone App
+                      </button>
+                      <button 
+                        type="button" 
+                        onClick={() => setNewVehicle({...newVehicle, tracking_mode: 'device'})}
+                        className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase transition-all ${newVehicle.tracking_mode === 'device' ? 'bg-indigo-500 text-white shadow-lg' : 'bg-white dark:bg-dark-900 text-slate-400 border border-slate-100 dark:border-white/5'}`}
+                      >
+                        GPS Device
+                      </button>
+                  </div>
+                  
+                  {newVehicle.tracking_mode === 'device' && (
+                      <input 
+                        type="text" 
+                        placeholder="Device IMEI / ID" 
+                        value={newVehicle.device_id} 
+                        onChange={e => setNewVehicle({...newVehicle, device_id: e.target.value})} 
+                        className="w-full p-3 rounded-xl border border-indigo-200 bg-indigo-50 dark:bg-dark-900 dark:border-indigo-500/20 text-slate-800 dark:text-white font-bold text-xs" 
+                        required 
+                      />
+                  )}
+              </div>
+
               <select value={newVehicle.driver_id} onChange={e => setNewVehicle({...newVehicle, driver_id: e.target.value})} className="w-full p-4 rounded-2xl border dark:bg-dark-900 dark:border-white/10 text-slate-800 dark:text-white font-bold" required disabled={!newVehicle.school_id}>
                   <option value="">Select Driver</option>
                   {driversForSelectedSchool.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
@@ -923,17 +968,37 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, userNa
 
       {/* Other Modals (Vehicles, Curriculum, Periods) are rendered as children of Modal */}
       <Modal isOpen={!!selectedVehicleDetails} onClose={() => setSelectedVehicleDetails(null)} title="TRANSPORT INFO">
-          {/* ... Content ... */}
           {selectedVehicleDetails && (
               <div className="space-y-5">
                   <div className="p-6 bg-slate-900 text-white rounded-[2rem] shadow-xl text-center relative overflow-hidden">
                       <div className="relative z-10">
                           <Truck size={32} className="mx-auto mb-2 text-brand-400" />
                           <h3 className="font-black uppercase text-2xl tracking-tight">{selectedVehicleDetails.vehicle_number}</h3>
-                          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Bus / Van</p>
+                          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">{selectedVehicleDetails.vehicle_type || 'Bus'}</p>
                       </div>
                   </div>
-                  {/* ... Rest of vehicle details ... */}
+
+                  <div className="bg-white dark:bg-dark-900 p-5 rounded-[2rem] border border-slate-100 dark:border-white/5 space-y-4">
+                      <div className="flex justify-between items-center">
+                          <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Tracking Mode</p>
+                          <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase ${selectedVehicleDetails.tracking_mode === 'device' ? 'bg-indigo-500 text-white' : 'bg-emerald-500 text-white'}`}>
+                              {selectedVehicleDetails.tracking_mode === 'device' ? 'GPS Device' : 'Phone App'}
+                          </span>
+                      </div>
+                      
+                      {selectedVehicleDetails.tracking_mode === 'device' && (
+                          <div className="flex justify-between items-center pt-2 border-t border-slate-50 dark:border-white/5">
+                              <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Device ID</p>
+                              <span className="text-xs font-bold text-slate-800 dark:text-white">{selectedVehicleDetails.device_id || 'Not Set'}</span>
+                          </div>
+                      )}
+
+                      <div className="flex justify-between items-center pt-2 border-t border-slate-50 dark:border-white/5">
+                          <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Driver</p>
+                          <span className="text-xs font-bold text-slate-800 dark:text-white uppercase">{selectedVehicleDetails.driver_name || 'Not Assigned'}</span>
+                      </div>
+                  </div>
+
                   <button onClick={() => initiateDelete('vehicle', selectedVehicleDetails.id, selectedVehicleDetails.vehicle_number)} className="w-full py-4 rounded-2xl font-black uppercase text-xs bg-rose-500 text-white shadow-lg">Delete Vehicle</button>
               </div>
           )}

@@ -319,7 +319,19 @@ export const fetchVehicles = async (id: string): Promise<Vehicle[]> => {
   });
   return result || [];
 };
-export const upsertVehicle = async (v: Partial<Vehicle>): Promise<boolean> => { const { error } = await supabase.from('vehicles').upsert({ school_id: v.school_id, vehicle_number: v.vehicle_number, vehicle_type: v.vehicle_type, driver_id: v.driver_id, is_active: v.is_active || true }); return !error; };
+export const upsertVehicle = async (v: Partial<Vehicle>): Promise<boolean> => { 
+    const { error } = await supabase.from('vehicles').upsert({ 
+        id: v.id,
+        school_id: v.school_id, 
+        vehicle_number: v.vehicle_number, 
+        vehicle_type: v.vehicle_type, 
+        driver_id: v.driver_id, 
+        is_active: v.is_active ?? true,
+        tracking_mode: v.tracking_mode || 'phone',
+        device_id: v.device_id || null
+    }); 
+    return !error; 
+};
 export const fetchStudentsForClass = async (id: string, cn: string): Promise<Student[]> => { 
     const result = await fetchWithCache(`students_${id}_${cn}`, async () => {
         const { data } = await supabase.from('students').select('*').eq('school_id', id).eq('class_name', cn).order('name'); 
@@ -763,6 +775,22 @@ export const fetchStudentFullHistory = async (studentId: string, dateFrom?: stri
             activity_log: (subs.data || []).map((s:any) => ({ title: `Homework - Period ${s.period_number}`, detail: s.status, date: s.date }))
         };
     } catch(e) { return null; }
+};
+
+export const fetchVehicleHistory = async (vehicleId: string): Promise<{latitude: number, longitude: number}[]> => {
+    try {
+        const { data, error } = await supabase
+            .from('vehicle_location_history')
+            .select('latitude, longitude')
+            .eq('vehicle_id', vehicleId)
+            .order('recorded_at', { ascending: true })
+            .limit(50);
+        
+        if (error) throw error;
+        return data || [];
+    } catch(e) {
+        return [];
+    }
 };
 
 export const fetchStaffFullHistory = async (userId: string, dateFrom?: string, dateTo?: string): Promise<FullHistory | null> => {

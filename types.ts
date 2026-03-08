@@ -55,6 +55,8 @@ export interface Vehicle {
   last_lat?: number;
   last_lng?: number;
   updated_at?: string;
+  tracking_mode?: 'phone' | 'device';
+  device_id?: string;
 }
 
 export interface SchoolSummary {
