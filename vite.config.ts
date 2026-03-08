@@ -23,6 +23,7 @@ export default defineConfig(({ mode }) => {
           workbox: {
             // CRITICAL: Explicitly cache index.html and assets
             globPatterns: ['**/*.{js,css,html,ico,png,svg,json}'],
+            maximumFileSizeToCacheInBytes: 4000000,
             cleanupOutdatedCaches: true,
             clientsClaim: true,
             skipWaiting: true,

@@ -458,6 +458,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, userNa
       }
   }, [newUser.school_id]);
 
+  useEffect(() => {
+    if (isCurriculumModalOpen) {
+      loadCurriculumData();
+    }
+  }, [isCurriculumModalOpen, currStep, currSchool, currClass, currSubject, currLesson]);
+
+  useEffect(() => {
+    if (isPeriodsModalOpen && selectedSchoolForPeriods) {
+      setPeriodCount(selectedSchoolForPeriods.total_periods || 8);
+    }
+  }, [isPeriodsModalOpen, selectedSchoolForPeriods]);
+
   const handleSchoolSelectForVehicle = async (schoolId: string) => {
       setNewVehicle({...newVehicle, school_id: schoolId, driver_id: ''});
       if(schoolId) {
@@ -1006,18 +1018,140 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, userNa
 
       {/* Curriculum Modal */}
       <Modal isOpen={isCurriculumModalOpen} onClose={() => setIsCurriculumModalOpen(false)} title="ACADEMIC CONFIG">
-         {/* ... Content ... */}
          <div className="flex flex-col h-[70vh]">
-            {/* Logic for steps... */}
+            <div className="flex items-center gap-3 mb-4">
+                {currStep !== 'select_school' && (
+                    <button onClick={() => {
+                        if (currStep === 'manage_classes') setCurrStep('select_school');
+                        else if (currStep === 'manage_subjects') setCurrStep('manage_classes');
+                        else if (currStep === 'manage_lessons') setCurrStep('manage_subjects');
+                        else if (currStep === 'manage_homework') setCurrStep('manage_lessons');
+                    }} className="p-2 rounded-full bg-slate-100 dark:bg-white/10 text-slate-600 dark:text-slate-300">
+                        <ArrowLeft size={18} />
+                    </button>
+                )}
+                <div>
+                    <h3 className="font-black uppercase text-slate-800 dark:text-white">
+                        {currStep === 'select_school' ? 'Select School' : 
+                         currStep === 'manage_classes' ? `Classes: ${currSchool?.name}` :
+                         currStep === 'manage_subjects' ? `Subjects: ${currClass?.class_name}` :
+                         currStep === 'manage_lessons' ? `Lessons: ${currSubject?.subject_name}` :
+                         `Homework: ${currLesson?.lesson_name}`}
+                    </h3>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                        Step {currStep === 'select_school' ? '1' : currStep === 'manage_classes' ? '2' : currStep === 'manage_subjects' ? '3' : currStep === 'manage_lessons' ? '4' : '5'} of 5
+                    </p>
+                </div>
+            </div>
+
+            {currStep !== 'select_school' && (
+                <div className="flex gap-2 mb-4">
+                    <input 
+                        type="text" 
+                        placeholder={currStep === 'manage_classes' ? "Class Name (e.g. Class 10)" : currStep === 'manage_subjects' ? "Subject Name" : currStep === 'manage_lessons' ? "Lesson Name" : "Homework Template"}
+                        value={newItemName}
+                        onChange={e => setNewItemName(e.target.value)}
+                        className="flex-1 p-3 rounded-xl border dark:bg-dark-950 dark:border-white/10 text-xs font-bold"
+                    />
+                    <button 
+                        onClick={handleAddCurriculumItem}
+                        disabled={currLoading || !newItemName}
+                        className="px-4 bg-emerald-500 text-white rounded-xl font-black uppercase text-[10px] disabled:opacity-50"
+                    >
+                        {currLoading ? <Loader2 className="animate-spin" size={16} /> : <Plus size={18} />}
+                    </button>
+                </div>
+            )}
+
             <div className="flex-1 overflow-y-auto no-scrollbar space-y-2">
-                {/* ... List ... */}
+                {currLoading && currList.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-10 text-slate-400">
+                        <Loader2 className="animate-spin mb-2" size={24} />
+                        <p className="text-[10px] font-black uppercase">Loading Data...</p>
+                    </div>
+                ) : currList.length === 0 ? (
+                    <div className="text-center py-10 text-slate-400">
+                        <p className="text-[10px] font-black uppercase">No items found</p>
+                    </div>
+                ) : (
+                    currList.map((item) => (
+                        <div 
+                            key={item.id} 
+                            onClick={() => {
+                                if (currStep === 'select_school') { setCurrSchool(item); setCurrStep('manage_classes'); }
+                                else if (currStep === 'manage_classes') { setCurrClass(item); setCurrStep('manage_subjects'); }
+                                else if (currStep === 'manage_subjects') { setCurrSubject(item); setCurrStep('manage_lessons'); }
+                                else if (currStep === 'manage_lessons') { setCurrLesson(item); setCurrStep('manage_homework'); }
+                            }}
+                            className="p-4 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/5 flex items-center justify-between group cursor-pointer hover:border-emerald-500/30 transition-all"
+                        >
+                            <span className="font-bold text-slate-700 dark:text-slate-200 uppercase text-xs">
+                                {currStep === 'select_school' ? item.name : 
+                                 currStep === 'manage_classes' ? item.class_name :
+                                 currStep === 'manage_subjects' ? item.subject_name :
+                                 currStep === 'manage_lessons' ? item.lesson_name :
+                                 item.homework_template}
+                            </span>
+                            {currStep !== 'manage_homework' && <ChevronRight size={16} className="text-slate-300 group-hover:text-emerald-500 transition-colors" />}
+                        </div>
+                    ))
+                )}
             </div>
          </div>
       </Modal>
 
       {/* Periods Modal */}
       <Modal isOpen={isPeriodsModalOpen} onClose={() => setIsPeriodsModalOpen(false)} title="SCHOOL PERIODS">
-          {/* ... Content ... */}
+          <div className="space-y-6">
+              <div className="p-5 bg-indigo-50 dark:bg-indigo-500/10 rounded-[2rem] border border-indigo-100 dark:border-white/10">
+                  <p className="text-[10px] font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-widest mb-4">Select School to Configure</p>
+                  <select 
+                    value={selectedSchoolForPeriods?.id || ''} 
+                    onChange={e => {
+                        const s = schools.find(sch => sch.id === e.target.value);
+                        setSelectedSchoolForPeriods(s);
+                        if(s) setPeriodCount(s.total_periods || 8);
+                    }}
+                    className="w-full p-4 rounded-2xl border border-indigo-200 dark:bg-dark-900 dark:border-white/10 text-slate-800 dark:text-white font-bold"
+                  >
+                      <option value="">Choose School</option>
+                      {schools.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  </select>
+              </div>
+
+              {selectedSchoolForPeriods && (
+                  <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-300">
+                      <div className="flex items-center justify-between p-4 bg-white dark:bg-dark-900 rounded-2xl border border-slate-100 dark:border-white/5">
+                          <div>
+                              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Periods</p>
+                              <p className="text-2xl font-black text-slate-800 dark:text-white">{periodCount}</p>
+                          </div>
+                          <div className="flex gap-2">
+                              <button 
+                                onClick={() => setPeriodCount(Math.max(1, periodCount - 1))}
+                                className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-white/10 flex items-center justify-center text-slate-600 dark:text-white active:scale-90 transition-all"
+                              >
+                                  <MinusCircle size={24} />
+                              </button>
+                              <button 
+                                onClick={() => setPeriodCount(Math.min(12, periodCount + 1))}
+                                className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-white/10 flex items-center justify-center text-slate-600 dark:text-white active:scale-90 transition-all"
+                              >
+                                  <PlusCircle size={24} />
+                              </button>
+                          </div>
+                      </div>
+
+                      <button 
+                        onClick={handleUpdatePeriods}
+                        disabled={updatingPeriods}
+                        className="w-full py-4 bg-indigo-500 text-white rounded-[1.8rem] font-black uppercase text-xs shadow-xl shadow-indigo-500/20 active:scale-95 transition-all flex items-center justify-center gap-2"
+                      >
+                          {updatingPeriods ? <Loader2 className="animate-spin" size={18} /> : <><Save size={18} /> Save Configuration</>}
+                      </button>
+                  </div>
+              )}
+          </div>
       </Modal>
 
       {/* Delete Confirmation */}
