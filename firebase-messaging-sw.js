@@ -4,12 +4,13 @@ importScripts('https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js')
 importScripts('https://www.gstatic.com/firebasejs/9.0.0/firebase-messaging-compat.js');
 
 const firebaseConfig = {
-  apiKey: "AIzaSyDgUJ_-mq-i2JgwyzVKwmocRso6IUxVnvw",
-  authDomain: "vidyasetu-ai-adc1e.firebaseapp.com",
-  projectId: "vidyasetu-ai-adc1e",
-  storageBucket: "vidyasetu-ai-adc1e.firebasestorage.app",
-  messagingSenderId: "109380207060",
-  appId: "1:109380207060:web:a52990df319c6a7a5d5641"
+  apiKey: "AIzaSyCztVmtPxXPgiqn2nNNi44Aj-x1DO2fdgQ",
+  authDomain: "avi-talk-34b45.firebaseapp.com",
+  projectId: "avi-talk-34b45",
+  storageBucket: "avi-talk-34b45.firebasestorage.app",
+  messagingSenderId: "876798281404",
+  appId: "1:876798281404:web:b95abb49e213fb1d58b2b9",
+  measurementId: "G-6JKD0WJJTT"
 };
 
 firebase.initializeApp(firebaseConfig);

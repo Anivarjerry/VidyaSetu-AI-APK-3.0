@@ -5,15 +5,16 @@ import { getAuth, Auth } from "firebase/auth";
 
 // Updated Configuration provided by user
 const firebaseConfig = {
-  apiKey: "AIzaSyDgUJ_-mq-i2JgwyzVKwmocRso6IUxVnvw",
-  authDomain: "vidyasetu-ai-adc1e.firebaseapp.com",
-  projectId: "vidyasetu-ai-adc1e",
-  storageBucket: "vidyasetu-ai-adc1e.firebasestorage.app",
-  messagingSenderId: "109380207060",
-  appId: "1:109380207060:web:a52990df319c6a7a5d5641"
+  apiKey: "AIzaSyCztVmtPxXPgiqn2nNNi44Aj-x1DO2fdgQ",
+  authDomain: "avi-talk-34b45.firebaseapp.com",
+  projectId: "avi-talk-34b45",
+  storageBucket: "avi-talk-34b45.firebasestorage.app",
+  messagingSenderId: "876798281404",
+  appId: "1:876798281404:web:b95abb49e213fb1d58b2b9",
+  measurementId: "G-6JKD0WJJTT"
 };
 
-const VAPID_KEY = "BHICTM0s7nowrVwtsDP65Blrl0RKE7nC34L1z5mfxtt9WILgTnPuIrmc3q9H_HR6ojdE6CoqwAMcIzGL1f69XOM";
+const VAPID_KEY = "BAcmgCPf5OdeLkIWOtSDuCwATiyek8-qrcbtfZne4VDMAsSw9PsA2TTy31YNewMWnJtx-V6amCg-9kiYYyyqVEw";
 
 let messagingInstance: Messaging | null = null;
 let authInstance: Auth | null = null;
