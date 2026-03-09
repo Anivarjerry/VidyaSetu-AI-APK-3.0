@@ -168,9 +168,9 @@ export const fetchTimeTable = async (schoolId: string, className: string, day: s
 
 export const fetchFullSchoolTimeTable = async (schoolId: string, day: string): Promise<TimeTableEntry[]> => {
     try {
-        const { data, error } = await supabase.from('time_tables').select('teacher_id, period_number, class_name').eq('school_id', schoolId).eq('day_of_week', day);
+        const { data, error } = await supabase.from('time_tables').select('*').eq('school_id', schoolId).eq('day_of_week', day);
         if (error) throw error;
-        return data || [];
+        return (data || []) as TimeTableEntry[];
     } catch(e) { return []; }
 };
 
@@ -306,7 +306,7 @@ export const fetchTeacherHistory = async (sc: string, mob: string, d: string): P
           userId = user.id;
       }
       const { data } = await supabase.from('daily_periods').select('*').eq('teacher_user_id', userId).eq('date', d).order('period_number');
-      return (data || []).map((p: any) => ({ id: p.id, period_number: p.period_number, status: 'submitted', class_name: p.class_name, subject: p.subject, lesson: p.lesson, homework: p.homework, homework_type: p.homework_type }));
+      return (data || []).map((p: any) => ({ id: p.id, period_number: p.period_number, status: 'submitted' as const, class_name: p.class_name, subject: p.subject, lesson: p.lesson, homework: p.homework, homework_type: p.homework_type }));
   });
   return result || [];
 };
@@ -512,7 +512,12 @@ export const fetchAIContextData = async (role: Role, schoolIdCode: string, userI
         contextParts.push(`TODAY'S ATTENDANCE: ${att ? att.status.toUpperCase() : 'NOT MARKED YET'}.`);
         if (className) {
             const { data: hw } = await supabase.from('daily_periods').select('period_number, subject, homework, homework_type, users!teacher_user_id(name)').eq('school_id', schoolUUID).eq('class_name', className).eq('date', today).order('period_number');
-            if (hw && hw.length > 0) { contextParts.push(`TODAY'S CLASS HOMEWORK (${className}):\n${hw.map(h => `- Period ${h.period_number} [${h.subject} by ${h.users?.name || 'Teacher'}]: ${h.homework} (Type: ${h.homework_type})`).join('\n')}`); } 
+            if (hw && hw.length > 0) { 
+                contextParts.push(`TODAY'S CLASS HOMEWORK (${className}):\n${hw.map(h => {
+                    const teacherName = Array.isArray(h.users) ? h.users[0]?.name : (h.users as any)?.name;
+                    return `- Period ${h.period_number} [${h.subject} by ${teacherName || 'Teacher'}]: ${h.homework} (Type: ${h.homework_type})`;
+                }).join('\n')}`); 
+            } 
             else { contextParts.push(`TODAY'S CLASS HOMEWORK: No homework has been uploaded for ${className} today yet.`); }
         }
         const { data: sLeaves } = await supabase.from('student_leaves').select('leave_type, start_date, status').eq('student_id', studentId).order('created_at', { ascending: false }).limit(1);

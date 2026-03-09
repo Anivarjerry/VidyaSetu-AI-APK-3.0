@@ -507,7 +507,8 @@ export const downloadExamResultsExcel = async (schoolId: string, className?: str
             "Grade": r.grade
         }));
 
-        exportToExcel(excelData, recordId ? `Result_${data[0]?.exam_records?.subject}` : "All_Exam_Results");
+        const examRecord = Array.isArray(data[0]?.exam_records) ? data[0]?.exam_records[0] : (data[0]?.exam_records as any);
+        exportToExcel(excelData, recordId ? `Result_${examRecord?.subject}` : "All_Exam_Results");
         return { success: true };
     } catch(e) { return { success: false }; }
 };
@@ -538,6 +539,7 @@ export const downloadStudentReport = async (schoolId: string, studentId: string,
             e.grade
         ]);
 
+        const userMobile = Array.isArray(student.users) ? student.users[0]?.mobile : (student.users as any)?.mobile;
         const result = generatePDF({
             title: `PROGRESS REPORT: ${studentName}`,
             subTitle: `Class: ${student.class_name} | Session 2024-25`,
@@ -548,7 +550,7 @@ export const downloadStudentReport = async (schoolId: string, studentId: string,
                 father: student.father_name || '-',
                 mother: student.mother_name || '-',
                 dob: student.dob || '-',
-                mobile: student.users?.mobile || '-'
+                mobile: userMobile || '-'
             }
         });
         return { success: result };

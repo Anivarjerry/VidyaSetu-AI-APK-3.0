@@ -7,7 +7,7 @@ const AUTH_CACHE_PREFIX = 'auth_session_';
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-const fetchWithRetry = async (fn: () => Promise<any>, retries = 3, delay = 1000) => {
+const fetchWithRetry = async (fn: () => PromiseLike<any>, retries = 3, delay = 1000) => {
   for (let i = 0; i < retries; i++) {
     try {
       const result = await fn();
@@ -167,10 +167,13 @@ export const loginUser = async (credentials: LoginRequest): Promise<LoginRespons
   }
 };
 
-export const updateUserToken = async (userId: string, token: string) => {
+export const updateUserToken = async (userId: string, token: string, role: Role) => {
   try {
-    await supabase.from('users').update({ fcm_token: token }).eq('id', userId);
-  } catch (error) {}
+    const table = role === 'admin' ? 'admins' : 'users';
+    await supabase.from(table).update({ fcm_token: token }).eq('id', userId);
+  } catch (error) {
+    console.error("Error updating FCM token:", error);
+  }
 };
 
 export const fetchPendingApprovals = async (schoolId: string) => {

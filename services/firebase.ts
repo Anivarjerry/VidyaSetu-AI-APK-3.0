@@ -61,13 +61,14 @@ export const requestForToken = async () => {
   }
 };
 
-export const onMessageListener = () =>
-  new Promise((resolve) => {
-    const messaging = getMessagingSafe();
-    if (!messaging) return;
-    onMessage(messaging, (payload) => {
-      resolve(payload);
-    });
+export const onMessageListener = (callback: (payload: any) => void) => {
+  const messaging = getMessagingSafe();
+  if (!messaging) return () => {};
+  
+  // onMessage returns an unsubscribe function
+  return onMessage(messaging, (payload) => {
+    callback(payload);
   });
+};
 
 export { getMessagingSafe as messaging, authInstance as auth };

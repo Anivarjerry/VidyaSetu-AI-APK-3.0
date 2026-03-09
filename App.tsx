@@ -91,46 +91,62 @@ const AppContent: React.FC = () => {
 
   // --- FIREBASE NOTIFICATION INIT ---
   useEffect(() => {
+    let unsubscribe: (() => void) | undefined;
+
     const initNotifications = async () => {
+      // 1. Register Service Worker
       if ('serviceWorker' in navigator) {
           try {
-              // Standard registration without scope complications
-              // Changed to relative path './' to fix origin mismatch errors
               await navigator.serviceWorker.register('./firebase-messaging-sw.js');
           } catch (err) {
-              // Fail silently or log warning, but don't crash
               console.warn('Service Worker Registration Warning:', err);
           }
       }
 
-      const token = await requestForToken();
-      if (token && authData.userId) {
-        // console.log("FCM Token Generated:", token);
-        await updateUserToken(authData.userId, token);
+      // 2. Request Token and Update Database
+      try {
+          const token = await requestForToken();
+          if (token && authData.userId && authData.userRole) {
+            // Only update if token is new or not in local storage to save DB calls
+            const lastToken = localStorage.getItem('fcm_token_last');
+            if (lastToken !== token) {
+                await updateUserToken(authData.userId, token, authData.userRole);
+                localStorage.setItem('fcm_token_last', token);
+            }
+          }
+      } catch (err) {
+          console.error("Notification Init Error:", err);
       }
+
+      // 3. Listen for Foreground Messages
+      unsubscribe = onMessageListener((payload: any) => {
+          if (payload && payload.notification) {
+              const { title, body } = payload.notification;
+              
+              // Show browser notification if permission is granted
+              if (Notification.permission === 'granted') {
+                  new Notification(title || 'VidyaSetu Alert', {
+                      body: body,
+                      icon: '/android/android-launchericon-192-192.png',
+                      badge: '/android/android-launchericon-192-192.png',
+                      tag: 'vidyasetu-alert'
+                  });
+              } else {
+                  // Fallback for UI if needed
+                  console.log("Foreground Notification Received:", payload);
+              }
+          }
+      });
     };
 
-    if (authData.view !== 'login') {
+    if (authData.view !== 'login' && authData.userId) {
       initNotifications();
-      
-      onMessageListener()
-        .then((payload: any) => {
-          if (payload) {
-             // console.log("Foreground Message:", payload);
-             if (Notification.permission === 'granted') {
-                 new Notification(payload.notification?.title || 'VidyaSetu Alert', {
-                     body: payload.notification?.body,
-                     icon: '/android/android-launchericon-192-192.png'
-                 });
-             } else {
-                 // Fallback alert
-                 // alert(`🔔 ${payload.notification?.title}: ${payload.notification?.body}`);
-             }
-          }
-        })
-        .catch(err => console.log('failed: ', err));
     }
-  }, [authData.userId, authData.view]);
+
+    return () => {
+        if (unsubscribe) unsubscribe();
+    };
+  }, [authData.userId, authData.view, authData.userRole]);
 
   const handleLogin = async (creds: LoginRequest) => {
     setIsLoggingIn(true);
