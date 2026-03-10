@@ -35,7 +35,9 @@ export const LeaveRequestModal: React.FC<LeaveRequestModalProps> = ({ isOpen, on
     leave_type: 'Casual Leave',
     start_date: '',
     end_date: '',
-    reason: ''
+    reason: '',
+    is_half_day: false,
+    is_emergency: false
   });
   const [history, setHistory] = useState<StaffLeave[]>([]);
   const [tab, setTab] = useState<'apply' | 'history'>('apply');
@@ -88,6 +90,28 @@ export const LeaveRequestModal: React.FC<LeaveRequestModalProps> = ({ isOpen, on
               <div className="space-y-1"><label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Until</label><input type="date" value={formData.end_date} onChange={e => setFormData({...formData, end_date: e.target.value})} className="w-full p-4 bg-slate-50 dark:bg-dark-900 border border-slate-100 dark:border-white/10 rounded-2xl text-[10px] font-black dark:text-white" required /></div>
             </div>
             <div className="space-y-1"><label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Reason</label><textarea value={formData.reason} onChange={e => setFormData({...formData, reason: e.target.value})} placeholder="Explain your absence..." rows={4} className="w-full p-5 bg-slate-50 dark:bg-dark-900 border border-slate-100 dark:border-white/10 rounded-3xl text-sm font-bold dark:text-slate-200 text-slate-800 outline-none focus:ring-2 focus:ring-brand-500/10 resize-none shadow-inner-sm" required /></div>
+            
+            <div className="grid grid-cols-2 gap-3">
+              <div 
+                onClick={() => setFormData({...formData, is_half_day: !formData.is_half_day})}
+                className={`p-4 rounded-2xl border flex items-center justify-between cursor-pointer transition-all ${formData.is_half_day ? 'bg-brand-500/10 border-brand-500 text-brand-600' : 'bg-white dark:bg-dark-900 border-slate-200 dark:border-white/10 text-slate-400'}`}
+              >
+                <span className="text-[10px] font-black uppercase">Half Day</span>
+                <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${formData.is_half_day ? 'border-brand-500 bg-brand-500 text-white' : 'border-slate-300'}`}>
+                  {formData.is_half_day && <Check size={10} strokeWidth={4} />}
+                </div>
+              </div>
+              <div 
+                onClick={() => setFormData({...formData, is_emergency: !formData.is_emergency})}
+                className={`p-4 rounded-2xl border flex items-center justify-between cursor-pointer transition-all ${formData.is_emergency ? 'bg-rose-500/10 border-rose-500 text-rose-600' : 'bg-white dark:bg-dark-900 border-slate-200 dark:border-white/10 text-slate-400'}`}
+              >
+                <span className="text-[10px] font-black uppercase">Emergency</span>
+                <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${formData.is_emergency ? 'border-rose-500 bg-rose-500 text-white' : 'border-slate-300'}`}>
+                  {formData.is_emergency && <Check size={10} strokeWidth={4} />}
+                </div>
+              </div>
+            </div>
+
             <button 
                 type="submit" 
                 disabled={submitting} 
@@ -105,7 +129,11 @@ export const LeaveRequestModal: React.FC<LeaveRequestModalProps> = ({ isOpen, on
                      {l.status === 'pending' ? 'ALERT: PENDING' : l.status}
                    </div>
                    <h4 className="font-black text-slate-800 dark:text-white uppercase text-sm mb-1">{l.leave_type}</h4>
-                   <p className="text-[10px] text-slate-400 font-bold mb-3">{l.start_date} to {l.end_date}</p>
+                   <p className="text-[10px] text-slate-400 font-bold mb-2">{l.start_date} to {l.end_date}</p>
+                   <div className="flex gap-2 mb-3">
+                     {l.is_half_day && <span className="px-2 py-0.5 bg-brand-500/10 text-brand-600 text-[8px] font-black uppercase rounded-lg">Half Day</span>}
+                     {l.is_emergency && <span className="px-2 py-0.5 bg-rose-500/10 text-rose-600 text-[8px] font-black uppercase rounded-lg">Emergency</span>}
+                   </div>
                    <p className="text-xs text-slate-600 dark:text-slate-300 font-bold italic leading-relaxed">"{l.reason}"</p>
                 </div>
               ))}
@@ -328,7 +356,13 @@ export const StaffLeaveManagementModal: React.FC<StaffLeaveManagementModalProps>
                             </div>
                         </div>
                         <div className="p-5 bg-white/60 dark:bg-dark-950/40 rounded-3xl border border-white dark:border-white/5">
-                            <p className="text-[8px] font-black text-slate-400 uppercase mb-2">Detailed Reason</p>
+                            <div className="flex justify-between items-center mb-2">
+                                <p className="text-[8px] font-black text-slate-400 uppercase">Detailed Reason</p>
+                                <div className="flex gap-2">
+                                    {selectedItem.is_half_day && <span className="px-2 py-0.5 bg-brand-500/10 text-brand-600 text-[8px] font-black uppercase rounded-lg">Half Day</span>}
+                                    {selectedItem.is_emergency && <span className="px-2 py-0.5 bg-rose-500/10 text-rose-600 text-[8px] font-black uppercase rounded-lg">Emergency</span>}
+                                </div>
+                            </div>
                             <p className="text-sm text-slate-800 dark:text-slate-200 font-bold italic leading-relaxed">"{selectedItem.reason}"</p>
                         </div>
                     </div>

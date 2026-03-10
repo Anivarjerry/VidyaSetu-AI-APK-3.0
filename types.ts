@@ -135,6 +135,46 @@ export interface StaffLeave {
   principal_comment?: string;
   created_at?: string;
   user_name?: string; // Joined from users
+  is_half_day?: boolean; // NEW: Support for half-day leaves
+  is_emergency?: boolean; // NEW: Support for emergency leaves (no deduction)
+}
+
+export interface StaffSalaryConfig {
+  id?: string;
+  user_id: string;
+  school_id: string;
+  base_salary: number;
+  allowed_leaves: number;
+  deduction_per_day: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface StaffAdvance {
+  id?: string;
+  user_id: string;
+  school_id: string;
+  amount: number;
+  reason: string;
+  date: string;
+  created_at?: string;
+}
+
+export interface StaffPayroll {
+  id?: string;
+  user_id: string;
+  school_id: string;
+  month: number;
+  year: number;
+  base_salary: number;
+  total_leaves: number;
+  unpaid_leaves: number;
+  deduction_amount: number;
+  advance_deduction: number;
+  final_salary: number;
+  status: 'generated' | 'paid';
+  pdf_url?: string;
+  created_at?: string;
 }
 
 export interface StudentLeave {

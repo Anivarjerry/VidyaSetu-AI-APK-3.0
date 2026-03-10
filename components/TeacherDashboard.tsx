@@ -13,6 +13,7 @@ import { submitPeriodData } from '../services/dashboardService';
 import { GalleryModal } from './GalleryModal';
 import { ExamModal } from './ExamModal';
 import { ReportModal } from './ReportModal';
+import { SalarySlipsModal } from './SalarySlipsModal';
 
 interface TeacherDashboardProps {
   data: DashboardData;
@@ -84,6 +85,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
       { key: 'leave', title: t('staff_leave'), sub: "Request Off", icon: <CalendarRange size={20} />, color: "text-rose-600", bg: "bg-rose-500/10" },
       { key: 'history', title: "History", sub: "View Logs", icon: <History size={20} />, color: "text-indigo-600", bg: "bg-indigo-500/10" },
       { key: 'reports', title: "Downloads", sub: "PDF Reports", icon: <FileText size={20} />, color: "text-slate-600", bg: "bg-slate-500/10" },
+      { key: 'salary', title: "Salary Slips", sub: "My Payroll", icon: <Wallet size={20} />, color: "text-emerald-600", bg: "bg-emerald-500/10" },
   ];
 
   return (

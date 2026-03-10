@@ -9,6 +9,7 @@ import { TransportTrackerModal } from './TransportTrackerModal';
 import { AnalyticsModal } from './AnalyticsModal';
 import { HomeworkAnalyticsModal } from './HomeworkAnalyticsModal';
 import { StaffLeaveManagementModal } from './LeaveModals';
+import { SalaryManagementModal } from './SalaryManagementModal';
 import { AttendanceModal } from './AttendanceModal';
 import { ExamModal } from './ExamModal';
 import { GalleryModal } from './GalleryModal';
@@ -191,6 +192,7 @@ export const PrincipalDashboard: React.FC<PrincipalDashboardProps> = ({
     { key: "exam", title: "Results", subtitle: "Marks", icon: <Award size={22} /> },
     { key: "gallery", title: "Gallery", subtitle: "Photos", icon: <ImageIcon size={22} /> },
     { key: "staff_config", title: "Staff Config", subtitle: "Skills & Tier", icon: <UserCog size={22} /> },
+    { key: "salary_management", title: "Salary", subtitle: "Payroll & Adv", icon: <Wallet size={22} /> },
     { key: "report", title: "Reports", subtitle: "Download", icon: <Download size={22} /> },
     { key: "location_setup", title: "Location", subtitle: "GPS Setup", icon: <MapPin size={22} /> },
   ];
@@ -349,6 +351,9 @@ export const PrincipalDashboard: React.FC<PrincipalDashboardProps> = ({
       
       {/* NEW: STAFF CONFIG MODAL */}
       {data && (<StaffConfigModal isOpen={activeModal === 'staff_config'} onClose={() => setActiveModal(null)} schoolId={data.school_db_id || ''} />)}
+
+      {/* NEW: SALARY MANAGEMENT MODAL */}
+      {data && (<SalaryManagementModal isOpen={activeModal === 'salary_management'} onClose={() => setActiveModal(null)} schoolId={data.school_db_id || ''} />)}
 
       {/* NEW: LOCATION SETUP MODAL */}
       {data && (<LocationSetupModal isOpen={activeModal === 'location_setup'} onClose={() => setActiveModal(null)} schoolId={data.school_db_id || ''} currentLat={data.school_latitude} currentLng={data.school_longitude} onSuccess={onRefresh} />)}

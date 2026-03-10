@@ -390,6 +390,95 @@ export const fetchSchoolStudentLeaves = async (id: string): Promise<StudentLeave
 };
 export const updateStudentLeaveStatus = async (id: string, s: string, c: string): Promise<boolean> => { const { error } = await supabase.from('student_leaves').update({ status: s, principal_comment: c }).eq('id', id); return !error; };
 
+// --- SALARY & PAYROLL SERVICES ---
+export const fetchStaffSalaryConfig = async (schoolId: string): Promise<StaffSalaryConfig[]> => {
+    const { data } = await supabase.from('staff_salary_config').select('*').eq('school_id', schoolId);
+    return data || [];
+};
+
+export const updateStaffSalaryConfig = async (config: StaffSalaryConfig): Promise<boolean> => {
+    const { error } = await supabase.from('staff_salary_config').upsert(config, { onConflict: 'user_id' });
+    return !error;
+};
+
+export const fetchStaffAdvances = async (schoolId: string, month: number, year: number): Promise<StaffAdvance[]> => {
+    const start = `${year}-${String(month).padStart(2, '0')}-01`;
+    const lastDay = new Date(year, month, 0).getDate();
+    const end = `${year}-${String(month).padStart(2, '0')}-${lastDay}`;
+    const { data } = await supabase.from('staff_advances').select('*, users(name)').eq('school_id', schoolId).gte('date', start).lte('date', end);
+    return (data || []).map((a: any) => ({ ...a, user_name: a.users?.name }));
+};
+
+export const addStaffAdvance = async (advance: StaffAdvance): Promise<boolean> => {
+    const { error } = await supabase.from('staff_advances').insert(advance);
+    return !error;
+};
+
+export const fetchStaffPayroll = async (schoolId: string, month: number, year: number): Promise<StaffPayroll[]> => {
+    const { data } = await supabase.from('staff_payroll').select('*, users(name)').eq('school_id', schoolId).eq('month', month).eq('year', year);
+    return (data || []).map((p: any) => ({ ...p, user_name: p.users?.name }));
+};
+
+export const generateMonthlyPayroll = async (schoolId: string, month: number, year: number): Promise<boolean> => {
+    const { data: configs } = await supabase.from('staff_salary_config').select('*').eq('school_id', schoolId);
+    if (!configs || configs.length === 0) return false;
+
+    const start = `${year}-${String(month).padStart(2, '0')}-01`;
+    const lastDay = new Date(year, month, 0).getDate();
+    const end = `${year}-${String(month).padStart(2, '0')}-${lastDay}`;
+
+    const payrolls: StaffPayroll[] = [];
+
+    for (const config of configs) {
+        const { data: leaves } = await supabase.from('staff_leaves')
+            .select('*')
+            .eq('user_id', config.user_id)
+            .eq('status', 'approved')
+            .gte('start_date', start)
+            .lte('start_date', end);
+
+        let totalLeaveDays = 0;
+        let nonEmergencyDays = 0;
+
+        (leaves || []).forEach(l => {
+            const weight = l.is_half_day ? 0.5 : 1;
+            totalLeaveDays += weight;
+            if (!l.is_emergency) {
+                nonEmergencyDays += weight;
+            }
+        });
+
+        const unpaidLeaveDays = Math.max(0, nonEmergencyDays - config.allowed_leaves);
+        const deductionAmount = unpaidLeaveDays * config.deduction_per_day;
+
+        const { data: advances } = await supabase.from('staff_advances')
+            .select('amount')
+            .eq('user_id', config.user_id)
+            .gte('date', start)
+            .lte('date', end);
+        
+        const totalAdvance = (advances || []).reduce((sum, a) => sum + Number(a.amount), 0);
+        const finalSalary = config.base_salary - deductionAmount - totalAdvance;
+
+        payrolls.push({
+            user_id: config.user_id,
+            school_id: schoolId,
+            month,
+            year,
+            base_salary: config.base_salary,
+            total_leaves: totalLeaveDays,
+            unpaid_leaves: unpaidLeaveDays,
+            deduction_amount: deductionAmount,
+            advance_deduction: totalAdvance,
+            final_salary: Math.max(0, finalSalary),
+            status: 'generated'
+        });
+    }
+
+    const { error } = await supabase.from('staff_payroll').upsert(payrolls, { onConflict: 'user_id,month,year' });
+    return !error;
+};
+
 // --- CURRICULUM SERVICES ---
 export const fetchSchoolClasses = async (id: string) => { 
     const result = await fetchWithCache(`classes_${id}`, async () => {
