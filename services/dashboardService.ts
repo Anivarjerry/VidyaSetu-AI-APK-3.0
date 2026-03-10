@@ -64,6 +64,13 @@ export const fetchPublicParents = async (schoolId: string) => {
     } catch (e) { return []; }
 };
 
+export const fetchSchoolUsers = async (schoolId: string) => {
+    try {
+        const { data } = await supabase.from('users').select('*').eq('school_id', schoolId).order('name');
+        return data || [];
+    } catch (e) { return []; }
+};
+
 export const fetchStudentOptionsForParent = async (parentId: string) => {
     try {
         const { data } = await supabase.from('students').select('id, name, class_name').eq('parent_user_id', parentId).order('name');
