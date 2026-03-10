@@ -64,6 +64,12 @@ export const StaffAttendanceModal: React.FC<StaffAttendanceModalProps> = ({
     }
   }, [isOpen]);
 
+  useEffect(() => {
+    if (view === 'capture' && videoRef.current && stream) {
+      videoRef.current.srcObject = stream;
+    }
+  }, [view, stream]);
+
   const checkStatus = async () => {
     setLoading(true);
     const marked = await checkStaffAttendanceToday(userId);

@@ -40,6 +40,12 @@ export const FaceIDManagement: React.FC<FaceIDManagementProps> = ({
     }
   }, [isOpen]);
 
+  useEffect(() => {
+    if (step === 'capture' && videoRef.current && stream) {
+      videoRef.current.srcObject = stream;
+    }
+  }, [step, stream]);
+
   const stopCamera = () => {
     if (stream) {
       stream.getTracks().forEach(track => track.stop());
