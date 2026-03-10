@@ -6,7 +6,7 @@ const QUEUE_STORE = 'mutation_queue';
 
 export interface QueueItem {
   id?: number;
-  type: 'SUBMIT_ATTENDANCE' | 'SUBMIT_PERIOD' | 'APPLY_LEAVE' | 'APPLY_STUDENT_LEAVE' | 'VISITOR_ENTRY' | 'SUBMIT_HOMEWORK_STATUS';
+  type: 'SUBMIT_ATTENDANCE' | 'SUBMIT_PERIOD' | 'APPLY_LEAVE' | 'APPLY_STUDENT_LEAVE' | 'VISITOR_ENTRY' | 'SUBMIT_HOMEWORK_STATUS' | 'SUBMIT_STAFF_ATTENDANCE';
   payload: any;
   timestamp: number;
 }

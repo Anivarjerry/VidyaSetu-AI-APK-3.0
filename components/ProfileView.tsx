@@ -1,11 +1,12 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { DashboardData, LoginRequest } from '../types';
 import { SkeletonProfile } from './Skeletons';
 import { 
-  GraduationCap, Crown, CreditCard, ChevronRight, Star, HelpCircle, Info, ShieldCheck
+  GraduationCap, Crown, CreditCard, ChevronRight, Star, HelpCircle, Info, ShieldCheck, ScanFace
 } from 'lucide-react';
 import { useThemeLanguage } from '../contexts/ThemeLanguageContext';
+import { FaceIDManagement } from './FaceIDManagement';
 
 interface ProfileViewProps {
   data: DashboardData | null;
@@ -15,6 +16,7 @@ interface ProfileViewProps {
   onOpenSubscription?: () => void;
   onOpenHelp?: () => void;
   onOpenAbout?: () => void;
+  onRefresh?: () => void;
 }
 
 export const ProfileView: React.FC<ProfileViewProps> = ({ 
@@ -22,9 +24,12 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   isLoading, 
   onOpenSubscription,
   onOpenHelp,
-  onOpenAbout
+  onOpenAbout,
+  onRefresh,
+  credentials
 }) => {
   const { t } = useThemeLanguage();
+  const [isFaceModalOpen, setIsFaceModalOpen] = useState(false);
   
   if (isLoading || !data) {
     return <SkeletonProfile />;
@@ -39,6 +44,8 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   const isTeacher = user_role === 'teacher';
   const isPrincipal = user_role === 'principal';
   const isDriver = user_role === 'driver';
+
+  const isStaff = isTeacher || isDriver || user_role === 'gatekeeper';
 
   return (
     <div className="p-4 w-full max-w-md mx-auto animate-in slide-in-from-bottom-8 duration-700 pb-24">
@@ -107,6 +114,27 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
         </div>
       )}
 
+      {isStaff && (
+        <div 
+          onClick={() => setIsFaceModalOpen(true)}
+          className="mb-6 p-5 rounded-[2.5rem] bg-white dark:bg-dark-900 border border-slate-100 dark:border-white/5 shadow-sm transition-all active:scale-95 cursor-pointer group"
+        >
+          <div className="flex items-center gap-4">
+             <div className="w-14 h-14 rounded-2xl bg-brand-500/10 text-brand-500 flex items-center justify-center shadow-inner group-hover:bg-brand-500 group-hover:text-white transition-all">
+                <ScanFace size={28} />
+             </div>
+             <div className="flex-1">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Security & Access</p>
+                <h4 className="text-lg font-black text-slate-800 dark:text-white uppercase leading-tight">Face ID Management</h4>
+                <p className="text-[11px] text-brand-600 font-bold uppercase mt-1">
+                  {data.face_descriptor ? 'Face Registered' : 'Not Registered'}
+                </p>
+             </div>
+             <ChevronRight className="text-slate-200 group-hover:text-brand-500 transition-colors" />
+          </div>
+        </div>
+      )}
+
       <div className="space-y-4">
         <div className="bg-white dark:bg-dark-900 rounded-[2.5rem] shadow-sm border border-slate-100 dark:border-white/5 overflow-hidden">
           <div className="px-6 py-5 bg-slate-50 dark:bg-white/5 border-b border-slate-100 dark:border-white/5 flex items-center gap-2">
@@ -139,6 +167,15 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
           </div>
         </div>
       </div>
+
+      <FaceIDManagement 
+        isOpen={isFaceModalOpen} 
+        onClose={() => setIsFaceModalOpen(false)} 
+        userId={data.user_id || ''} 
+        userName={data.user_name} 
+        currentPassword={credentials?.password}
+        onSuccess={() => onRefresh?.()}
+      />
     </div>
   );
 };

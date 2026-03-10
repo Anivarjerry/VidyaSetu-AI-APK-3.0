@@ -67,6 +67,8 @@ export interface SchoolSummary {
   school_name: string;
   school_code: string;
   total_periods?: number; // Added for dynamic periods
+  latitude?: number;
+  longitude?: number;
 }
 
 export interface SchoolUser {
@@ -105,6 +107,10 @@ export interface DashboardData {
   today_attendance?: 'present' | 'absent' | 'leave' | 'pending';
   siblings?: SiblingInfo[]; // NEW: List of all students linked to a parent
   assigned_subject?: string; // NEW: For Teachers
+  face_descriptor?: any; // NEW: For Face Recognition
+  face_photo_url?: string; // NEW: For Face Recognition
+  school_latitude?: number;
+  school_longitude?: number;
 }
 
 export interface ParentHomework {
@@ -290,6 +296,19 @@ export interface FullHistory {
   exam_log: { title: string; subject: string; marks: string; date: string }[];
   leave_log: { type: string; dates: string; status: string; reason: string }[];
   activity_log: { title: string; detail: string; date: string }[]; // Homework for teachers, Submissions for students
+}
+
+// --- STAFF ATTENDANCE TYPE ---
+export interface StaffAttendanceRecord {
+  id?: string;
+  user_id: string;
+  check_in_time?: string;
+  status: string;
+  selfie_url?: string;
+  location_lat?: number;
+  location_lng?: number;
+  is_verified: boolean;
+  role: string;
 }
 
 // --- TIME TABLE TYPE ---

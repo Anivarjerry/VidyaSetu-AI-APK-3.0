@@ -19,6 +19,7 @@ import { fetchVisitorEntries, searchPeople, fetchRecentPeople, fetchStudentFullH
 import { generate360Report } from '../services/reportService';
 import { useThemeLanguage } from '../contexts/ThemeLanguageContext';
 import { TimeTableTab } from './TimeTableTab';
+import { LocationSetupModal } from './LocationSetupModal';
 
 interface PrincipalDashboardProps {
   data: DashboardData;
@@ -191,6 +192,7 @@ export const PrincipalDashboard: React.FC<PrincipalDashboardProps> = ({
     { key: "gallery", title: "Gallery", subtitle: "Photos", icon: <ImageIcon size={22} /> },
     { key: "staff_config", title: "Staff Config", subtitle: "Skills & Tier", icon: <UserCog size={22} /> },
     { key: "report", title: "Reports", subtitle: "Download", icon: <Download size={22} /> },
+    { key: "location_setup", title: "Location", subtitle: "GPS Setup", icon: <MapPin size={22} /> },
   ];
 
   return (
@@ -347,6 +349,9 @@ export const PrincipalDashboard: React.FC<PrincipalDashboardProps> = ({
       
       {/* NEW: STAFF CONFIG MODAL */}
       {data && (<StaffConfigModal isOpen={activeModal === 'staff_config'} onClose={() => setActiveModal(null)} schoolId={data.school_db_id || ''} />)}
+
+      {/* NEW: LOCATION SETUP MODAL */}
+      {data && (<LocationSetupModal isOpen={activeModal === 'location_setup'} onClose={() => setActiveModal(null)} schoolId={data.school_db_id || ''} currentLat={data.school_latitude} currentLng={data.school_longitude} onSuccess={onRefresh} />)}
 
       {/* APPROVAL MODAL */}
       <Modal isOpen={activeModal === 'approvals'} onClose={() => setActiveModal(null)} title="PENDING APPROVALS">

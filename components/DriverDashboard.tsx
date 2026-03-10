@@ -1,11 +1,12 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { DashboardData } from '../types';
-import { Truck, Play, Square, CalendarRange, MoreHorizontal, Lock, Navigation } from 'lucide-react';
+import { Truck, Play, Square, CalendarRange, MoreHorizontal, Lock, Navigation, Sparkles } from 'lucide-react';
 import { useModalBackHandler } from '../hooks/useModalBackHandler';
 import { useThemeLanguage } from '../contexts/ThemeLanguageContext';
 import { updateVehicleLocation } from '../services/dashboardService';
 import { LeaveRequestModal } from './LeaveModals';
+import { StaffAttendanceModal } from './StaffAttendanceModal';
 
 interface DriverDashboardProps {
   data: DashboardData;
@@ -16,6 +17,7 @@ interface DriverDashboardProps {
 export const DriverDashboard: React.FC<DriverDashboardProps> = ({ data, isSchoolActive, onShowLocked }) => {
   const { t } = useThemeLanguage();
   const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false);
+  const [isAttendanceModalOpen, setIsAttendanceModalOpen] = useState(false);
   
   // GPS State
   const [isTripActive, setIsTripActive] = useState(false);
@@ -25,6 +27,7 @@ export const DriverDashboard: React.FC<DriverDashboardProps> = ({ data, isSchool
   const lastUpdateTimestamp = useRef<number>(0);
 
   useModalBackHandler(isLeaveModalOpen, () => setIsLeaveModalOpen(false));
+  useModalBackHandler(isAttendanceModalOpen, () => setIsAttendanceModalOpen(false));
 
   useEffect(() => {
       // Clean up GPS on unmount
@@ -116,20 +119,24 @@ export const DriverDashboard: React.FC<DriverDashboardProps> = ({ data, isSchool
                 </div>
             </div>
 
-            {/* 3. PLACEHOLDER CARD (For Symmetry) */}
-            <div className="glass-card p-4 rounded-[1.8rem] flex flex-col justify-center items-center text-center gap-2 shadow-sm bg-slate-50 dark:bg-white/5 border-slate-100 dark:border-white/5">
-                <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-slate-300 dark:text-slate-600">
-                    <Navigation size={24} />
+            {/* 3. ATTENDANCE CARD */}
+            <div 
+                onClick={() => isSchoolActive ? setIsAttendanceModalOpen(true) : onShowLocked()}
+                className={`glass-card p-4 rounded-[1.8rem] flex flex-col justify-center items-center text-center gap-2 cursor-pointer group active:scale-[0.98] transition-all shadow-sm ${!isSchoolActive ? 'bg-rose-50 dark:bg-rose-950/10 border-rose-100 dark:border-rose-900/20' : 'bg-white dark:bg-dark-900'}`}
+            >
+                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-inner transition-transform group-hover:scale-110 ${!isSchoolActive ? 'bg-rose-500 text-white' : 'bg-emerald-500/10 text-emerald-600'}`}>
+                    <Sparkles size={24} />
                 </div>
                 <div>
-                    <h3 className="font-black uppercase text-xs leading-tight text-slate-400 dark:text-slate-600">Route Map</h3>
-                    <p className="text-[9px] text-slate-300 dark:text-slate-700 font-bold uppercase tracking-widest mt-0.5">Coming Soon</p>
+                    <h3 className={`font-black uppercase text-xs leading-tight ${!isSchoolActive ? 'text-rose-600' : 'text-slate-800 dark:text-white'}`}>Attendance</h3>
+                    <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Face ID Check</p>
                 </div>
             </div>
 
         </div>
 
         <LeaveRequestModal isOpen={isLeaveModalOpen} onClose={() => setIsLeaveModalOpen(false)} userId={data?.user_id || ''} schoolId={data?.school_db_id || ''} />
+        <StaffAttendanceModal isOpen={isAttendanceModalOpen} onClose={() => setIsAttendanceModalOpen(false)} userId={data?.user_id || ''} userName={data?.user_name} role={data?.user_role} storedDescriptor={data?.face_descriptor} schoolLat={data?.school_latitude} schoolLng={data?.school_longitude} />
     </div>
   );
 };

@@ -1,5 +1,5 @@
 
-import { DashboardData, PeriodData, Role, ParentHomework, NoticeItem, NoticeRequest, AnalyticsSummary, TeacherProgress, HomeworkAnalyticsData, StudentHomeworkStatus, Student, AttendanceStatus, Vehicle, StaffLeave, AttendanceHistoryItem, StudentLeave, SchoolSummary, SchoolUser, SiblingInfo, GalleryItem, ExamRecord, ExamMark, VisitorEntry, SearchPerson, FullHistory, TimeTableEntry, TeacherProfile } from '../types';
+import { DashboardData, PeriodData, Role, ParentHomework, NoticeItem, NoticeRequest, AnalyticsSummary, TeacherProgress, HomeworkAnalyticsData, StudentHomeworkStatus, Student, AttendanceStatus, Vehicle, StaffLeave, AttendanceHistoryItem, StudentLeave, SchoolSummary, SchoolUser, SiblingInfo, GalleryItem, ExamRecord, ExamMark, VisitorEntry, SearchPerson, FullHistory, TimeTableEntry, TeacherProfile, StaffAttendanceRecord } from '../types';
 import { supabase } from './supabaseClient';
 import { offlineStore } from './offlineStore';
 
@@ -435,6 +435,12 @@ export const updateSchoolPeriods = async (schoolId: string, count: number): Prom
     return !error;
 };
 
+export const updateSchoolLocation = async (schoolId: string, lat: number, lng: number): Promise<boolean> => {
+    if(!navigator.onLine) return false;
+    const { error } = await supabase.from('schools').update({ latitude: lat, longitude: lng }).eq('id', schoolId);
+    return !error;
+};
+
 export const fetchSchoolUserList = async (id: string, cat: string): Promise<SchoolUser[]> => {
   if (cat === 'students') {
      const { data } = await supabase.from('students').select('id, name, users(mobile)').eq('school_id', id).order('name');
@@ -536,13 +542,13 @@ export const fetchDashboardData = async ( sc: string, mob: string, role: Role, p
   return fetchWithCache(`dashboard_${sc}_${mob}`, async () => {
       try {
         const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(sc.trim());
-        let schoolQuery = supabase.from('schools').select('id, name, school_code, is_active, subscription_end_date, total_periods');
+        let schoolQuery = supabase.from('schools').select('id, name, school_code, is_active, subscription_end_date, total_periods, latitude, longitude');
         if (isUUID) schoolQuery = schoolQuery.eq('id', sc.trim());
         else schoolQuery = schoolQuery.ilike('school_code', sc.trim());
 
         const { data: school } = await schoolQuery.maybeSingle();
         if (!school) return null;
-        let uQ = supabase.from('users').select('id, name, role, mobile, subscription_end_date, assigned_subject').eq('school_id', school.id).eq('mobile', mob);
+        let uQ = supabase.from('users').select('id, name, role, mobile, subscription_end_date, assigned_subject, face_descriptor, face_photo_url').eq('school_id', school.id).eq('mobile', mob);
         if (pw) uQ = uQ.eq('password', pw);
         const { data: user } = await uQ.maybeSingle();
         if (!user) return null;
@@ -553,7 +559,7 @@ export const fetchDashboardData = async ( sc: string, mob: string, role: Role, p
         const isClient = role === 'parent' || role === 'student' as any;
         const displayDate = isClient ? user.subscription_end_date : school.subscription_end_date;
 
-        const base: DashboardData = { user_id: user.id, school_db_id: school.id, user_name: user.name, user_role: user.role as Role, mobile_number: user.mobile, school_name: school.name, school_code: school.school_code, subscription_status: isClient ? (schoolActive && userActive ? 'active' : 'inactive') : (schoolActive ? 'active' : 'inactive'), school_subscription_status: schoolActive ? 'active' : 'inactive', subscription_end_date: displayDate, total_periods: school.total_periods || 8, assigned_subject: user.assigned_subject };
+        const base: DashboardData = { user_id: user.id, school_db_id: school.id, user_name: user.name, user_role: user.role as Role, mobile_number: user.mobile, school_name: school.name, school_code: school.school_code, subscription_status: isClient ? (schoolActive && userActive ? 'active' : 'inactive') : (schoolActive ? 'active' : 'inactive'), school_subscription_status: schoolActive ? 'active' : 'inactive', subscription_end_date: displayDate, total_periods: school.total_periods || 8, assigned_subject: user.assigned_subject, face_descriptor: user.face_descriptor, face_photo_url: user.face_photo_url, school_latitude: school.latitude, school_longitude: school.longitude };
 
         if (role === 'gatekeeper') return base; 
 
@@ -578,6 +584,46 @@ export const fetchDashboardData = async ( sc: string, mob: string, role: Role, p
         return base;
       } catch (error) { return null; }
   });
+};
+
+// --- STAFF FACE ID & ATTENDANCE SERVICES ---
+export const updateUserFaceData = async (userId: string, descriptor: number[], photoUrl: string): Promise<boolean> => {
+    if (!navigator.onLine) return false;
+    try {
+        const { error } = await supabase.from('users').update({
+            face_descriptor: descriptor,
+            face_photo_url: photoUrl
+        }).eq('id', userId);
+        return !error;
+    } catch (e) { return false; }
+};
+
+export const submitStaffAttendance = async (record: StaffAttendanceRecord): Promise<boolean> => {
+    if (!navigator.onLine) {
+        await offlineStore.addToQueue('SUBMIT_STAFF_ATTENDANCE', record);
+        return true;
+    }
+    try {
+        const { error } = await supabase.from('staff_attendance').insert([record]);
+        return !error;
+    } catch (e) { return false; }
+};
+
+export const fetchStaffAttendanceHistory = async (userId: string): Promise<StaffAttendanceRecord[]> => {
+    const result = await fetchWithCache(`staff_att_hist_${userId}`, async () => {
+        const { data, error } = await supabase.from('staff_attendance').select('*').eq('user_id', userId).order('check_in_time', { ascending: false }).limit(30);
+        if (error) return [];
+        return data || [];
+    });
+    return result || [];
+};
+
+export const checkStaffAttendanceToday = async (userId: string): Promise<boolean> => {
+    try {
+        const today = getISTDate();
+        const { data } = await supabase.from('staff_attendance').select('id').eq('user_id', userId).gte('check_in_time', `${today}T00:00:00`).lte('check_in_time', `${today}T23:59:59`).maybeSingle();
+        return !!data;
+    } catch (e) { return false; }
 };
 
 // --- GALLERY SERVICES ---

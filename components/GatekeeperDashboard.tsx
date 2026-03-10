@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Shield, Plus, History, Camera, User, Phone, MapPin, Users, Target, Save, X, Loader2, ShieldCheck, Sparkles, School, CalendarRange, ChevronRight, Calendar, Clock } from 'lucide-react';
+import { Shield, Plus, History, Camera, User, Phone, MapPin, Users, Target, Save, X, Loader2, ShieldCheck, Sparkles, School, CalendarRange, ChevronRight, Calendar, Clock, ScanFace } from 'lucide-react';
 import { fetchVisitorEntries, addVisitorEntry, getISTDate, fetchDashboardData, fetchSchoolSummary } from '../services/dashboardService';
 import { VisitorEntry, DashboardData, SchoolSummary } from '../types';
 import { Modal } from './Modal';
@@ -9,6 +9,7 @@ import { BottomNav } from './BottomNav';
 import { SchoolInfoCard } from './SchoolInfoCard';
 import { ProfileView } from './ProfileView';
 import { LeaveRequestModal } from './LeaveModals';
+import { StaffAttendanceModal } from './StaffAttendanceModal';
 import { SettingsModal, AboutModal, HelpModal } from './MenuModals';
 import { useThemeLanguage } from '../contexts/ThemeLanguageContext';
 import { useModalBackHandler } from '../hooks/useModalBackHandler';
@@ -200,6 +201,7 @@ export const GatekeeperDashboard: React.FC<GatekeeperDashboardProps> = ({ onLogo
                         <SchoolInfoCard schoolName={dashboardData?.school_name || 'My School'} schoolCode={dashboardData?.school_code || '---'} onClick={handleSchoolClick} />
                         <div className="flex items-center justify-between mb-4 px-1"><h3 className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em]">Gate Operations</h3><div className="px-2 py-1 bg-emerald-50 dark:bg-emerald-500/10 rounded-lg text-[9px] font-black text-emerald-600 uppercase flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> Active</div></div>
                         <div className="space-y-4 pb-10">
+                            <div onClick={() => setActiveModal('staff_attendance')} className="glass-card p-5 rounded-[2.5rem] flex items-center justify-between active:scale-[0.98] transition-all cursor-pointer shadow-sm border-slate-100 dark:border-white/5 group"><div className="flex items-center gap-4"><div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-inner bg-emerald-500/10 text-emerald-600"><ScanFace size={28} /></div><div className="text-left"><h3 className="font-black uppercase text-base leading-tight text-slate-800 dark:text-white">My Attendance</h3><p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Face ID Verification</p></div></div><ChevronRight size={22} className="text-slate-200 group-hover:text-emerald-500 transition-colors" /></div>
                             <div onClick={() => setActiveModal('leave')} className="glass-card p-5 rounded-[2.5rem] flex items-center justify-between active:scale-[0.98] transition-all cursor-pointer shadow-sm border-slate-100 dark:border-white/5 group"><div className="flex items-center gap-4"><div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-inner bg-brand-500/10 text-brand-600"><CalendarRange size={28} /></div><div className="text-left"><h3 className="font-black uppercase text-base leading-tight text-slate-800 dark:text-white">Apply Leave</h3><p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Staff Request Portal</p></div></div><ChevronRight size={22} className="text-slate-200 group-hover:text-emerald-500 transition-colors" /></div>
                             <div onClick={() => setActiveModal('entry')} className="w-full bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-[2.5rem] p-6 text-white shadow-xl shadow-emerald-500/30 flex items-center justify-between cursor-pointer active:scale-95 transition-all relative overflow-hidden group"><div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-3xl pointer-events-none group-hover:scale-150 transition-transform duration-700"></div><div className="flex items-center gap-5 relative z-10"><div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center backdrop-blur-md shadow-inner border border-white/10"><Plus size={32} strokeWidth={3} /></div><div><h2 className="text-xl font-black uppercase leading-tight">New Visitor</h2><p className="text-emerald-100 text-[10px] font-bold uppercase tracking-widest mt-1 opacity-90 flex items-center gap-1"><Sparkles size={10} /> Log Entry</p></div></div></div>
                             <div onClick={() => setActiveModal('history')} className="glass-card p-5 rounded-[2.5rem] flex items-center justify-between active:scale-[0.98] transition-all cursor-pointer shadow-sm border-slate-100 dark:border-white/5 group"><div className="flex items-center gap-4"><div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-inner bg-slate-100 dark:bg-white/5 text-slate-500"><History size={28} /></div><div className="text-left"><h3 className="font-black uppercase text-base leading-tight text-slate-800 dark:text-white">Visitor Logs</h3><p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">View Past Records</p></div></div><ChevronRight size={22} className="text-slate-200 group-hover:text-emerald-500 transition-colors" /></div>
@@ -246,6 +248,9 @@ export const GatekeeperDashboard: React.FC<GatekeeperDashboardProps> = ({ onLogo
 
         {/* 3. LEAVE MODAL */}
         <LeaveRequestModal isOpen={activeModal === 'leave'} onClose={() => setActiveModal(null)} userId={userId} schoolId={schoolId} />
+
+        {/* 3.5 STAFF ATTENDANCE MODAL */}
+        <StaffAttendanceModal isOpen={activeModal === 'staff_attendance'} onClose={() => setActiveModal(null)} userId={dashboardData?.user_id || ''} userName={dashboardData?.user_name || ''} role={dashboardData?.user_role || ''} storedDescriptor={dashboardData?.face_descriptor} schoolLat={dashboardData?.school_latitude} schoolLng={dashboardData?.school_longitude} />
 
         {/* 4. SCHOOL DETAIL MODAL (New) */}
         <Modal isOpen={showSchoolDetails} onClose={() => setShowSchoolDetails(false)} title="INSTITUTION PROFILE">

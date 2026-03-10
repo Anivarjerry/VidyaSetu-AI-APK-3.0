@@ -6,6 +6,7 @@ import { useThemeLanguage } from '../contexts/ThemeLanguageContext';
 import { AttendanceModal } from './AttendanceModal';
 import { LeaveRequestModal } from './LeaveModals';
 import { TeacherHistoryModal } from './TeacherHistoryModal';
+import { StaffAttendanceModal } from './StaffAttendanceModal';
 import { PeriodModal } from './PeriodModal';
 import { Modal } from './Modal';
 import { submitPeriodData } from '../services/dashboardService';
@@ -77,6 +78,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
   const dashboardItems = [
       { key: 'homework', title: "Daily Portal", sub: "Update Work", icon: <BookOpen size={20} />, color: "text-brand-600", bg: "bg-brand-500/10" },
       { key: 'attendance', title: t('attendance'), sub: t('digital_register'), icon: <UserCheck size={20} />, color: "text-blue-600", bg: "bg-blue-500/10" },
+      { key: 'staff_attendance', title: "My Attendance", sub: "Face ID Check", icon: <Sparkles size={20} />, color: "text-emerald-600", bg: "bg-emerald-500/10" },
       { key: 'exam_mgmt', title: "Results", sub: "Marks Entry", icon: <FileCheck size={20} />, color: "text-purple-600", bg: "bg-purple-500/10" },
       { key: 'gallery', title: "Gallery", sub: "Photos", icon: <ImageIcon size={20} />, color: "text-orange-600", bg: "bg-orange-500/10" },
       { key: 'leave', title: t('staff_leave'), sub: "Request Off", icon: <CalendarRange size={20} />, color: "text-rose-600", bg: "bg-rose-500/10" },
@@ -108,6 +110,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
 
        {/* MODALS */}
        <AttendanceModal isOpen={activeModal === 'attendance'} onClose={() => setActiveModal(null)} schoolId={data.school_db_id || ''} teacherId={data.user_id || ''} />
+       <StaffAttendanceModal isOpen={activeModal === 'staff_attendance'} onClose={() => setActiveModal(null)} userId={data.user_id || ''} userName={data.user_name} role={data.user_role} storedDescriptor={data.face_descriptor} schoolLat={data.school_latitude} schoolLng={data.school_longitude} />
        <LeaveRequestModal isOpen={activeModal === 'leave'} onClose={() => setActiveModal(null)} userId={data.user_id || ''} schoolId={data.school_db_id || ''} />
        <TeacherHistoryModal isOpen={activeModal === 'history'} onClose={() => setActiveModal(null)} credentials={credentials} />
        

@@ -77,6 +77,9 @@ export const SyncManager = {
                         item.payload.date
                     );
                     break;
+                case 'SUBMIT_STAFF_ATTENDANCE':
+                    success = await dashboardService.submitStaffAttendance(item.payload);
+                    break;
             }
 
             if (success && item.id) {
