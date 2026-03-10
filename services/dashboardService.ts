@@ -407,6 +407,9 @@ export const fetchSubjectLessons = async (id: string) => { const { data } = awai
 export const addSchoolClass = async (id: string, name: string) => { return await supabase.from('school_classes').insert([{ school_id: id, class_name: name }]); };
 export const addClassSubject = async (id: string, name: string) => { return await supabase.from('class_subjects').insert([{ class_id: id, subject_name: name }]); };
 export const addSubjectLesson = async (id: string, name: string) => { return await supabase.from('subject_lessons').insert([{ subject_id: id, lesson_name: name }]); };
+export const deleteSchoolClass = async (id: string) => { return await supabase.from('school_classes').delete().eq('id', id); };
+export const deleteClassSubject = async (id: string) => { return await supabase.from('class_subjects').delete().eq('id', id); };
+export const deleteSubjectLesson = async (id: string) => { return await supabase.from('subject_lessons').delete().eq('id', id); };
 export const fetchLessonHomework = async (id: string) => { const { data } = await supabase.from('lesson_homework').select('*').eq('lesson_id', id).order('created_at'); return data || []; };
 export const addLessonHomework = async (id: string, t: string) => { return await supabase.from('lesson_homework').insert([{ lesson_id: id, homework_template: t }]); };
 export const deleteLessonHomework = async (id: string) => { return await supabase.from('lesson_homework').delete().eq('id', id); };
@@ -605,14 +608,25 @@ export const submitStaffAttendance = async (record: StaffAttendanceRecord): Prom
     }
     try {
         const { error } = await supabase.from('staff_attendance').insert([record]);
-        return !error;
-    } catch (e) { return false; }
+        if (error) {
+            console.error("Supabase Staff Attendance Error:", error);
+            return false;
+        }
+        return true;
+    } catch (e) { 
+        console.error("Staff Attendance Exception:", e);
+        return false; 
+    }
 };
 
 export const fetchStaffAttendanceHistory = async (userId: string): Promise<StaffAttendanceRecord[]> => {
     const result = await fetchWithCache(`staff_att_hist_${userId}`, async () => {
-        const { data, error } = await supabase.from('staff_attendance').select('*').eq('user_id', userId).order('check_in_time', { ascending: false }).limit(30);
-        if (error) return [];
+        const { data } = await supabase.from('staff_attendance')
+            .select('*')
+            .eq('user_id', userId)
+            .order('created_at', { ascending: false })
+            .limit(30);
+        
         return data || [];
     });
     return result || [];
@@ -621,7 +635,13 @@ export const fetchStaffAttendanceHistory = async (userId: string): Promise<Staff
 export const checkStaffAttendanceToday = async (userId: string): Promise<boolean> => {
     try {
         const today = getISTDate();
-        const { data } = await supabase.from('staff_attendance').select('id').eq('user_id', userId).gte('check_in_time', `${today}T00:00:00`).lte('check_in_time', `${today}T23:59:59`).maybeSingle();
+        const { data } = await supabase.from('staff_attendance')
+            .select('id')
+            .eq('user_id', userId)
+            .gte('created_at', `${today}T00:00:00`)
+            .lte('created_at', `${today}T23:59:59`)
+            .maybeSingle();
+            
         return !!data;
     } catch (e) { return false; }
 };

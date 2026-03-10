@@ -91,7 +91,7 @@ export const StaffAttendanceModal: React.FC<StaffAttendanceModalProps> = ({
 
   const startCamera = async () => {
     if (!storedDescriptor) {
-      setError('Face ID not registered. Please register your face in the profile section first.');
+      setError('पहले फेस रजिस्टर करें (Please register your face in the profile section first).');
       return;
     }
     try {
@@ -111,11 +111,22 @@ export const StaffAttendanceModal: React.FC<StaffAttendanceModalProps> = ({
   const captureAndVerify = async () => {
     if (!videoRef.current || !canvasRef.current || !storedDescriptor) return;
 
-    setLoading(true);
-    setError(null);
-    setView('processing');
-
     try {
+      const video = videoRef.current;
+      const canvas = canvasRef.current;
+      if (!video || !canvas) return;
+
+      // Capture photo FIRST before switching view to avoid null reference
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error('Canvas context failed');
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      setLoading(true);
+      setError(null);
+      setView('processing');
+
       // 1. Get Location
       const position = await new Promise<GeolocationPosition>((resolve, reject) => {
         navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 10000 });
@@ -135,16 +146,8 @@ export const StaffAttendanceModal: React.FC<StaffAttendanceModalProps> = ({
         }
       }
 
-      const video = videoRef.current;
-      const canvas = canvasRef.current;
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) throw new Error('Canvas context failed');
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      
       // 2. Get Face Descriptor from Selfie
-      const capturedDescriptor = await getFaceDescriptor(video);
+      const capturedDescriptor = await getFaceDescriptor(canvas); // Use canvas instead of video since video might be unmounted
       if (!capturedDescriptor) {
         setError('No face detected. Please try again in better lighting.');
         setView('capture');
@@ -233,6 +236,14 @@ export const StaffAttendanceModal: React.FC<StaffAttendanceModalProps> = ({
                   <Camera size={18} /> START VERIFICATION
                 </button>
               )}
+
+              {error && (
+                <div className="flex items-center gap-2 text-rose-500 bg-rose-50 dark:bg-rose-900/10 p-3 rounded-xl border border-rose-100 dark:border-rose-800">
+                  <AlertCircle size={14} />
+                  <span className="text-[10px] font-black uppercase">{error}</span>
+                </div>
+              )}
+
               <button 
                 onClick={() => setView('history')}
                 className="w-full py-5 rounded-[2rem] bg-slate-100 dark:bg-white/5 text-slate-500 font-black uppercase text-xs tracking-widest active:scale-95 transition-all flex items-center justify-center gap-2"
@@ -352,10 +363,10 @@ export const StaffAttendanceModal: React.FC<StaffAttendanceModalProps> = ({
                       </div>
                       <div>
                         <h5 className="font-black text-sm text-slate-800 dark:text-white">
-                          {new Date(h.check_in_time!).toLocaleDateString()}
+                          {new Date(h.created_at!).toLocaleDateString()}
                         </h5>
                         <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
-                          <Clock size={10} /> {new Date(h.check_in_time!).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          <Clock size={10} /> {new Date(h.created_at!).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </p>
                       </div>
                     </div>

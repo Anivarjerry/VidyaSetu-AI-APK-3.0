@@ -7,13 +7,17 @@ import {
   Users, Trash2, ChevronRight, Check, 
   X, AlertCircle, ShieldAlert, Key, Star, Clock, MoreVertical, Settings, Info, LogOut,
   UserCheck, UserPlus, Mail, Hash, Layers, LayoutGrid, GraduationCap, MapPin, Truck,
-  ShieldCheck, BookOpen, RefreshCw, Home, Zap, ArrowLeft, Loader2, MinusCircle, PlusCircle, HelpCircle, Save, Lock, Unlock, Phone, Eye, EyeOff, Shield
+  ShieldCheck, BookOpen, RefreshCw, Home, Zap, ArrowLeft, Loader2, MinusCircle, PlusCircle, HelpCircle, Save, Lock, Unlock, Phone, Eye, EyeOff, Shield, ScanFace
 } from 'lucide-react';
 import { Modal } from './Modal';
 import { SettingsModal, AboutModal, HelpModal } from './MenuModals';
 import { useThemeLanguage } from '../contexts/ThemeLanguageContext';
 import { useModalBackHandler } from '../hooks/useModalBackHandler';
-import { upsertVehicle, fetchSchoolClasses, addSchoolClass, fetchClassSubjects, addClassSubject, fetchSubjectLessons, addSubjectLesson, fetchLessonHomework, addLessonHomework, updateSchoolPeriods } from '../services/dashboardService';
+import { 
+  upsertVehicle, fetchSchoolClasses, addSchoolClass, fetchClassSubjects, addClassSubject, 
+  fetchSubjectLessons, addSubjectLesson, fetchLessonHomework, addLessonHomework, 
+  updateSchoolPeriods, deleteSchoolClass, deleteClassSubject, deleteSubjectLesson, deleteLessonHomework 
+} from '../services/dashboardService';
 
 interface AdminDashboardProps {
   onLogout: () => void;
@@ -45,6 +49,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, userNa
   const [schools, setSchools] = useState<any[]>(getCache('admin_schools') || []);
   const [users, setUsers] = useState<any[]>(getCache('admin_users') || []);
   const [vehicles, setVehicles] = useState<any[]>(getCache('admin_vehicles') || []);
+  const [recentAttendance, setRecentAttendance] = useState<any[]>([]);
   
   // New States for Student-Parent Linking
   const [parentsList, setParentsList] = useState<any[]>([]);
@@ -69,6 +74,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, userNa
   const [selectedVehicleDetails, setSelectedVehicleDetails] = useState<any>(null);
   
   const [deleteModalStep, setDeleteModalStep] = useState<'none' | 'auth' | 'confirm' | 'deleting'>('none');
+  const [deleteAuthCode, setDeleteAuthCode] = useState('');
+  const [deleting, setDeleting] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [activeMenuModal, setActiveMenuModal] = useState<'settings' | 'about' | 'help' | null>(null);
 
@@ -221,6 +228,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, userNa
           setVehicles(mapped);
           setCache('admin_vehicles', mapped);
       }
+
+      const { data: att } = await supabase.from('staff_attendance').select('*, users(name, role)').order('created_at', { ascending: false }).limit(20);
+      if (att) setRecentAttendance(att);
     } catch (e) {} finally { if(!background) setLoading(false); }
   }, []);
 
@@ -357,6 +367,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, userNa
     else if (currStep === 'manage_lessons') await addSubjectLesson(currSubject.id, newItemName);
     else if (currStep === 'manage_homework') await addLessonHomework(currLesson.id, newItemName);
     setNewItemName('');
+    await loadCurriculumData();
+    setCurrLoading(false);
+  };
+
+  const handleDeleteCurriculumItem = async (id: string) => {
+    if (!window.confirm("Are you sure you want to delete this item?")) return;
+    setCurrLoading(true);
+    if (currStep === 'manage_classes') await deleteSchoolClass(id);
+    else if (currStep === 'manage_subjects') await deleteClassSubject(id);
+    else if (currStep === 'manage_lessons') await deleteSubjectLesson(id);
+    else if (currStep === 'manage_homework') await deleteLessonHomework(id);
     await loadCurriculumData();
     setCurrLoading(false);
   };
@@ -516,9 +537,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, userNa
       else if (type === 'active_schools') data = schools.filter(s => s.is_active);
       else if (type === 'total_users') data = users;
       else if (type === 'active_users') data = users.filter(u => isUserActive(u.subscription_end_date));
-      pushToStack({ type: 'summary', data: data, title: t(type), readonly: true });
+      pushToStack(t(type), data, 'summary');
   };
-  const pushToStack = (view: any) => { setNavStack([...navStack, view]); };
+  const pushToStack = (title: string, data: any[], type: string) => { 
+    setNavStack([...navStack, { title, data, type }]); 
+  };
 
   return (
     <div className="fixed inset-0 h-full w-full bg-white dark:bg-dark-950 flex flex-col overflow-hidden transition-colors">
@@ -583,6 +606,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, userNa
                             </div>
                             <ChevronRight size={22} />
                         </div>
+                        <div onClick={() => pushToStack('Staff Attendance', recentAttendance, 'attendance')} className="p-5 rounded-[2.2rem] bg-brand-600 text-white shadow-xl flex items-center justify-between cursor-pointer active:scale-[0.98] transition-all hover:bg-brand-700">
+                            <div className="flex items-center gap-4">
+                                <div className="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center backdrop-blur-md"><ScanFace size={24} /></div>
+                                <div><h3 className="text-lg font-black uppercase leading-tight">Staff Attendance</h3><p className="text-[10px] font-black text-brand-100/60 uppercase tracking-widest mt-1">Recent Check-ins</p></div>
+                            </div>
+                            <ChevronRight size={22} />
+                        </div>
                     </div>
                   </>
               ) : (
@@ -593,9 +623,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, userNa
                       </div>
                       <div className="space-y-3">
                           {navStack[navStack.length-1].data.map((item: any) => (
-                              <div key={item.id} className="p-4 bg-white dark:bg-dark-900 rounded-[2rem] border border-slate-100 dark:border-white/5 shadow-sm">
-                                  <h4 className="font-black text-slate-800 dark:text-white uppercase">{item.name || item.vehicle_number}</h4>
-                                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{item.school_code || item.mobile || item.school_name}</p>
+                              <div key={item.id} className="p-4 bg-white dark:bg-dark-900 rounded-[2rem] border border-slate-100 dark:border-white/5 shadow-sm flex items-center justify-between">
+                                  <div>
+                                      <h4 className="font-black text-slate-800 dark:text-white uppercase">{item.name || item.vehicle_number || item.users?.name}</h4>
+                                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
+                                          {item.school_code || item.mobile || item.school_name || (item.created_at ? new Date(item.created_at).toLocaleTimeString() : item.status)}
+                                      </p>
+                                  </div>
+                                  {item.status && (
+                                      <span className={`px-3 py-1 rounded-full text-[8px] font-black uppercase ${item.status === 'present' ? 'bg-emerald-500 text-white' : 'bg-rose-500 text-white'}`}>
+                                          {item.status}
+                                      </span>
+                                  )}
                               </div>
                           ))}
                       </div>
@@ -1092,7 +1131,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, userNa
                                  currStep === 'manage_lessons' ? item.lesson_name :
                                  item.homework_template}
                             </span>
-                            {currStep !== 'manage_homework' && <ChevronRight size={16} className="text-slate-300 group-hover:text-emerald-500 transition-colors" />}
+                            <div className="flex items-center gap-2">
+                                {currStep !== 'select_school' && (
+                                    <button 
+                                        onClick={(e) => { e.stopPropagation(); handleDeleteCurriculumItem(item.id); }}
+                                        className="p-2 text-rose-400 hover:text-rose-600 transition-colors"
+                                    >
+                                        <Trash2 size={16} />
+                                    </button>
+                                )}
+                                {currStep !== 'manage_homework' && <ChevronRight size={16} className="text-slate-300 group-hover:text-emerald-500 transition-colors" />}
+                            </div>
                         </div>
                     ))
                 )}
@@ -1156,7 +1205,39 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, userNa
 
       {/* Delete Confirmation */}
       <Modal isOpen={deleteModalStep !== 'none'} onClose={() => setDeleteModalStep('none')} title="CONFIRM DELETE">
-          {/* ... Content ... */}
+          <div className="space-y-6">
+              <div className="p-6 bg-rose-50 dark:bg-rose-500/10 rounded-[2rem] border border-rose-100 dark:border-rose-500/20 text-center">
+                  <div className="w-16 h-16 bg-rose-500 text-white rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg shadow-rose-500/20">
+                      <Trash2 size={32} />
+                  </div>
+                  <h3 className="font-black uppercase text-slate-800 dark:text-white text-lg">Dangerous Action</h3>
+                  <p className="text-xs font-bold text-slate-500 dark:text-slate-400 mt-2 leading-relaxed">
+                      You are about to permanently delete <span className="text-rose-600 dark:text-rose-400 font-black">"{itemToDelete?.name}"</span>. This action cannot be undone.
+                  </p>
+              </div>
+
+              {deleteModalStep === 'auth' && (
+                  <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-300">
+                      <div className="space-y-1">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Enter Admin Secret Code</label>
+                          <input 
+                              type="password" 
+                              placeholder="••••••"
+                              value={deleteAuthCode}
+                              onChange={e => setDeleteAuthCode(e.target.value)}
+                              className="w-full p-4 rounded-2xl border border-slate-200 dark:bg-dark-900 dark:border-white/10 text-center text-2xl font-black tracking-[1em] text-slate-800 dark:text-white"
+                          />
+                      </div>
+                      <button 
+                          onClick={finalDelete}
+                          disabled={deleting || !deleteAuthCode}
+                          className="w-full py-4 bg-rose-500 text-white rounded-[1.8rem] font-black uppercase text-xs shadow-xl shadow-rose-500/20 active:scale-95 transition-all flex items-center justify-center gap-2"
+                      >
+                          {deleting ? <Loader2 className="animate-spin" size={18} /> : "Confirm Permanent Deletion"}
+                      </button>
+                  </div>
+              )}
+          </div>
       </Modal>
 
       <SettingsModal isOpen={activeMenuModal === 'settings'} onClose={() => setActiveMenuModal(null)} />

@@ -295,100 +295,93 @@ export const StaffLeaveManagementModal: React.FC<StaffLeaveManagementModalProps>
     }
   };
 
-  if (isOpen) {
-      return (
-        <div className="fixed inset-0 z-[250] flex items-center justify-center p-4">
-            <div className="absolute inset-0 bg-slate-900/40 premium-modal-backdrop" onClick={onClose} />
-            <div className="bg-white dark:bg-dark-900 rounded-[3rem] shadow-2xl w-full max-w-md h-[80vh] flex flex-col overflow-hidden premium-modal-content relative z-10 border border-white/20">
-                <div className="flex justify-between items-center p-8 border-b border-slate-100 dark:border-white/5 bg-white dark:bg-dark-900">
-                    <h3 className="text-xl font-black text-slate-800 dark:text-white tracking-tight uppercase leading-tight">LEAVE PORTAL</h3>
-                    <div className="flex items-center gap-2">
-                        <button onClick={() => loadAllLeaves(true)} disabled={isRefreshing} className={`p-2.5 rounded-2xl transition-all ${isRefreshing ? 'bg-brand-500/20 text-brand-500' : 'text-emerald-500 bg-emerald-500/10 hover:bg-emerald-500/20'}`}>
-                            <RefreshCw size={20} className={isRefreshing ? "animate-spin" : ""} strokeWidth={2.5} />
-                        </button>
-                        <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-white p-2.5 rounded-2xl bg-slate-50 dark:bg-slate-800 transition-all active:scale-90">
-                            <X size={24} strokeWidth={2.5} />
-                        </button>
-                    </div>
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title="LEAVE PORTAL">
+        <div className="space-y-4">
+            <div className="flex justify-end mb-2">
+                <button 
+                    onClick={() => loadAllLeaves(true)} 
+                    disabled={isRefreshing} 
+                    className={`p-2.5 rounded-2xl transition-all flex items-center gap-2 text-[10px] font-black uppercase tracking-widest ${isRefreshing ? 'bg-brand-500/20 text-brand-500' : 'text-emerald-500 bg-emerald-500/10 hover:bg-emerald-500/20'}`}
+                >
+                    <RefreshCw size={14} className={isRefreshing ? "animate-spin" : ""} strokeWidth={3} />
+                    {isRefreshing ? 'Refreshing...' : 'Refresh'}
+                </button>
+            </div>
+
+            <div className="space-y-4">
+                {!selectedItem && (
+                <div className="flex bg-slate-100 dark:bg-white/5 p-1 rounded-2xl border border-slate-200/50 dark:border-white/5 premium-subview-enter">
+                    <button onClick={() => setActiveTab('staff')} className={`flex-1 py-3.5 rounded-xl text-[10px] font-black uppercase transition-all ${activeTab === 'staff' ? 'bg-white dark:bg-brand-500/15 text-brand-700 dark:text-brand-400 border border-brand-200 dark:border-brand-500/20 shadow-md' : 'text-slate-400 dark:text-slate-600'}`}>Staff ({staffLeaves.filter(l => l.status === 'pending').length})</button>
+                    <button onClick={() => setActiveTab('students')} className={`flex-1 py-3.5 rounded-xl text-[10px] font-black uppercase transition-all ${activeTab === 'students' ? 'bg-white dark:bg-brand-500/15 text-brand-700 dark:text-brand-400 border border-brand-200 dark:border-brand-500/20 shadow-md' : 'text-slate-400 dark:text-slate-600'}`}>Students ({studentLeaves.filter(l => l.status === 'pending').length})</button>
                 </div>
-                
-                <div className="p-8 overflow-y-auto no-scrollbar bg-white dark:bg-dark-900 flex-1">
-                    <div className="space-y-4">
-                        {!selectedItem && (
-                        <div className="flex bg-slate-100 dark:bg-white/5 p-1 rounded-2xl border border-slate-200/50 dark:border-white/5 premium-subview-enter">
-                            <button onClick={() => setActiveTab('staff')} className={`flex-1 py-3.5 rounded-xl text-[10px] font-black uppercase transition-all ${activeTab === 'staff' ? 'bg-white dark:bg-brand-500/15 text-brand-700 dark:text-brand-400 border border-brand-200 dark:border-brand-500/20 shadow-md' : 'text-slate-400 dark:text-slate-600'}`}>Staff ({staffLeaves.filter(l => l.status === 'pending').length})</button>
-                            <button onClick={() => setActiveTab('students')} className={`flex-1 py-3.5 rounded-xl text-[10px] font-black uppercase transition-all ${activeTab === 'students' ? 'bg-white dark:bg-brand-500/15 text-brand-700 dark:text-brand-400 border border-brand-200 dark:border-brand-500/20 shadow-md' : 'text-slate-400 dark:text-slate-600'}`}>Students ({studentLeaves.filter(l => l.status === 'pending').length})</button>
-                        </div>
-                        )}
+                )}
 
-                        {selectedItem ? (
-                        <div className="space-y-6 premium-subview-enter">
-                            <div className={`p-7 rounded-[2.5rem] bg-brand-500/5 dark:bg-brand-500/10 border border-brand-500/20 dark:border-white/5`}>
-                                <div className="flex items-center gap-4 mb-6">
-                                    <div className="w-14 h-14 rounded-2xl bg-white dark:bg-dark-900 flex items-center justify-center text-brand-600 shadow-sm">{activeTab === 'staff' ? <User size={28} /> : <GraduationCap size={28} />}</div>
-                                    <div>
-                                    <h3 className="font-black text-slate-800 dark:text-white uppercase text-lg leading-tight">{selectedItem.user_name || selectedItem.student_name}</h3>
-                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{activeTab === 'staff' ? 'Faculty Member' : 'Student Request'}</p>
-                                    </div>
-                                </div>
-                                <div className="p-5 bg-white/60 dark:bg-dark-950/40 rounded-3xl border border-white dark:border-white/5">
-                                    <p className="text-[8px] font-black text-slate-400 uppercase mb-2">Detailed Reason</p>
-                                    <p className="text-sm text-slate-800 dark:text-slate-200 font-bold italic leading-relaxed">"{selectedItem.reason}"</p>
-                                </div>
+                {selectedItem ? (
+                <div className="space-y-6 premium-subview-enter">
+                    <div className={`p-7 rounded-[2.5rem] bg-brand-500/5 dark:bg-brand-500/10 border border-brand-500/20 dark:border-white/5`}>
+                        <div className="flex items-center gap-4 mb-6">
+                            <div className="w-14 h-14 rounded-2xl bg-white dark:bg-dark-900 flex items-center justify-center text-brand-600 shadow-sm">{activeTab === 'staff' ? <User size={28} /> : <GraduationCap size={28} />}</div>
+                            <div>
+                            <h3 className="font-black text-slate-800 dark:text-white uppercase text-lg leading-tight">{selectedItem.user_name || selectedItem.student_name}</h3>
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{activeTab === 'staff' ? 'Faculty Member' : 'Student Request'}</p>
                             </div>
-
-                            {selectedItem.status === 'pending' && (
-                                <textarea value={comment} onChange={e => setComment(e.target.value)} placeholder="Note from Principal (Optional)..." rows={3} className="w-full p-6 bg-slate-50 dark:bg-dark-900 border border-slate-100 dark:border-white/5 rounded-[2rem] outline-none focus:ring-2 focus:ring-brand-500/10 text-sm font-bold text-slate-800 dark:text-white resize-none transition-all shadow-inner-sm" />
-                            )}
-
-                            <div className="grid grid-cols-1 gap-4">
-                                {selectedItem.status === 'pending' ? (
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <button onClick={() => handleAction('rejected')} disabled={submitting} className="py-7 rounded-3xl bg-rose-500/10 text-rose-600 font-black text-xs uppercase tracking-widest transition-all active:scale-95 border-2 border-rose-200/20 shadow-lg shadow-rose-500/5">Reject</button>
-                                        <button 
-                                            onClick={() => handleAction('approved')} 
-                                            disabled={submitting} 
-                                            className="py-7 rounded-3xl flex justify-center items-center gap-2 bg-emerald-500 text-white border-none shadow-xl shadow-emerald-500/20 active:scale-[0.98] transition-all font-black text-xs uppercase tracking-widest"
-                                        >
-                                            {submitting ? <Loader2 className="animate-spin" size={16} /> : 'Approve'}
-                                        </button>
-                                    </div>
-                                ) : (
-                                    <div className="p-6 bg-slate-50 dark:bg-brand-500/5 rounded-[2rem] text-center border border-slate-100 dark:border-brand-500/10">
-                                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-1">Request Processed</p>
-                                        <div className="flex justify-center mt-2">{renderStatus(selectedItem.status)}</div>
-                                    </div>
-                                )}
-                            </div>
-                            <button onClick={() => setSelectedItem(null)} className="w-full py-2 text-[9px] font-black text-slate-400 uppercase tracking-widest">Back to List</button>
                         </div>
+                        <div className="p-5 bg-white/60 dark:bg-dark-950/40 rounded-3xl border border-white dark:border-white/5">
+                            <p className="text-[8px] font-black text-slate-400 uppercase mb-2">Detailed Reason</p>
+                            <p className="text-sm text-slate-800 dark:text-slate-200 font-bold italic leading-relaxed">"{selectedItem.reason}"</p>
+                        </div>
+                    </div>
+
+                    {selectedItem.status === 'pending' && (
+                        <textarea value={comment} onChange={e => setComment(e.target.value)} placeholder="Note from Principal (Optional)..." rows={3} className="w-full p-6 bg-slate-50 dark:bg-dark-900 border border-slate-100 dark:border-white/5 rounded-[2rem] outline-none focus:ring-2 focus:ring-brand-500/10 text-sm font-bold text-slate-800 dark:text-white resize-none transition-all shadow-inner-sm" />
+                    )}
+
+                    <div className="grid grid-cols-1 gap-4">
+                        {selectedItem.status === 'pending' ? (
+                            <div className="grid grid-cols-2 gap-4">
+                                <button onClick={() => handleAction('rejected')} disabled={submitting} className="py-7 rounded-3xl bg-rose-500/10 text-rose-600 font-black text-xs uppercase tracking-widest transition-all active:scale-95 border-2 border-rose-200/20 shadow-lg shadow-rose-500/5">Reject</button>
+                                <button 
+                                    onClick={() => handleAction('approved')} 
+                                    disabled={submitting} 
+                                    className="py-7 rounded-3xl flex justify-center items-center gap-2 bg-emerald-500 text-white border-none shadow-xl shadow-emerald-500/20 active:scale-[0.98] transition-all font-black text-xs uppercase tracking-widest"
+                                >
+                                    {submitting ? <Loader2 className="animate-spin" size={16} /> : 'Approve'}
+                                </button>
+                            </div>
                         ) : (
-                        <div className="space-y-3 premium-subview-enter">
-                            <div className="max-h-[60vh] overflow-y-auto pr-1 space-y-4 no-scrollbar">
-                                {loading ? <div className="text-center py-12"><Loader2 className="animate-spin mx-auto text-brand-500" /></div> : (activeTab === 'staff' ? staffLeaves : studentLeaves).length === 0 ? <div className="text-center py-16 opacity-30 uppercase text-[9px] font-black tracking-widest">Clear Queue</div> : (activeTab === 'staff' ? staffLeaves : studentLeaves).map(l => (
-                                    <div key={l.id} onClick={() => setSelectedItem(l)} className={`p-5 bg-white dark:bg-dark-950 rounded-[2.2rem] border border-slate-100 dark:border-white/5 shadow-sm flex items-center justify-between cursor-pointer hover:shadow-lg transition-all active:scale-[0.98] ${l.status === 'pending' ? 'border-l-4 border-l-rose-500 bg-rose-50/20' : ''}`}>
-                                    <div className="flex items-center gap-4">
-                                        <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${l.status === 'pending' ? 'bg-rose-500/10 text-rose-600' : 'bg-brand-500/10 text-brand-600'} shadow-inner`}>
-                                            {activeTab === 'staff' ? <User size={24} /> : <GraduationCap size={24} />}
-                                        </div>
-                                        <div className="min-w-0">
-                                            <h4 className="font-black text-slate-800 dark:text-white uppercase leading-tight truncate">{l.user_name || l.student_name}</h4>
-                                            <div className="mt-1.5 flex items-center gap-2">
-                                                {renderStatus(l.status)}
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <ChevronRight size={18} className="text-slate-200 dark:text-slate-800" />
-                                    </div>
-                                ))}
+                            <div className="p-6 bg-slate-50 dark:bg-brand-500/5 rounded-[2rem] text-center border border-slate-100 dark:border-brand-500/10">
+                                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-1">Request Processed</p>
+                                <div className="flex justify-center mt-2">{renderStatus(selectedItem.status)}</div>
                             </div>
-                        </div>
                         )}
                     </div>
+                    <button onClick={() => setSelectedItem(null)} className="w-full py-2 text-[9px] font-black text-slate-400 uppercase tracking-widest">Back to List</button>
                 </div>
+                ) : (
+                <div className="space-y-3 premium-subview-enter">
+                    <div className="max-h-[60vh] overflow-y-auto pr-1 space-y-4 no-scrollbar">
+                        {loading ? <div className="text-center py-12"><Loader2 className="animate-spin mx-auto text-brand-500" /></div> : (activeTab === 'staff' ? staffLeaves : studentLeaves).length === 0 ? <div className="text-center py-16 opacity-30 uppercase text-[9px] font-black tracking-widest">Clear Queue</div> : (activeTab === 'staff' ? staffLeaves : studentLeaves).map(l => (
+                            <div key={l.id} onClick={() => setSelectedItem(l)} className={`p-5 bg-white dark:bg-dark-950 rounded-[2.2rem] border border-slate-100 dark:border-white/5 shadow-sm flex items-center justify-between cursor-pointer hover:shadow-lg transition-all active:scale-[0.98] ${l.status === 'pending' ? 'border-l-4 border-l-rose-500 bg-rose-50/20' : ''}`}>
+                            <div className="flex items-center gap-4">
+                                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${l.status === 'pending' ? 'bg-rose-500/10 text-rose-600' : 'bg-brand-500/10 text-brand-600'} shadow-inner`}>
+                                    {activeTab === 'staff' ? <User size={24} /> : <GraduationCap size={24} />}
+                                </div>
+                                <div className="min-w-0">
+                                    <h4 className="font-black text-slate-800 dark:text-white uppercase leading-tight truncate">{l.user_name || l.student_name}</h4>
+                                    <div className="mt-1.5 flex items-center gap-2">
+                                        {renderStatus(l.status)}
+                                    </div>
+                                </div>
+                            </div>
+                            <ChevronRight size={18} className="text-slate-200 dark:text-slate-800" />
+                            </div>
+                        ))}
+                    </div>
+                </div>
+                )}
             </div>
         </div>
-      );
-  }
-  return null;
+    </Modal>
+  );
 };

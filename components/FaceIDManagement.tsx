@@ -79,22 +79,24 @@ export const FaceIDManagement: React.FC<FaceIDManagementProps> = ({
   const captureAndProcess = async () => {
     if (!videoRef.current || !canvasRef.current) return;
 
-    setLoading(true);
-    setError(null);
-    setStep('processing');
-
     try {
       const video = videoRef.current;
       const canvas = canvasRef.current;
+      if (!video || !canvas) return;
+
+      // Capture photo FIRST before switching view to avoid null reference
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
       const ctx = canvas.getContext('2d');
       if (!ctx) throw new Error('Canvas context failed');
-      
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      
+
+      setLoading(true);
+      setError(null);
+      setStep('processing');
+
       // 1. Get Face Descriptor
-      const descriptor = await getFaceDescriptor(video);
+      const descriptor = await getFaceDescriptor(canvas); // Use canvas instead of video
       if (!descriptor) {
         setError('No face detected. Please try again in better lighting.');
         setStep('capture');
