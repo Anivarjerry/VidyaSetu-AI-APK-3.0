@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { DashboardData, LoginRequest, PeriodData } from '../types';
-import { UserCheck, CalendarRange, History, BookOpen, Lock, CheckCircle2, Sparkles, Image as ImageIcon, FileText, FileCheck } from 'lucide-react';
+import { UserCheck, CalendarRange, History, BookOpen, Lock, CheckCircle2, Sparkles, Image as ImageIcon, FileText, FileCheck, Wallet } from 'lucide-react';
 import { useThemeLanguage } from '../contexts/ThemeLanguageContext';
 import { AttendanceModal } from './AttendanceModal';
 import { LeaveRequestModal } from './LeaveModals';
