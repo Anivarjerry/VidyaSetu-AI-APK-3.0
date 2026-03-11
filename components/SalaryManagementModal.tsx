@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Modal } from './Modal';
 import { StaffSalaryConfig, StaffAdvance, StaffPayroll, SchoolUser } from '../types';
 import { fetchStaffSalaryConfig, updateStaffSalaryConfig, fetchStaffAdvances, addStaffAdvance, fetchStaffPayroll, generateMonthlyPayroll, fetchSchoolUsers } from '../services/dashboardService';
-import { Loader2, Wallet, Plus, Calendar, ChevronRight, ArrowLeft, Save, History, FileText, Download, AlertCircle, CheckCircle2, IndianRupee, User, Search } from 'lucide-react';
+import { Loader2, Wallet, Plus, Calendar, ChevronRight, ArrowLeft, Save, History, FileText, Download, AlertCircle, CheckCircle2, IndianRupee, User, Search, RefreshCw } from 'lucide-react';
 import { useThemeLanguage } from '../contexts/ThemeLanguageContext';
 import { useModalBackHandler } from '../hooks/useModalBackHandler';
 
