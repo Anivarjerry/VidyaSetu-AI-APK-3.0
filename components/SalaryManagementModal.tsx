@@ -29,8 +29,8 @@ export const SalaryManagementModal: React.FC<SalaryManagementModalProps> = ({ is
   const [advances, setAdvances] = useState<StaffAdvance[]>([]);
 
   // Form States
-  const [configForm, setConfigForm] = useState({ base_salary: 0, allowed_leaves: 2, deduction_per_day: 0 });
-  const [advanceForm, setAdvanceForm] = useState({ amount: 0, reason: '' });
+  const [configForm, setConfigForm] = useState({ base_salary: '', allowed_leaves: '2', deduction_per_day: '' });
+  const [advanceForm, setAdvanceForm] = useState({ amount: '', reason: '' });
 
   useModalBackHandler(view !== 'menu' && isOpen, () => {
     if (selectedStaff) setSelectedStaff(null);
@@ -56,9 +56,9 @@ export const SalaryManagementModal: React.FC<SalaryManagementModalProps> = ({ is
     setSelectedStaff(staff);
     const config = salaryConfigs.find(c => c.user_id === staff.id);
     if (config) {
-      setConfigForm({ base_salary: config.base_salary, allowed_leaves: config.allowed_leaves, deduction_per_day: config.deduction_per_day });
+      setConfigForm({ base_salary: String(config.base_salary), allowed_leaves: String(config.allowed_leaves), deduction_per_day: String(config.deduction_per_day) });
     } else {
-      setConfigForm({ base_salary: 0, allowed_leaves: 2, deduction_per_day: 0 });
+      setConfigForm({ base_salary: '', allowed_leaves: '2', deduction_per_day: '' });
     }
   };
 
@@ -68,7 +68,9 @@ export const SalaryManagementModal: React.FC<SalaryManagementModalProps> = ({ is
     const success = await updateStaffSalaryConfig({
       user_id: selectedStaff.id,
       school_id: schoolId,
-      ...configForm
+      base_salary: Number(configForm.base_salary) || 0,
+      allowed_leaves: Number(configForm.allowed_leaves) || 0,
+      deduction_per_day: Number(configForm.deduction_per_day) || 0
     });
     if (success) {
       loadStaff();
@@ -78,12 +80,13 @@ export const SalaryManagementModal: React.FC<SalaryManagementModalProps> = ({ is
   };
 
   const handleAddAdvance = async () => {
-    if (!selectedStaff || advanceForm.amount <= 0) return;
+    const amount = Number(advanceForm.amount) || 0;
+    if (!selectedStaff || amount <= 0) return;
     setSubmitting(true);
     const success = await addStaffAdvance({
       user_id: selectedStaff.id,
       school_id: schoolId,
-      amount: advanceForm.amount,
+      amount: amount,
       reason: advanceForm.reason,
       date: new Date().toISOString().split('T')[0]
     });
@@ -201,16 +204,16 @@ export const SalaryManagementModal: React.FC<SalaryManagementModalProps> = ({ is
                 <div className="space-y-4">
                   <div className="space-y-1">
                     <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Monthly Base Salary (₹)</label>
-                    <input type="number" value={configForm.base_salary} onChange={e => setConfigForm({...configForm, base_salary: Number(e.target.value)})} className="w-full p-4 bg-slate-50 dark:bg-dark-900 border border-slate-100 dark:border-white/10 rounded-2xl text-sm font-black dark:text-white outline-none focus:ring-2 focus:ring-brand-500/10" />
+                    <input type="number" value={configForm.base_salary} onChange={e => setConfigForm({...configForm, base_salary: e.target.value})} className="w-full p-4 bg-slate-50 dark:bg-dark-900 border border-slate-100 dark:border-white/10 rounded-2xl text-sm font-black dark:text-white outline-none focus:ring-2 focus:ring-brand-500/10" />
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1">
                       <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Allowed Leaves</label>
-                      <input type="number" value={configForm.allowed_leaves} onChange={e => setConfigForm({...configForm, allowed_leaves: Number(e.target.value)})} className="w-full p-4 bg-slate-50 dark:bg-dark-900 border border-slate-100 dark:border-white/10 rounded-2xl text-sm font-black dark:text-white outline-none focus:ring-2 focus:ring-brand-500/10" />
+                      <input type="number" value={configForm.allowed_leaves} onChange={e => setConfigForm({...configForm, allowed_leaves: e.target.value})} className="w-full p-4 bg-slate-50 dark:bg-dark-900 border border-slate-100 dark:border-white/10 rounded-2xl text-sm font-black dark:text-white outline-none focus:ring-2 focus:ring-brand-500/10" />
                     </div>
                     <div className="space-y-1">
                       <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Per Day Deduction (₹)</label>
-                      <input type="number" value={configForm.deduction_per_day} onChange={e => setConfigForm({...configForm, deduction_per_day: Number(e.target.value)})} className="w-full p-4 bg-slate-50 dark:bg-dark-900 border border-slate-100 dark:border-white/10 rounded-2xl text-sm font-black dark:text-white outline-none focus:ring-2 focus:ring-brand-500/10" />
+                      <input type="number" value={configForm.deduction_per_day} onChange={e => setConfigForm({...configForm, deduction_per_day: e.target.value})} className="w-full p-4 bg-slate-50 dark:bg-dark-900 border border-slate-100 dark:border-white/10 rounded-2xl text-sm font-black dark:text-white outline-none focus:ring-2 focus:ring-brand-500/10" />
                     </div>
                   </div>
                 </div>
@@ -281,7 +284,7 @@ export const SalaryManagementModal: React.FC<SalaryManagementModalProps> = ({ is
                 <div className="space-y-4">
                   <div className="space-y-1">
                     <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Amount (₹)</label>
-                    <input type="number" value={advanceForm.amount} onChange={e => setAdvanceForm({...advanceForm, amount: Number(e.target.value)})} className="w-full p-4 bg-slate-50 dark:bg-dark-900 border border-slate-100 dark:border-white/10 rounded-2xl text-sm font-black dark:text-white outline-none focus:ring-2 focus:ring-emerald-500/10" />
+                    <input type="number" value={advanceForm.amount} onChange={e => setAdvanceForm({...advanceForm, amount: e.target.value})} className="w-full p-4 bg-slate-50 dark:bg-dark-900 border border-slate-100 dark:border-white/10 rounded-2xl text-sm font-black dark:text-white outline-none focus:ring-2 focus:ring-emerald-500/10" />
                   </div>
                   <div className="space-y-1">
                     <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Reason / Note</label>
