@@ -71,6 +71,35 @@ export interface SchoolSummary {
   longitude?: number;
 }
 
+export interface ClassFeeStructure {
+  id: string;
+  school_id: string;
+  class_name: string;
+  tuition_fee: number;
+  transport_fee: number;
+  other_fee: number;
+  academic_year: string;
+}
+
+export interface StudentFeeProfile {
+  id: string;
+  student_id: string;
+  school_id: string;
+  discount_amount: number;
+  uses_transport: boolean;
+}
+
+export interface FeeTransaction {
+  id: string;
+  student_id: string;
+  school_id: string;
+  amount_paid: number;
+  payment_date: string;
+  payment_mode: string;
+  remarks?: string;
+  receipt_number?: string;
+}
+
 export interface SchoolUser {
   id: string;
   name: string;

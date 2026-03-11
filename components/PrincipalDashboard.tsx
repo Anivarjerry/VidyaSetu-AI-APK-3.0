@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { DashboardData, LoginRequest, SearchPerson, FullHistory } from '../types';
-import { Megaphone, MapPin, BarChart2, BookOpen, CalendarRange, UserCheck, Award, Image as ImageIcon, Download, Lock, Users, ShieldCheck, Search, Filter, FileText, Loader2, ListFilter, UserCog, RefreshCw, CheckCircle2, UserX, Check, Phone, Wallet } from 'lucide-react';
+import { Megaphone, MapPin, BarChart2, BookOpen, CalendarRange, UserCheck, Award, Image as ImageIcon, Download, Lock, Users, ShieldCheck, Search, Filter, FileText, Loader2, ListFilter, UserCog, RefreshCw, CheckCircle2, UserX, Check, Phone, Wallet, IndianRupee } from 'lucide-react';
 import { useModalBackHandler } from '../hooks/useModalBackHandler';
 import { Modal } from './Modal';
 import { NoticeModal } from './NoticeModal';
@@ -10,6 +10,7 @@ import { AnalyticsModal } from './AnalyticsModal';
 import { HomeworkAnalyticsModal } from './HomeworkAnalyticsModal';
 import { StaffLeaveManagementModal } from './LeaveModals';
 import { SalaryManagementModal } from './SalaryManagementModal';
+import { FeesManagementModal } from './FeesManagementModal';
 import { AttendanceModal } from './AttendanceModal';
 import { ExamModal } from './ExamModal';
 import { GalleryModal } from './GalleryModal';
@@ -184,6 +185,7 @@ export const PrincipalDashboard: React.FC<PrincipalDashboardProps> = ({
     { key: "approvals", title: "Approvals", subtitle: "Verify Users", icon: <Users size={22} /> },
     { key: "visitor_logs", title: "Security", subtitle: "Visitors", icon: <ShieldCheck size={22} /> },
     { key: "notice", title: "Notices", subtitle: 'Broadcast', icon: <Megaphone size={22} /> },
+    { key: "fees_management", title: "Fees", subtitle: "Khatabook", icon: <IndianRupee size={22} /> },
     { key: "transport", title: "Transport", subtitle: 'Live Map', icon: <MapPin size={22} /> },
     { key: "teacher_analytics", title: "Staff", subtitle: 'Performance', icon: <BarChart2 size={22} /> },
     { key: "parents_analytics", title: "Homework", subtitle: 'Compliance', icon: <BookOpen size={22} /> },
@@ -354,6 +356,9 @@ export const PrincipalDashboard: React.FC<PrincipalDashboardProps> = ({
 
       {/* NEW: SALARY MANAGEMENT MODAL */}
       {data && (<SalaryManagementModal isOpen={activeModal === 'salary_management'} onClose={() => setActiveModal(null)} schoolId={data.school_db_id || ''} />)}
+
+      {/* NEW: FEES MANAGEMENT MODAL */}
+      {data && (<FeesManagementModal isOpen={activeModal === 'fees_management'} onClose={() => setActiveModal(null)} schoolId={data.school_db_id || ''} />)}
 
       {/* NEW: LOCATION SETUP MODAL */}
       {data && (<LocationSetupModal isOpen={activeModal === 'location_setup'} onClose={() => setActiveModal(null)} schoolId={data.school_db_id || ''} currentLat={data.school_latitude} currentLng={data.school_longitude} onSuccess={onRefresh} />)}
