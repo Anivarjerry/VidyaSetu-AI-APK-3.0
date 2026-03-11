@@ -158,6 +158,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
        <GalleryModal isOpen={activeModal === 'gallery'} onClose={() => setActiveModal(null)} schoolId={data.school_db_id || ''} userId={data.user_id || ''} canUpload={true} />
        <ExamModal isOpen={activeModal === 'exam_mgmt'} onClose={() => setActiveModal(null)} role='teacher' schoolId={data.school_db_id || ''} userId={data.user_id || ''} assignedSubject={data.assigned_subject} />
        <ReportModal isOpen={activeModal === 'reports'} onClose={() => setActiveModal(null)} role='teacher' schoolId={data.school_db_id} userId={data.user_id} />
+       <SalarySlipsModal isOpen={activeModal === 'salary'} onClose={() => setActiveModal(null)} userId={data.user_id || ''} schoolId={data.school_db_id || ''} />
     </div>
   );
 };
